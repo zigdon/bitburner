@@ -1,6 +1,8 @@
+import {netLog} from "/lib/log.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
     var target = ns.args[0];
-    await ns.grow(target);
-    ns.tprintf("%s grow %s finished", new Date().toLocaleTimeString("en-US", { timeZone: "PST" }), target);
+    var growth = await ns.grow(target);
+    await netLog(ns, "grow %s finished, grew by %.2f", target, growth);
 }

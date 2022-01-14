@@ -1,26 +1,46 @@
 /** @param {NS} ns **/
 export async function main(ns) {
     var data = eval(ns.args[0]);
+    if (!data) {
+        ns.tprint("No data");
+        return;
+    }
     // ["948481", -76]
+    // ["827206835052", -74]
+
     var digits = data[0];
     var target = data[1];
 
-    var opts = maths(ns, digits);
+    ns.tprint(digits, " ", target);
+
+    var opts = await maths(ns, digits);
     var res = [];
     opts.forEach((o) => {
-        if (eval(o) == target) { res.push(o) }
+        // ns.tprint(o);
+        if (eval(o) == target) {
+            res.push(o);
+        }
     });
     ns.tprint(res);
 }
+
+// var cache = new Map();
 
 /**
  * @param {NS} ns
  * @param {string} digits
  * @param {int} target
  */
-function maths(ns, digits) {
+async function maths(ns, digits) {
+    /*
+    if (cache.has(digits)) {
+        ns.tprint("cache hit: ", digits);
+        return cache.get(digits);
+    } */
+    ns.tprint(digits);
     var res = [];
-    for (var i=1; i<=digits.length; i++) {
+    for (var i = 1; i <= digits.length; i++) {
+        await ns.sleep(10);
         var n = digits.substr(0, i);
 
         if (i == digits.length) {
@@ -29,18 +49,16 @@ function maths(ns, digits) {
         }
 
         var sub = [];
-        // +
-        sub = maths(ns, digits.substr(i));
-        sub.forEach((s) => {res.push(n+"+"+s)})
-
-        // -
-        sub = maths(ns, digits.substr(i));
-        sub.forEach((s) => {res.push(n+"-"+s)})
-
-        // *
-        sub = maths(ns, digits.substr(i));
-        sub.forEach((s) => {res.push(n+"*"+s)})
+        sub = await maths(ns, digits.substr(i));
+        sub.forEach((s) => {
+            // s = Number(s);
+            res.push(n + "+" + s);
+            res.push(n + "-" + s);
+            res.push(n + "*" + s);
+        })
     }
+
+    // cache.set(digits, res);
 
     return res;
 }

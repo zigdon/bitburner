@@ -1,0 +1,5 @@
+1: workers -> controler
+2: controler -> workers
+3: CTL -> controller
+4: CTL -> buyer
+5: -> logger

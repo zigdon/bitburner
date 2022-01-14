@@ -1,4 +1,4 @@
-var commaFmt = new Intl.NumberFormat('en-US', { useGrouping: true, maximumFractionDigits: 2});
+import * as fmt from "lib/fmt.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -15,71 +15,83 @@ export async function main(ns) {
   ns.disableLog("ALL");
 
   await scanFrom(ns, "home", "", 0, found);
+  await saveDB(ns, found);
 
-  var runFunc;
-  var show = new Map();
+  var eachFunc;
+  var showFunc;
+  var mapAcc = new Map();
   switch (cmd) {
     case "map":
       printUp(ns, start, found);
       printFrom(ns, start, found, ns.args[2]);
       break;
     case "hacked":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         if (v.root && !v.host.startsWith('pserv')) {
           printHost(ns, v);
         }
       }
       break;
+    case "values":
+      var list = [];
+      eachFunc = function(v) {
+        list.push(v);
+      }
+      showFunc = function() {
+        list.sort((a,b) => {return a.max - b.max});
+        list.forEach((h) => {ns.tprintf("%25s: $%s", h.host, fmt.int(h.max))});
+      }
+      break;
     case "contracts":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         v.files.forEach(function(f) {
           if (f.endsWith(".cct")) {
-            ns.tprintf("Found contract on %s (%s): %s",
-              v.host, trailTo(ns, found, v), f);
+            ns.tprintf("Found contract on %s: %s", v.host, f);
           }
         })
       }
       break;
     case "files":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         if (v.host == "home") {
           return;
         }
         v.files.forEach(function(f) {
-          if (!f.endsWith(".cct") && f != "worker.js") {
-            if (!show.has(f)) {
-              show.set(f, []);
+          if (!f.endsWith(".cct") && !f.endsWith(".js")) {
+            if (!mapAcc.has(f)) {
+              mapAcc.set(f, []);
             }
-            var hs = show.get(f);
+            var hs = mapAcc.get(f);
             hs.push(v.host);
-            show.set(f, hs);
+            mapAcc.set(f, hs);
           }
         })
       }
       break;
     case "orgs":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         var org = ns.getServer(v.host).organizationName;
         if (!org) { return };
         ns.tprintf("%s: %s", org, v.host);
       }
       break;
     case "reset":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         ns.kill("worker.js", v.host);
         ns.exec("worker.js", v.host);
       }
       break;
     case "mkaliases":
-      runFunc = function(v) {
+      eachFunc = function(v) {
         if (v.host == "home" || v.parent == "home") {
           return;
         }
         ns.tprintf(trailTo(ns, found, v) + ";");
       }
+      break;
     default:
       ns.tprintf("Unknown command %s", cmd);
-      ns.tprintf("cmds: contracts (default), map, hacked, files, orgs, reset, mkaliases");
+      ns.tprintf("cmds: contracts (default), map, hacked, values, files, orgs, reset, mkaliases");
       ns.exit();
   }
 
@@ -87,11 +99,14 @@ export async function main(ns) {
     ns.tprintf(trailTo(ns, found, found.get(start)));
   }
 
-  if (runFunc) {
-    found.forEach(runFunc);
+  if (eachFunc) {
+    found.forEach(eachFunc);
   }
-  if (show.size > 0) {
-    show.forEach((hs, f) => {ns.tprintf("%s: %s", f, hs.join(", "))});
+  if (mapAcc.size > 0) {
+    mapAcc.forEach((hs, f) => {ns.tprintf("%s: %s", f, hs.join(", "))});
+  }
+  if (showFunc) {
+    showFunc();
   }
 }
 
@@ -127,7 +142,7 @@ function printHost(ns, host) {
     var prefix = " ".repeat(host.depth);
     ns.tprintf("%s%s: %s %d %s",
       prefix, host.host, host.root, host.hack,
-      commaFmt.format(host.max));
+      fmt.int(host.max));
 }
 
 /**
@@ -200,4 +215,25 @@ async function scanFrom(ns, host, parent, depth, found) {
     }
     await scanFrom(ns, hosts[i], host, depth + 1, found);
   }
+}
+
+/**
+ * @param {NS} ns
+ * @param {Map} found
+ */
+async function saveDB(ns, found) {
+  var data = [];
+  var pServers = ns.getPurchasedServers();
+  var contains = function(item, a) {
+    var found = false;
+    a.forEach((i) => {
+      if (i == item) {
+        found = true;
+      }})
+    return found;
+  }
+  found.forEach((h) => {
+    data.push([h.host, h.hack, h.max, h.ports, h.root, contains(h.host, pServers)].join("\t"));
+  })
+  await ns.write("/lib/hosts.txt", data.join("\n"), "w");
 }

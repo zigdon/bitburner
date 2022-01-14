@@ -1,6 +1,10 @@
-var commaFmt = new Intl.NumberFormat('en-US', { useGrouping: true, maximumFractionDigits: 2});
+import * as fmt from "/lib/fmt.js";
+import {console} from "/lib/log.js";
+
 var script = "worker.js";
+var installer = "/tools/install.js";
 var reserve = 0;
+var mode = "none";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -9,24 +13,31 @@ export async function main(ns) {
 	ns.disableLog("sleep");
 	var req = ns.getScriptRam(script);
 
-	if (ns.fileExists("buyerReserve.txt", "home")) {
-		reserve = Math.floor(ns.read("buyerReserve.txt"));
+	if (ns.fileExists("/lib/buyerReserve.txt", "home")) {
+		reserve = Math.floor(ns.read("/lib/buyerReserve.txt"));
+	}
+	if (ns.fileExists("/lib/buyerMode.txt", "home")) {
+		mode = ns.read("/lib/buyerMode.txt");
 	}
 
 	ns.print("req: " + req);
 
-	var ram = 4;
+	var ram = 2;
 	if (ns.serverExists("pserv-0")) {
 		ram = ns.getServerMaxRam("pserv-0");
 	}
-	log(ns, "Buying servers with %s GB RAM for $%s", ram, commaFmt.format(ns.getPurchasedServerCost(ram)));
-	log(ns, "Waiting 1 minute before starting...");
+	var batchRam = ns.getScriptRam("/daemons/batch.js");
+	while (ram < batchRam) {
+		ram *= 2;
+	}
+	await console(ns, "Buying servers with %s GB RAM for $%s", ram, fmt.int(ns.getPurchasedServerCost(ram)));
+	await console(ns, "Waiting 1 minute before starting...");
 	await ns.sleep(60000);
 
 	while (ram <= ns.getPurchasedServerMaxRam()) {
 		var newReq = ns.getScriptRam(script);
 		if (req != newReq) {
-			log(ns, "Updating required memory from %d GB to %d GB", req, newReq);
+			await console(ns, "Updating required memory from %d GB to %d GB", req, newReq);
 			req = newReq;
 		}
 
@@ -46,13 +57,13 @@ export async function main(ns) {
 			if (ram > ns.getPurchasedServerCost()) {
 				ram = ns.getPurchasedServerCost();
 			}
-			log(ns, "Increasing server ram to %d GB ($%s)", ram, commaFmt.format(ns.getPurchasedServerCost(ram)));
+			await console(ns, "Increasing server ram to %d GB ($%s)", ram, fmt.int(ns.getPurchasedServerCost(ram)));
 			continue;
 		}
 
 		// wait until we have enough money
 		var need = ns.getPurchasedServerCost(ram);
-		log(ns, "Waiting for $%s, leaving $%s in reserve", commaFmt.format(need), commaFmt.format(reserve));
+		await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
 		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
 			await checkControl(ns, need, reserve);
 			await ns.sleep(10000);
@@ -60,19 +71,29 @@ export async function main(ns) {
 
 		// if the server exists, delete it
 		if (ns.serverExists(next)) {
-			log(ns, "deleting obsolete server %s", next);
+			await console(ns, "deleting obsolete server %s", next);
 			ns.killall(next);
 			ns.deleteServer(next);
 		}
 		
 		next = ns.purchaseServer(next, ram);
-		log(ns, "bought new server %s with %d GB RAM, launching %d threads", next, ram, ram/req);
-		await ns.scp(script, next);
-		ns.exec(script, next, ram/req);
-		await ns.sleep(200);
+		switch (mode) {
+			case "batch":
+				await console(ns, "bought new server %s with %d GB RAM, installing batch", next, ram);
+				ns.exec(installer, "home", 1, next);
+				break;
+			case "worker":
+				await console(ns, "bought new server %s with %d GB RAM, launching %d threads", next, ram, ram/req);
+				await ns.scp(script, next);
+				ns.exec(script, next, ram/req);
+				break;
+			default:
+				await console(ns, "bought new server %s with %d GB RAM, leaving idle", next, ram);
+		}
+		await ns.sleep(1000);
 	}
 
-	log(ns, "Bought max servers with max memory, done");
+	await console(ns, "Bought max servers with max memory, done");
 }
 
 /**
@@ -133,30 +154,22 @@ async function checkControl(ns, need, reserve) {
 			break;
 		case "reserve":
 			reserve = parseMoney(words[1]);
-			log(ns, "Setting reserve to $%s", commaFmt.format(reserve));
-			await ns.write("buyerReserve.txt", reserve, "w");
+			await console(ns, "Setting reserve to $%s", fmt.int(reserve));
+			await ns.write("/lib/buyerReserve.txt", reserve, "w");
+			break;
+		case "mode":
+			mode = words[1];
+			await console(ns, "Setting mode to %s", mode);
+			await ns.write("/lib/buyerMode.txt", mode, "w");
 			break;
 		case "report":
-			log(ns, "Waiting for $%s, leaving $%s in reserve", commaFmt.format(need), commaFmt.format(reserve));
+			await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
 			break;
 		case "quit":
-			log(ns, "quitting");
+			await console(ns, "quitting");
 			ns.quit();
 		default:
-			log(ns, "Unknown control command: " + words.join(" "));
-			log(ns, "cmds: reserve, quit, report");
+			ns.tprintf("Unknown control command: " + words.join(" "));
+			ns.tprintf("cmds: reserve, quit, report");
 	}
-}
-
-/**
- * @param {NS} ns
- * @param {string} tmpl
- * @param {string[]} ...args
- */
-function log(ns, tmpl, ...args) {
-    var now = new Date();
-    tmpl = ns.sprintf("%s - %s", now.toLocaleTimeString("en-US", { timeZone: "PST" }), tmpl);
-	var msg = ns.sprintf(tmpl, ...args);
-	ns.print(msg);
-	ns.tprintf(msg);
 }

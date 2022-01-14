@@ -1,9 +1,12 @@
-import * as fmt from "lib/fmt.js";
+import * as fmt from "/lib/fmt.js";
+import {log, console} from "/lib/log.js";
+import {installWeaken} from "/tools/install.js";
 
-var targetMax = 0;
 var nextHack = [];
 var myHack = 0;
-var script = "worker.js";
+var workerScript = "worker.js";
+var batchScript = "/daemons/batch.js";
+var weakenScript = "/daemons/weakener.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -12,22 +15,12 @@ export async function main(ns) {
   nextHack = [];
 
   if (found.length > 0) {
-    ns.print("previous instance not reset");
-    ns.tprint("previous instance not reset");
+    await console(ns, "previous instance not reset");
     ns.exit();
   }
   ns.disableLog("ALL");
-  if (ns.fileExists("targets.txt", "home")) {
-    ns.read("targets.txt").split(" ").forEach((t) => {
-      var max = ns.getServerMaxMoney(t);
-      ns.tprintf("Current target: %s $%s", t, fmt.int(max));
-      if (targetMax < max) {
-        targetMax = max;
-      }
-    })
-  }
   myHack = ns.getHackingLevel();
-  ns.print("hack level: " + myHack);
+  log(ns, "hack level: " + myHack);
 
   var progs = [
     { file: "BruteSSH.exe", func: ns.brutessh },
@@ -41,52 +34,27 @@ export async function main(ns) {
       openers.unshift(p.func);
     }
   });
-  ns.print("Found " + openers.length + " openers.");
+  log(ns, "Found " + openers.length + " openers.");
 
   var hacked = await scanFrom(ns, "home", "", 0, found, openers);
 
-  // printFrom(ns, "home", found);
-
-  /*  print hosts that need hacking */
-  found.forEach(function (host) {
-    if (host.root || host.hack > myHack || host.ports > openers.length) {
-      return
-    }
-    var trail = [host.host];
-    var parent = host.parent;
-    while (found.has(parent)) {
-      trail.unshift(parent);
-      parent = found.get(parent);
-    }
-    trail.unshift("~");
-    ns.tprintf("%s: %d (%s) $%s", host.host, host.hack, trail.join("> "), fmt.int(host.max));
-  });
-
   if (hacked.length > 0) {
-    ns.tprintf("hacked %d hosts:", hacked.length);
-    hacked.forEach(function (host) {
-      ns.tprintf("%s: %d $%s", host.host, host.hack, fmt.int(host.max));
-    });
+    await console(ns, "hacked %d hosts:", hacked.length);
+    for (var h in hacked) {
+      var host = hacked[h];
+      await console(ns, "%s: %d $%s", host.host, host.hack, fmt.int(host.max));
+    };
   }
 
-  ns.tprintf("*** Next hacking levels:");
-  nextHack.forEach(function(l, i) {
-    ns.tprintf("  %d: %d (%s)", i, l.lvl, l.host);
-  })
-}
 
-/**
- * @param {NS} ns
- * @param {string} host
- * @param {Map} found
- */
-function printFrom(ns, host, found) {
-  var h = found.get(host);
-  var prefix = " ".repeat(h.depth);
-  ns.tprintf("%s%s: %s %d %s", prefix, h.host, h.root, h.hack, fmt.int(h.max));
-  h.children.forEach(function (h) {
-    printFrom(ns, h, found);
-  });
+  await console(ns, "*** Next hacking levels:");
+  var out = [];
+  nextHack.forEach(function(l, i) {
+    out.push(["  %d: %d (%s)", i, l.lvl, l.host]);
+  })
+  for (var o in out) {
+    await console(ns, ...out[o]);
+  }
 }
 
 /**
@@ -116,12 +84,6 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
   };
   found.set(host, h);
 
-  // ns.tprintf("%s: %s", host, h.root);
-  if ((h.root || (h.hack <= myHack && h.ports <= openers.length)) && h.max > targetMax) {
-    ns.tprintf("New potential target: %s - $%s (gTime: %s, hTime: %s)",
-       host, fmt.int(h.max), fmt.time(h.growthTime), fmt.time(h.hackTime));
-  }
-
   if (found.has(parent)) {
     found.get(parent).children.unshift(host);
   }
@@ -130,12 +92,18 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     //   ns.tprintf("%s: installing backdoor");
     //   await ns.installBackdoor();
     // }
-    if (!ns.scriptRunning(script, host) && host != "home") {
-      ns.tprintf("%s: should be hacking", host);
-      await runScript(ns, host);
+    if (!ns.scriptRunning(workerScript, host) &&
+      !ns.scriptRunning(batchScript, host) &&
+      host.startsWith("pserv-")) {
+      log(ns, "%s: can be hacking", host);
+    } else if (!ns.scriptRunning(weakenScript, host) &&
+      host != "home" &&
+      !host.startsWith("pserv-")) {
+        await console(ns, "Starting weakener on %s", host);
+        await installWeaken(ns, host);
     }
   } else if (h.hack <= myHack && h.ports <= openers.length) {
-    ns.tprint(host + ": should hack");
+    // ns.tprint(host + ": should hack");
     await doHack(ns, host, openers);
     hacked.push(h);
   } else if (!nextHack[h.ports] || nextHack[h.ports].lvl > h.hack) {
@@ -161,38 +129,21 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
  */
 async function doHack(ns, host, openers) {
   var ports = ns.getServerNumPortsRequired(host);
-  ns.print("Trying " + openers.legnth + " openers on " + host);
+  log(ns, "Trying " + openers.legnth + " openers on " + host);
   openers.forEach(function (f) {
     if (f(host) <= 0) {
-      ns.tprintf("can't run %s on %s", f, host);
+      console(ns, "can't run %s on %s", f, host);
       return;
     }
     ports--;
   });
 
   if (ports > 0) {
-    ns.tprintf("couldn't open enough ports on %s", host);
+    await console(ns, "couldn't open enough ports on %s", host);
     return;
   }
 
-  ns.print("running nuke on " + host);
+  log(ns, "running nuke on " + host);
   ns.nuke(host);
-  ns.tprintf("hacked %s", host);
-  await runScript(ns, host);
-}
-
-/**
- * @param {NS} ns
- * @param {string} host
- */
-async function runScript(ns, host) {
-  var sR = ns.getScriptRam(script, "home");
-  var n = ns.getServerMaxRam(host) / sR;
-  if (n < 1) {
-    ns.tprintf("Not enough memory on %s to be hacking.", host);
-    return;
-  }
-  ns.tprintf("Launching %d threads on %s", n, host);
-  await ns.scp(script, "home", host);
-  ns.exec(script, host, n);
+  await console(ns, "hacked %s", host);
 }
