@@ -30,20 +30,21 @@ export async function main(ns) {
 	while (ram < batchRam) {
 		ram *= 2;
 	}
-	await console(ns, "Buying servers with %s GB RAM for $%s", ram, fmt.int(ns.getPurchasedServerCost(ram)));
+	await console(ns, "Buying servers with %s GB RAM for $%s", fmt.int(ram), fmt.int(ns.getPurchasedServerCost(ram)));
 	await console(ns, "Waiting 1 minute before starting...");
 	await ns.sleep(60000);
+	var max = ns.getPurchasedServerMaxRam();
 
-	while (ram <= ns.getPurchasedServerMaxRam()) {
+	while (ram <= max) {
 		var newReq = ns.getScriptRam(script);
 		if (req != newReq) {
-			await console(ns, "Updating required memory from %d GB to %d GB", req, newReq);
+			await console(ns, "Updating required memory from %s GB to %s GB", fmt.int(req), fmt.int(newReq));
 			req = newReq;
 		}
 
 		var next = getNextServer(ns, ram);
 		if (next == "") {
-			if (ram == ns.getPurchasedServerCost()) {
+			if (ram == max) {
 				break;
 			}
 			var rate = Math.log2(ram);
@@ -54,10 +55,13 @@ export async function main(ns) {
 			} else {
 				ram *= 8;
 			} 
-			if (ram > ns.getPurchasedServerCost()) {
-				ram = ns.getPurchasedServerCost();
+			if (ram > max) {
+				ram = max;
 			}
-			await console(ns, "Increasing server ram to %d GB ($%s)", ram, fmt.int(ns.getPurchasedServerCost(ram)));
+			while (ns.getServerMoneyAvailable("home") > ns.getPurchasedServerCost(ram*2)*2 && ram < max) {
+				ram *= 2;
+			}
+			await console(ns, "Increasing server ram to %s GB ($%s)", fmt.int(ram), fmt.int(ns.getPurchasedServerCost(ram)));
 			continue;
 		}
 
@@ -79,16 +83,16 @@ export async function main(ns) {
 		next = ns.purchaseServer(next, ram);
 		switch (mode) {
 			case "batch":
-				await console(ns, "bought new server %s with %d GB RAM, installing batch", next, ram);
+				await console(ns, "bought new server %s with %s GB RAM, installing batch", next, fmt.int(ram));
 				ns.exec(installer, "home", 1, next);
 				break;
 			case "worker":
-				await console(ns, "bought new server %s with %d GB RAM, launching %d threads", next, ram, ram/req);
+				await console(ns, "bought new server %s with %s GB RAM, launching %d threads", next, fmt.int(ram), ram/req);
 				await ns.scp(script, next);
 				ns.exec(script, next, ram/req);
 				break;
 			default:
-				await console(ns, "bought new server %s with %d GB RAM, leaving idle", next, ram);
+				await console(ns, "bought new server %s with %s GB RAM, leaving idle", next, fmt.int(ram));
 		}
 		await ns.sleep(1000);
 	}
