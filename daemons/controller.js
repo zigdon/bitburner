@@ -1,11 +1,13 @@
-var commaFmt = new Intl.NumberFormat('en-US', { useGrouping: true, maximumFractionDigits: 2 });
+import * as fmt from "/lib/fmt.js";
+import {log, loglvl, netLog} from "/lib/log.js";
 
 var workers = new Map();
 var targets = new Map();
-var script = "worker.js";
+var script = "/daemons/worker.js";
 var reqVersion = 11;
 
 var lastReport = Date.now();
+var lastNetReport = Date.now() - 280000;
 var debug = 0;
 
 /** @param {NS} ns **/
@@ -24,24 +26,30 @@ export async function main(ns) {
 
 /**
  * @param {NS} ns
+ * @param {function(NS, {string}, ...any)}
  */
-function report(ns) {
-    log(ns, 0, "======================");
-    targets.forEach(function (t) {
-        log(ns, 0, "%s: %d weaken (%d->%d), %d grow (%s->%s), %d hack",
+async function report(ns, f) {
+    await f(ns, "====================== (%d targets)", targets.size);
+    var lines = [];
+    targets.forEach((t) => {
+        lines.push(ns.sprintf("%s: %d weaken (%d->%d), %d grow (%s->%s), %d hack",
             t.host, t.weakenCount, t.curSec, t.minSec,
-            t.growCount, commaFmt.format(t.curVal), commaFmt.format(t.maxVal), t.hackCount,
-        )
+            t.growCount, fmt.int(t.curVal), fmt.int(t.maxVal), t.hackCount,
+        ));
     })
+    for (var l in lines) {
+        await f(ns, lines[l]);
+    }
 }
 
 /**
  *  @param {NS} ns 
- *  @param {string} target
+ *  @param {string[]} ts
  **/
-function addTarget(ns, target) {
-    log(ns, 0, "adding target: '%s'", target);
-    targets.set(target, {
+async function addTargets(ns, ts) {
+    await netLog(ns, "adding targets: '%s'", ts);
+    ts.forEach((target) => {
+        targets.set(target, {
         host: target,
         weakenCount: 0,
         growCount: 0,
@@ -50,7 +58,7 @@ function addTarget(ns, target) {
         maxVal: ns.getServerMaxMoney(target),
         curSec: ns.getServerSecurityLevel(target),
         curVal: ns.getServerMoneyAvailable(target),
-    });
+    })});
 }
 
 /**
@@ -59,18 +67,23 @@ function addTarget(ns, target) {
  **/
 async function saveTargets(ns, path) {
     var data = [];
-    targets.forEach((t) => {data.push(t.host)});
+    targets.forEach((t) => { data.push(t.host) });
     await ns.write(path, data.join(" "), "w");
-    log(ns, 0, "Saved targets: %s", data);
+    await netLog(ns, "Saved targets: %s", data);
 }
 
 /**
  *  @param {NS} ns 
  **/
 async function init(ns) {
+    var ts = [];
     ns.read("targets.txt").split(" ").forEach(function (target) {
-        addTarget(ns, target);
+        ts.push(target);
     });
+    await addTargets(ns, ts);
+    ts.forEach((target) => {
+        updateTarget(target);
+    })
 
     ns.clearPort(1);  // incoming
     ns.clearPort(2);  // outgoing
@@ -89,14 +102,16 @@ async function process(ns, msg) {
     var h;
     var words = msg.text.split(" ");
     if (workers.has(msg.host)) {
-        log(ns, 2, "found existing entry for %s", msg.host);
+        loglvl(ns, 2, "found existing entry for %s", msg.host);
         h = workers.get(msg.host);
         h.lastSeen = Date.now();
     } else {
-        log(ns, 2, "creating entry for %s", msg.host);
+        loglvl(ns, 2, "creating entry for %s", msg.host);
         h = {
             host: msg.host,
             lastSeen: Date.now(),
+            threads: 0,
+            target: 0,
             mem: ns.getServerMaxRam(msg.host),
             cmd: "idle",
         };
@@ -110,53 +125,37 @@ async function process(ns, msg) {
     var threads = h.mem / ns.getScriptRam(script, msg.host);
     if (words[0] == "version") {
         if (words[1] != reqVersion) {
-            log(ns, 0, "%s is running wrong version %d, restarting.", msg.host, reqVersion);
+            await netLog(ns, "%s is running wrong version %d, restarting.", msg.host, reqVersion);
             ns.kill(script, msg.host);
             await ns.scp(script, "home", msg.host);
             ns.exec(script, msg.host, threads);
         }
         return;
     } else if (words[0] == "done") {
-        if (targets.has(words[2])) {
-            var t = targets.get(words[2]);
-            switch (words[1]) {
-                case "weaken":
-                    if (t.weakenCount -= threads < 0) {
-                        t.weakenCount = 0;
-                    }
-                    break;
-                case "grow":
-                    if (t.growCount -= threads < 0) {
-                        t.growCount = 0;
-                    }
-                    break;
-                case "hack":
-                    if (t.hackCount -= threads < 0) {
-                        t.hackCount = 0;
-                    }
-                    break;
-            }
-            targets.set(t.host, t);
-        }
+        h.target = "none";
         h.cmd = "idle";
+        updateTarget(words[2]);
     } else if (words[0] == "idle") {
-        log(ns, 1, "%s is idle for %d seconds, uncloging...",
+        loglvl(ns, 1, "%s is idle for %d seconds, uncloging...",
             msg.host, words[1]);
         if (await unclogFor(ns, msg.host)) {
             return;
         }
     } else if (words[0] != "ready") {
-        log(ns, 0, "unknown message from %s: %s", msg.host, msg.text);
+        await netLog(ns, "unknown message from %s: %s", msg.host, msg.text);
     }
 
     workers.set(msg.host, h);
+
     var inst = selectTarget(ns, threads);
     if (!inst) {
-        log(ns, 0, "No targets, idling.");
+        await netLog(ns, "No targets, idling.");
         return;
     }
 
     h.cmd = inst.cmd;
+    h.target = inst.host;
+    h.threads = inst.threads;
     if (inst.threads) {
         await send(ns, msg.host, ns.sprintf("%s %s %d", inst.cmd, inst.host, inst.threads));
     } else {
@@ -169,7 +168,7 @@ async function process(ns, msg) {
  *  @param {string} host
  **/
 async function unclogFor(ns, host) {
-    log(ns, 2, "starting unclog");
+    loglvl(ns, 2, "starting unclog");
     var first = ns.peek(2);
     while (true) {
         var head = ns.peek(2);
@@ -187,6 +186,41 @@ async function unclogFor(ns, host) {
     }
 }
 
+function updateTarget(target) {
+    if (!targets.has(target)) {
+        return;
+    }
+    var t = targets.get(target);
+    var w = 0;
+    var g = 0;
+    var h = 0;
+    workers.forEach((v) => {
+        if (v.target == target) {
+            switch (v.cmd) {
+                case "weaken":
+                    if (v.threads) {
+                        w += v.threads;
+                    }
+                    break;
+                case "grow":
+                    if (v.threads) {
+                        g += v.threads;
+                    }
+                    break;
+                case "hack":
+                    if (v.threads) {
+                        h += v.threads;
+                    }
+                    break;
+            }
+        }
+    })
+    t.weakenCount = w;
+    t.growCount = g;
+    t.hackCount = h;
+    targets.set(target, t);
+}
+
 /**
  *  @param {NS} ns 
  *  @param {string} host
@@ -194,37 +228,22 @@ async function unclogFor(ns, host) {
  **/
 async function send(ns, host, msg) {
     if (host != "") {
-        log(ns, 2, "sending '%s' to '%s'", msg, host);
+        loglvl(ns, 2, "sending '%s' to '%s'", msg, host);
         msg = ns.sprintf("%s: %d %s", host, Date.now(), msg);
     } else {
-        log(ns, 2, "sending '%s' to ALL", msg);
+        loglvl(ns, 2, "sending '%s' to ALL", msg);
     }
     while (!await ns.tryWritePort(2, msg)) {
-        log(ns, 1, "outgoing queue full, retrying...");
+        loglvl(ns, 1, "outgoing queue full, retrying...");
         // check the head of the queue for obsolete messages
         var head = ns.peek(2);
         var words = head.split(" ");
         if (Date.now() - words[1] > 20000) {
-            log(ns, 1, "removing obsolete message '%s'", head);
+            loglvl(ns, 1, "removing obsolete message '%s'", head);
             ns.readPort(2);
         }
         await ns.sleep(100);
     }
-}
-
-/**
- * @param {NS} ns
- * @param {int} lvl
- * @param {string} tmpl
- * @param {string[]} ..args
- */
-function log(ns, lvl, tmpl, ...args) {
-    if (lvl > debug) {
-        return;
-    }
-    var now = new Date();
-    tmpl = ns.sprintf("%s - %s", now.toLocaleTimeString("en-US", { timeZone: "PST" }), tmpl);
-    ns.print(ns.sprintf(tmpl, ...args));
 }
 
 /**
@@ -240,34 +259,35 @@ async function checkControl(ns) {
         switch (words[0]) {
             case "target":
                 if (words[1] == "add") {
-                    addTarget(ns, words[2]);
+                    await addTargets(ns, [words[2]]);
                 } else if (words[1] == "del") {
-                    log(ns, 0, "removing target '%s'", words[2]);
+                    await netLog(ns, "removing target '%s'", words[2]);
                     targets.delete(words[2]);
                 }
                 await saveTargets(ns, "targets.txt");
                 break;
             case "ping":
                 if (words[1]) {
-                    log(ns, 0, "Sending a ping to %s", debug, words[1]);
+                    await netLog(ns, "Sending a ping to %s", debug, words[1]);
                     await send(ns, words[1], "ping");
                 } else {
-                    log(ns, 0, "Sending a ping to ALL", debug);
+                    await netLog(ns, "Sending a ping to ALL", debug);
                     await send(ns, "", "ping");
                 }
                 break;
             case "loglevel":
-                log(ns, 0, "Changing log level from %d to %d", debug, words[1]);
+                await netLog(ns, "loglevel not implemented");
+                loglvl(ns, 0, "Changing log level from %d to %d", debug, words[1]);
                 debug = words[1];
                 break;
             case "report":
-                report(ns);
+                await report(ns, netLog);
                 break;
             case "quit":
                 ns.exit();
                 break;
             default:
-                log(ns, 0, "Unknown control command: '%s'", msg);
+                await netLog(ns, "Unknown control command: '%s'", msg);
         }
     }
 }
@@ -276,19 +296,23 @@ async function checkControl(ns) {
  * @param {NS} ns
  */
 async function wait(ns) {
-    log(ns, 2, "waiting...");
+    loglvl(ns, 2, "waiting...");
     while (true) {
         await checkControl(ns);
         if (Date.now() - lastReport > 10000) {
             lastReport = Date.now();
-            report(ns);
+            await report(ns, log);
+        }
+        if (Date.now() - lastNetReport > 300000) {
+            lastNetReport = Date.now();
+            await report(ns, netLog);
         }
         var msg = await ns.readPort(1);
         if (msg == "NULL PORT DATA") {
             await ns.sleep(100);
             continue;
         }
-        log(ns, 2, "read: '%s'", msg);
+        loglvl(ns, 2, "read: '%s'", msg);
         var data = msg.split(": ", 2);
         return { host: data[0], text: data[1] };
     }
@@ -319,9 +343,9 @@ function selectTarget(ns, threads) {
         // - pretend that every grow call increases the value by 0.7%
         var ratio = t.curVal / t.maxVal;
         var secGap = t.curSec - t.minSec;
-        log(ns, 2, "%s ratio: %.2f, count: %d", t.host, ratio, t.growCount);
-        log(ns, 2, "%s secGap: %d, count: %d", t.host, secGap, t.weakenCount);
-        if (secGap > 50 && (secGap-50) / 0.05 > t.weakenCount) {
+        loglvl(ns, 2, "%s ratio: %.2f, count: %d", t.host, ratio, t.growCount);
+        loglvl(ns, 2, "%s secGap: %d, count: %d", t.host, secGap, t.weakenCount);
+        if (secGap > 50 && (secGap - 50) / 0.05 > t.weakenCount) {
             if (t.weakenCount < fewest || fewest == 0) {
                 cmd = "weaken";
                 target = t.host;
@@ -333,7 +357,7 @@ function selectTarget(ns, threads) {
                 target = t.host;
                 fewest = t.growCount + threads;
             }
-        } else if (secGap > 5 && (secGap-5) / 0.05 > t.weakenCount) {
+        } else if (secGap > 5 && (secGap - 5) / 0.05 > t.weakenCount) {
             if (t.weakenCount < fewest || fewest == 0) {
                 cmd = "weaken";
                 target = t.host;
@@ -354,17 +378,17 @@ function selectTarget(ns, threads) {
     switch (cmd) {
         case "weaken":
             t.weakenCount += threads;
-            log(ns, 1, "weaken: +%d threads = %d; sec: %.2f -> %.2f",
+            loglvl(ns, 1, "weaken: +%d threads = %d; sec: %.2f -> %.2f",
                 threads, t.weakenCount, t.curSec, t.minSec);
             break;
         case "grow":
             t.growCount += threads;
-            log(ns, 1, "grow: +%d threads = %d; val: %s -> %s",
-                threads, t.growCount, commaFmt.format(t.curVal), commaFmt.format(t.maxVal));
+            loglvl(ns, 1, "grow: +%d threads = %d; val: %s -> %s",
+                threads, t.growCount, fmt.int(t.curVal), fmt.int(t.maxVal));
             break;
         case "hack":
             t.hackCount += threads;
-            log(ns, 1, "hack: +%d threads = %d", threads, t.hackCount);
+            loglvl(ns, 1, "hack: +%d threads = %d", threads, t.hackCount);
             break;
     }
     targets.set(target, t);
