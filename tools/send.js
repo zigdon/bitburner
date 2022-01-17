@@ -11,6 +11,12 @@ export async function main(ns) {
         case "buyer":
             port = 4;
             break;
+        case "logger":
+            port = 7;
+            break;
+        case "cron":
+            port = 8;
+            break;
     }
     var ph = ns.getPortHandle(port);
     var msg = ns.args.slice(1).join(" ");
