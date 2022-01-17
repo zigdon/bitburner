@@ -3,26 +3,25 @@ export async function main(ns) {
     var data = ns.args[0].split(",");
     // 7,0,8,7,4,0,2,6,7,8,3
     ns.tprint(data);
-    ns.tprint(jump(ns, data));
+    ns.tprint(jump(data));
 }
 
 /**
- * @param {NS} ns
  * @param {int[]} data
  */
-function jump(ns, data) {
+export function jump(data) {
     if (data[0] == 0) {
-        return "";
+        return false;
     }
     for (var i=1; i <= data[0]; i++) {
         if (i == data.length-1) {
-            return i;
+            return true;
         }
-        var sub = jump(ns, data.slice(i));
+        var sub = jump(data.slice(i));
         if (sub) {
-            return i + "," + sub;
+            return true;
         }
     }
 
-    return "";
+    return false;
 }

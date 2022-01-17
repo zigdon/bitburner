@@ -1,13 +1,17 @@
 /** @param {NS} ns **/
-export async function main(ns) {
+async function main(ns) {
     var data = [
-[11,49, 7,35,11, 2,27,39,44],
-        [13,24,21,27,34,23, 8, 1,43],
-        [18, 6,46,18,41,34,39,48,21],
-        [ 6,43,20,25, 1,14, 4,11, 5],
-        [19,19,16,10,50,10,28,10,24],
-        [21,13,38,46,19,47,39,10,41]                    ];
+        [27, 7,47],
+        [18, 3,15],
+        [41,22,11],
+        [21,16,45],
+        [ 6, 2,44],
+    ];
 
+    ns.tprint(spiral(data));
+}
+
+export function spiral(data) {
     var w = data[0].length;
     var h = data.length;
     var res = [];
@@ -19,7 +23,6 @@ export async function main(ns) {
     var dir = { x: 1, y: 0 };
 
     while (true) {
-        // ns.tprintf("[(%d,%d) - (%d,%d)]: (%d,%d): %s", left, top, right, bottom, pos.x, pos.y, data[pos.y][pos.x])
         res.push(data[pos.y][pos.x]);
         if (left > pos.x + dir.x ||
             pos.x + dir.x > right ||
@@ -51,5 +54,5 @@ export async function main(ns) {
         }
     }
 
-    ns.tprint(res);
+    return res;
 }

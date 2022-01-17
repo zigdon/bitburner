@@ -4,8 +4,17 @@ export async function main(ns) {
     var data = ns.args[0];
     // (a)()a(())))a)()
 
+    var res = makeValid(data);
+    ns.tprint("========");
+    res.forEach((r) => {ns.tprint(r)});
+}
+
+/**
+ * @param {string} data
+ * @returns {number}
+ */
+function count(data) {
     var cnt = 0;
-    
     for (var i=0; i<data.length; i++) {
         var c = data[i];
         if (c == "(") {
@@ -14,128 +23,101 @@ export async function main(ns) {
             cnt--;
         }
     }
-    ns.tprint(data, " (", cnt, ")");
-    var res = await makeValid(ns, data, cnt, 0);
-    ns.tprint("========");
-    res.forEach((r) => {ns.tprint(r)});
-    ns.tprint(res);
+
+    return cnt;
 }
 
-var cache = new Map();
-
 /**
- * @param {string} s
+ * @param {string} data
+ * @param {number} cnt
+ * @returns {string[]}
  */
-async function valid(ns, s) {
-    if (s.length < 2) {
-        return false;
+export function makeValid(data) {
+    var cnt = count(data);
+    if (cnt == 0) {
+        return [data];
     }
-    if (cache.has(s)) {
-        return false;
-    }
-    await ns.sleep(5);
-    cache.set(s, true);
 
-    var p = 0;
-    
-    for (var i=0; i<s.length; i++) {
-        var c = s[i];
-        if (c == "(") {
-            p++;
-        } else if (c == ")") {
-            p--;
-            if (p < 0) {
+    data = trim(data);
+    cnt = count(data);
+
+    if (cnt == 0) {
+        return [data];
+    }
+
+    var res = [];
+    var subRes = new Map()
+    for (var i=0; i<data.length; i++) {
+        var newCnt = cnt;
+        if ("()".indexOf(data[i]) == -1) {
+            continue;
+        } else if (cnt > 0 && data[i] == ")") {
+            continue;
+        } else if (cnt < 0 && data[i] == "(") {
+            continue;
+        }
+        if (data[i] == ")") {
+            newCnt++;
+        } else {
+            newCnt--;
+        }
+        var fix = data.slice(0,i) + data.slice(i+1);
+        fix = trim(fix)
+        newCnt = count(fix);
+
+        if (newCnt == 0) {
+            subRes.set(fix, true);
+            continue
+        }
+
+        var sub = makeValid(fix);
+        sub.forEach((s) => {subRes.set(s, true)})
+    }
+
+    var best = 0;
+    subRes.forEach((_, r) => {if (r.length>best) { best = r.length } });
+    subRes.forEach((_, r) => {if (r.length == best) {res.push(r)}});
+
+    return res.filter(invalid);
+}
+
+function invalid(data) {
+    var cnt = 0;
+    for (var i=0; i< data.length; i++) {
+        if (data[i] == "(") {
+            cnt++;
+        } else if (data[i] == ")") {
+            if (cnt == 0) {
                 return false;
             }
+            cnt--;
         }
     }
 
-    return p == 0;
+    return cnt == 0;
 }
 
-var lastPrint = Date.now();
-/**
- * @param {NS} ns
- * @param {string} data
- * @param {number} cnt
- * @param {number} best
- * @returns {string[]}
- */
-async function makeValid(ns, data, cnt, best) {
-    ns.print(data, "  (", cnt, ")");
-    if (cnt == 0) {
-        return [];
-    }
+function trim(data) {
     // strip any leading )
     for (var i=0; i<data.length; i++) {
         if (data[i] == "(") {
             break;
         }
         if (data[i] == ")") {
-            var newdata = data.slice(0,i) + data.slice(i+1);
-            ns.print("Removing ) from ", data, " -> ", newdata);
-            data = newdata;
+            data = data.slice(0, i) + data.slice(i+1);
             i--;
-            cnt++;
         }
     }
+
     // strip any trailing (
     for (var i=data.length-1; i>=0; i--) {
         if (data[i] == ")") {
             break;
         }
         if (data[i] == "(") {
-            var newdata = data.slice(0,i) + data.slice(i+1);
-            ns.print("Removing ( from ", data, " -> ", newdata);
-            data = newdata;
-            cnt--;
+            data = data.slice(0, i) + data.slice(i+1);
         }
     }
 
-    /*
-    if (Date.now() - lastPrint > 5000) {
-        ns.print(data, "  (", cnt, ")");
-        lastPrint = Date.now();
-    } */
-
-    if (cnt == 0) {
-        if (best == 0 || data.length > best) {
-            best = data.length;
-        }
-        return [data];
-    }
-
-    await ns.sleep(5);
-    var res = [];
-    for (var i=0; i<data.length; i++) {
-        if (data[i] != "(" && data[i] != ")") {
-            i++;
-            continue;
-        } else if (data[i] == "(") {
-            cnt--;
-        } else if (data[i] == ")") {
-            cnt++;
-        }
-        var fix = data.slice(0,i) + data.slice(i+1);
-        ns.print("Removed ", data[i], " from ", data, " -> ", fix, " (", cnt, ")");
-
-        if (await valid(ns, fix)) {
-            if (best == 0 || fix.length > best) {
-                best = fix.length;
-            } 
-            if (fix.length == best) {
-                res.push(fix);
-            } 
-        }
-
-        if (cnt == 0) {
-            continue;
-        }
-        if (fix.length >= best || best == 0) {
-            var sub = await makeValid(ns, fix, cnt, best);
-            sub.forEach((s) => {res.push(s)})
-        }
-    }
-
-    return res;
+    return data
 }

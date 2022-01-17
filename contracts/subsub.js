@@ -16,7 +16,7 @@ export async function main(ns) {
     var sum = data[0];
 
     for (var s=0; s< data.length; s++) {
-        var res = subsum(ns, data.slice(s));
+        var res = subsum(data.slice(s));
         if (res.sum > sum) {
             longest = res.len;
             sum = res.sum;
@@ -27,10 +27,9 @@ export async function main(ns) {
 }
 
 /**
- * @param {NS} ns
  * @param {int[]} data
  */
-function subsum(ns, data) {
+export function subsum(data) {
     var res = {len:0, sum:0};
     for (var l=1; l<data.length; l++) {
         for (var s=0; s+l<=data.length; s++) {

@@ -8,7 +8,7 @@ export async function main(ns) {
     }
 
     var trades = getTrades(ns, data);
-    var picks = await pick(ns, trades, tx);
+    var picks = await pickTrades(ns, trades, tx);
     ns.tprintf("Selected trades:");
     picks.forEach((t) => (ns.tprintf("{buy: %d, sell: %d}", t.buy, t.sell)));
     var profit = 0;
@@ -23,7 +23,7 @@ export async function main(ns) {
  * @param {int} trades.sell
  * @param {int} tx
  */
-async function pick(ns, trades, tx) {
+export async function pickTrades(ns, trades, tx) {
     if (tx >= trades.length) {
         return trades;
     }
@@ -36,7 +36,7 @@ async function pick(ns, trades, tx) {
             var profit = 0;
             var next = [];
             if (tx > 1) {
-                next = await pick(ns, trades.slice(s+1), tx-1);
+                next = await pickTrades(ns, trades.slice(s+1), tx-1);
                 next.forEach((t) => { profit += t.sell - t.buy })
             }
             
@@ -52,7 +52,7 @@ async function pick(ns, trades, tx) {
     return bestNext;
 }
 
-function getTrades(ns, data) {
+export function getTrades(ns, data) {
     // find transactions, buy at a local min, sell at a following local max
     var trades = [];
     var val = data[0];

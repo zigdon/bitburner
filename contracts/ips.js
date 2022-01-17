@@ -12,7 +12,7 @@ export async function main(ns) {
  * @param {string} digits
  * @param {int} n
  */
-function mkIPs(ns, digits, n) {
+export function mkIPs(ns, digits, n) {
     if (digits.length > n*3 || digits[0] == "0") {
         return [];
     }
