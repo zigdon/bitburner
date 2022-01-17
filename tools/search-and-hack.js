@@ -1,15 +1,25 @@
 import * as fmt from "/lib/fmt.js";
 import {log, console} from "/lib/log.js";
-import {installWeaken} from "/tools/install.js";
+import {installWeaken, installWorker} from "/tools/install.js";
 
 var nextHack = [];
 var myHack = 0;
 var workerScript = "worker.js";
 var batchScript = "/daemons/batch.js";
 var weakenScript = "/daemons/weakener.js";
+var controllerScript = "/daemons/controller.js";
+var droneMode = "worker";
 
 /** @param {NS} ns **/
 export async function main(ns) {
+  if (ns.args[0]) {
+    droneMode = ns.args[0];
+  } else {
+    if (ns.getPurchasedServers().length > 3) {
+      droneMode = "weaken";
+    }
+  }
+  await console(ns, "Drone mode: %s", droneMode);
   var found = new Map();
   var openers = [];
   nextHack = [];
@@ -96,11 +106,16 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
       !ns.scriptRunning(batchScript, host) &&
       host.startsWith("pserv-")) {
       log(ns, "%s: can be hacking", host);
-    } else if (!ns.scriptRunning(weakenScript, host) &&
-      host != "home" &&
-      !host.startsWith("pserv-")) {
-        await console(ns, "Starting weakener on %s", host);
+    } else if ( host != "home" && !host.startsWith("pserv-")) {
+      if (droneMode == "weaken" && !ns.scriptRunning(weakenScript, host)) {
+        await log(ns, "Starting weakener on %s", host);
         await installWeaken(ns, host);
+      } else if ( droneMode = "worker" &&
+        !ns.scriptRunning(workerScript, host) &&
+        !ns.scriptRunning(controllerScript, host)) {
+        await log(ns, "Starting worker on %s", host);
+        await installWorker(ns, host);
+      }
     }
   } else if (h.hack <= myHack && h.ports <= openers.length) {
     // ns.tprint(host + ": should hack");
