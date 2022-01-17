@@ -10,6 +10,7 @@ export async function main(ns) {
     ns.disableLog("sleep");
     var target = ns.args[0];
     var reserve = ns.args[1];
+    reserve = parseMemory(reserve);
     if (!reserve) {
         reserve = 0;
     }
@@ -37,10 +38,12 @@ export async function main(ns) {
     var maxG = Math.floor((maxRam - scriptRam) / gRam);
 
     // If something else is running on the machine, wait for it to end.
-    await netLog(ns, "[%s] Script needs %d GB, total ram: %d GB.", target, scriptRam, maxRam);
+    await netLog(ns, "[%s] Script needs %s GB, reserve %s GB, total ram: %s GB.",
+        target, fmt.int(scriptRam), fmt.int(reserve), fmt.int(maxRam));
     pause = 1000;
     while (availRam < maxRam - scriptRam - reserve - 2) {
-        await netLog(ns, "[%s] Unexpected memory use, waiting %s: %d/%d", target, fmt.time(pause), availRam, maxRam);
+        await netLog(ns, "[%s] Unexpected memory use, waiting %s: %s/%s",
+            target, fmt.time(pause), fmt.int(availRam), fmt.int(maxRam - scriptRam - reserve -2));
         await ns.sleep(pause);
         availRam = maxRam - ns.getServerUsedRam(hostname);
         pause *= 2;
@@ -336,4 +339,25 @@ async function threadsForWeaken(ns, target, max) {
     }
     await netLog(ns, "Not enough threads to weaken by %.2f, returning %d", target, max);
     return max;
+}
+
+function parseMemory(n) {
+    if (typeof(n) == "number") {
+        return n;
+    }
+    if (!n) {
+        return 0;
+    }
+    var unit = n.substring(n.length-2);
+    n = n.substring(0, n.length-2);
+    switch (unit) {
+        case "pb":
+            n*=1000;
+        case "tb":
+            n*=1000;
+        default:
+            n*=1;
+    }
+
+    return n;
 }
