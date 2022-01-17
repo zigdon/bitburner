@@ -1,10 +1,13 @@
+import {netLog} from "/lib/log.js";
+import * as fmt from "/lib/fmt.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
 	var version = 11;
 	ns.disableLog("sleep");
 	var target = "";
 	var cont = true;
-	log(ns, "agent starting");
+	await netLog(ns, "agent starting");
 	await send(ns, "version %d", version);
 	while (cont) {
 		var words = await wait(ns);
@@ -20,16 +23,19 @@ export async function main(ns) {
 				await ns.sleep(10000);
 				break;
 			case "weaken":
-				await ns.weaken(target, opts);
+				var got = await ns.weaken(target, opts);
 				await send(ns, "done weaken %s", target);
+				await netLog(ns, "Weakened %s by %.2f", target, got);
 				break;
 			case "grow":
-				await ns.grow(target, opts);
+				var got = await ns.grow(target, opts);
 				await send(ns, "done grow %s", target);
+				await netLog(ns, "Grew %s by %.2f%%", target, (got-1)*100);
 				break;
 			case "hack":
-				await ns.hack(target, opts);
+				var got = await ns.hack(target, opts);
 				await send(ns, "done hack %s", target);
+				await netLog(ns, "Hacked %s for $%s", target, fmt.int(got));
 				break;
 			case "quit":
 				cont = false;
