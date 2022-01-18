@@ -46,7 +46,7 @@ export async function main(ns) {
       eachFunc = function(v) {
         v.files.forEach(function(f) {
           if (f.endsWith(".cct")) {
-            ns.tprintf("Found contract on %s: %s", v.host, f);
+            ns.tprintf("Found a contract on %s: %s", v.host, ns.codingcontract.getContractType(f, v.host));
           }
         })
       }
@@ -57,7 +57,7 @@ export async function main(ns) {
           return;
         }
         v.files.forEach(function(f) {
-          if (!f.endsWith(".cct") && !f.endsWith(".js")) {
+          if (!f.endsWith(".cct") && !f.endsWith(".js") && !f.endsWith(".txt")) {
             if (!mapAcc.has(f)) {
               mapAcc.set(f, []);
             }
@@ -83,7 +83,7 @@ export async function main(ns) {
       break;
     case "mkaliases":
       eachFunc = function(v) {
-        if (v.host == "home" || v.parent == "home") {
+        if (v.host == "home" || v.host.startsWith("pserv-")) {
           return;
         }
         ns.tprintf(trailTo(ns, found, v) + ";");

@@ -13,7 +13,7 @@ export async function main(ns) {
         await netLog(ns, "Starting all tasks");
     }
     var hs = hosts.hosts(ns);
-    hs = hs.filter((h) => { return h.root });
+    hs = hs.filter((h) => { return h.root && h.max > 0 });
     hs.sort((a, b) => { return b.max - a.max })
     var servers = ns.getPurchasedServers();
     var assignments = readAssignments(ns);
