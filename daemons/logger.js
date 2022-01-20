@@ -68,12 +68,12 @@ function mkFilter(ns, filter) {
     var fs = [];
     var sub = function(g, w) {
         return function(d, cur) {
-            return cur && g(d).indexOf(w) == -1;
+            return cur && g(d) && g(d).indexOf(w) == -1;
         }
     };
     var add = function(g, w) {
         return function(d, cur) {
-            return cur || g(d).indexOf(w) >= 0;
+            return cur || (g(d) && g(d).indexOf(w) >= 0);
         }
     };
     ["host", "proc", "text"].forEach((k) => {
@@ -89,14 +89,12 @@ function mkFilter(ns, filter) {
                 g = function(d) { return d.text };
                 break;
         }
-        var ws = filter.get("-"+k).keys();
-        for (var i in ws) {
-            fs.push(sub(g, ws[i]));
+        for (var w of filter.get("-"+k).keys()) {
+            fs.push(sub(g, w));
         }
-        ws = filter.get("+"+k).keys();
-        for (var i in ws) {
-            fs.push(add(g, ws[i]));
-        }
+        for (var w of filter.get("+"+k).keys()) {
+            fs.push(add(g, w));
+        };
     });
 
     return function(d) {
@@ -125,14 +123,14 @@ async function ctrlFilter(ns, filter, line) {
                 filter.set("+"+type, new Map());
                 break;
             case "add":
-                var cur = filter.get("+"+type);
-                filter.get("+"+type).set(cur, true);
+                filter.get("+"+type).set(val, true);
                 break;
             case "del":
-                var cur = filter.get("-"+type);
-                filter.get("-"+type).set(cur);
+                filter.get("-"+type).set(val, true);
                 break;
         }
+    } else {
+        await console(ns, "Unknown logger command: %s", line);
     }
     await saveFilter(ns, filter);
     return mkFilter(ns, filter);
@@ -146,7 +144,7 @@ function loadFilter(ns) {
     filter.set("-proc", new Map());
     filter.set("+text", new Map());
     filter.set("-text", new Map());
-    var data = ns.read("/lib/loggingFilter.txt");
+    var data = ns.read("/conf/loggingFilter.txt");
     if (data) {
         data.split("\n").forEach((l) => {
             var words = l.trim().split("\t");
@@ -162,12 +160,12 @@ function loadFilter(ns) {
  */
 async function saveFilter(ns, filter) {
     var data = [];
-    for (var k in filter) {
+    for (var k of filter.keys()) {
         var words = [];
-        for (var w in filter.get(k)) {
+        for (var w of filter.get(k).keys()) {
             words.push(w);
         }
-        data.push(ns.sprintf("%s %s", k, words.join(" ")));
+        data.push(ns.sprintf("%s\t%s", k, words.join("\t")));
     }
-    await ns.write("/lib/loggingFilter.txt", data.join("\n"), "w");
+    await ns.write("/conf/loggingFilter.txt", data.join("\n"), "w");
 }
