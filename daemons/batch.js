@@ -137,14 +137,30 @@ export async function main(ns) {
         await runBatch(ns, Date.now() + schedule[0].time, target, schedule);
         log(ns, "Waiting %s before starting another set...", fmt.time(growTime * 2));
         await ns.sleep(growTime * 2);
-        if (ns.isRunning(wScript, hostname) ||
-            ns.isRunning(gScript, hostname) ||
-            ns.isRunning(hScript, hostname)) {
-            await netLog(ns, "[%s] scripts still running...", target);
+        var pss = ns.ps(hostname);
+        var wait = true;
+        while (wait) {
+            wait = false;
+            var pCounts = [0, 0, 0];
+            pss.forEach((p) => {
+                var i = [wScript, gScript, hScript].indexOf(p.filename);
+                if (i == -1) {
+                    ns.print("Ignoring unrelated process %s", p.filename);
+                    return;
+                }
+                if (p.args[0] != target) {
+                    ns.print("Ignoring unrelated %s %s", p.filename, p.args[0]);
+                    return;
+                }
+                pCounts[i]++;
+                wait = true;
+            })
+
+            await netLog(ns, "batch scripts still running on %s: %s", target, pCounts);
             await ns.sleep(5000);
             continue;
         }
-
+        
         atSec = false;
         atVal = false;
         while (!atSec || !atVal) {
@@ -201,7 +217,7 @@ async function getThreads(ns, target, availRam, hRam, gRam, wRam) {
 
         log(ns, "[%s] considering hacking %d%%, with %d/%d/%d/%d threads, using %s GB out of %s GB", target,
             targetHack, hackThreads, weakHackThreads, growThreads, weakGrowThreads, fmt.int(reqRam), fmt.int(availRam));
-        if (reqRam < availRam) {
+        if (reqRam < availRam && growThreads*hackThreads*weakHackThreads*weakGrowThreads > 0) {
             break;
         }
         targetHack-=5;
