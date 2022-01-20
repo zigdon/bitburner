@@ -1,4 +1,11 @@
 import * as hosts from "/lib/hosts.js";
+import {readAssignments} from "/lib/assignments.js";
+
+var libs = [
+    "/lib/log.js",
+    "/lib/fmt.js",
+    "/lib/assignments.js",
+];
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -6,17 +13,37 @@ export async function main(ns) {
     var tool = ns.args[1];
     var args = ns.args.splice(2);
 
-    if (target == "all") {
+    if (!target || target == "all") {
         var hs = hosts.hosts(ns).filter((h) => {return !h.host.startsWith("pserv-")});
         var req = ns.getScriptRam("/daemons/weakener.js");
         for (var i in hs) {
             var h = hs[i];
-            if (h.host == "hone") {
+            if (h.host == "home") {
                 continue;
             }
-            ns.tprintf("installing weakener on %s", h.host);
-            if (ns.getServerMaxRam(h.host) > req) {
-                await installWeaken(ns, h.host);
+            if (ns.getServerMoneyAvailable("home") < 1000000000000) { // $1t
+                ns.tprintf("installing weakener on %s", h.host);
+                if (ns.getServerMaxRam(h.host) > req) {
+                    await installWeaken(ns, h.host);
+                }
+            } else {
+                ns.tprintf("installing sharer on %s", h.host);
+                await installSharer(ns, h.host);
+            }
+        }
+        return;
+    } else if (target == "pserv") {
+        var hs = hosts.hosts(ns).filter((h) => {return h.host.startsWith("pserv-")});
+        var req = ns.getScriptRam("/daemons/batch.js");
+        var a = readAssignments(ns);
+        for (var i in hs) {
+            var h = a.find((h) => {return h.worker == hs[i].host});
+            if (h && ns.getServerMaxRam(h.worker) > req) {
+                ns.tprintf("Installing batch on %s to hack %s", h.worker, h.target);
+                await installBatch(ns, h.worker, h.target);
+            } else {
+                ns.tprintf("Installing weakener on %s", hs[i].host);
+                await installWeaken(ns, hs[i].host);
             }
         }
         return;
@@ -31,6 +58,9 @@ export async function main(ns) {
             break;
         case "controller":
             await installController(ns, target);
+            break;
+        case "sharer":
+            await installSharer(ns, target);
             break;
         case "worker":
             await installWorker(ns, target);
@@ -52,9 +82,9 @@ export async function main(ns) {
 
 export async function installBatch(ns, worker, target) {
     if (target != "home") {
-        await ns.scp(
-            ["weaken.js", "hack.js", "grow.js", "/daemons/batch.js", "/lib/assignments.txt",
-                "/lib/fmt.js", "/lib/log.js"], "home", worker);
+        var files = ["weaken.js", "hack.js", "grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
     if (!ns.exec("daemons/batch.js", worker, 1, target)) {
@@ -64,9 +94,9 @@ export async function installBatch(ns, worker, target) {
 
 export async function installWeaken(ns, worker) {
     if (worker != "home") {
-        await ns.scp(
-            ["weaken.js", "/daemons/weakener.js",
-            "/lib/fmt.js", "/lib/log.js", "/lib/assignments.txt"], "home", worker);
+        var files = ["weaken.js", "/daemons/weakener.js", "/conf/assignments.txt"];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
     if (ns.getServerMaxRam(worker) > ns.getScriptRam("/daemons/weakener.js")) {
@@ -82,7 +112,9 @@ export async function installWeaken(ns, worker) {
  */
 export async function installController(ns, worker) {
     if (worker != "home") {
-        await ns.scp(["/daemons/controller.js", "/lib/log.js", "/lib/fmt.js"], "home", worker);
+        var files = ["/daemons/controller.js"];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
     var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
@@ -100,7 +132,9 @@ export async function installController(ns, worker) {
  */
 export async function installWorker(ns, worker) {
     if (worker != "home") {
-        await ns.scp(["/daemons/worker.js", "/lib/log.js", "/lib/fmt.js"], "home", worker);
+        var files = ["/daemons/worker.js"];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
     var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
@@ -114,18 +148,23 @@ export async function installWorker(ns, worker) {
 
 /**
  * @param {NS} ns
- * @returns {Object[]}
+ * @param {string} worker
  */
-export function readAssignments(ns) {
-    var data = ns.read("/lib/assignments.txt")
-    if (!data) {
-        return [];
+export async function installSharer(ns, worker) {
+    if (worker != "home") {
+        var files = [
+            "/daemons/share.js",
+            "/tools/share.js",
+        ];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
+        ns.killall(worker);
     }
-    var res = [];
-    data.split("\n").forEach((l) => {
-        var bits = l.trim().split("\t");
-        res.push({worker: bits[0], target: bits[1]});
-    })
-
-    return res;
+    var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
+    var req = ns.getScriptRam("/daemons/share.js") + ns.getScriptRam("/tools/share.js");
+    if (ram > req) {
+        if (!ns.exec("/daemons/share.js", worker)) {
+            ns.tprintf("Failed to launch sharer on %s", worker);
+        }
+    }
 }
