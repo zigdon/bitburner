@@ -6,22 +6,29 @@ var schedule = new Map();
 /** @param {NS} ns **/
 export async function main(ns) {
   ns.disableLog("sleep");
+  ns.disableLog("exec");
   await netLog(ns, "Cron daemon starting up");
   schedule = await loadSchedule(ns);
 
   while (true) {
+    await checkCtl(ns);
     await ns.sleep(10000);
-    checkCtl(ns);
 
     var now = Date.now();
-    for (var k in schedule) {
-      var j = schedule.get(k);
+    var toRun = [];
+    schedule.forEach((j) => {
       if (now > j.nextRun && !j.paused) {
-        await netLog(ns, "launching %s on %s", k, j.host);
-        j.lastRun = now;
-        j.nextRun = now + when + Math.random() * j.jitter;
-        ns.exec(j.proc, j.host, j.threads, j.args);
+        toRun.push(j)
       }
+    })
+
+    while (toRun.length > 0) {
+      var j = toRun.shift();
+      await netLog(ns, "launching %s on %s", j.name, j.host);
+      j.lastRun = now;
+      j.nextRun = now + j.when + Math.random() * j.jitter;
+      ns.exec(j.proc, j.host, j.threads, ...j.args);
+      schedule.set(j.name, j);
     }
   }
 }
@@ -33,12 +40,16 @@ export async function main(ns) {
 async function loadSchedule(ns) {
   schedule = new Map();
 
-  if (ns.fileExists("/lib/cron.txt")) {
-    await netLog(ns, "Loading cron from /lib/cron.txt");
-    var data = ns.read("/lib/cron.txt").split("\n");
+  if (ns.fileExists("/conf/cron.txt")) {
+    await netLog(ns, "Loading cron from /conf/cron.txt");
+    var data = ns.read("/conf/cron.txt").split("\n");
+    if (!data || data.length == 0) {
+      return schedule;
+    }
     var now = Date.now();
     data.forEach((l) => {
-      var words = l.trim().split(" ");
+      if (!l) { return }
+      var words = l.trim().split("\t");
       var entry = {
         name: words.shift(),
         when: fmt.parseTime(words.shift()),
@@ -54,7 +65,10 @@ async function loadSchedule(ns) {
       schedule.set(entry.name, entry);
     });
   }
-  await netLog(ns, "Loaded schedule: %d jobs", schedule.size);
+  await netLog(ns, "Loaded schedule: %d jobs:", schedule.size);
+  for (let j of schedule.values()) {
+    await netLog(ns, printJob(ns, j));
+  }
 
   return schedule;
 }
@@ -64,20 +78,20 @@ async function loadSchedule(ns) {
  * @param {Map<string,Object>} schedule
  */
 async function saveSchedule(ns) {
-  await netLog(ns, "Saving cron to /lib/cron.txt");
+  await netLog(ns, "Saving cron to /conf/cron.txt");
   var data = [];
   schedule.forEach((entry) => {
     data.push([
       entry.name,
-      entry.when,
+      fmt.time(entry.when),
       entry.host,
       entry.threads,
-      entry.jitter,
+      fmt.time(entry.jitter),
       entry.proc,
       entry.args,
     ].join("\t"));
   });
-  await ns.write("/lib/cron.txt", data.join("\n"), "w");
+  await ns.write("/conf/cron.txt", data.join("\n"), "w");
 }
 
 /**
@@ -85,10 +99,10 @@ async function saveSchedule(ns) {
  */
 async function checkCtl(ns) {
   var data = ns.readPort(8);
-  await netLog("Control command: %s", data);
   if (data.startsWith("NULL")) {
     return;
   }
+  await netLog(ns, "Control command: %s", data);
 
   var words = data.split(" ");
   var cmd = words.shift();
@@ -99,8 +113,8 @@ async function checkCtl(ns) {
       ns.exit();
       break;
     case "list":
-      for (var { k, v } in schedule) {
-        await console(ns, printJob(v));
+      for (let j of schedule.values()) {
+        await console(ns, printJob(ns, j));
       }
       break;
     case "add":
@@ -112,11 +126,13 @@ async function checkCtl(ns) {
         threads: words.shift(),
         proc: words.shift(),
         args: words,
+        paused: false,
       }
+      j.nextRun = Date.now()+j.when;
       var res = await ns.prompt("Create new job?\n" + printJob(ns, j));
       if (res) {
         schedule.set(j.name, j)
-        saveSchedule(ns);
+        await saveSchedule(ns);
         await console(ns, "New job added: %s", j.name);
       } else {
         await console(ns, "Aborted!");
@@ -155,6 +171,8 @@ async function checkCtl(ns) {
       break;
     default:
       await console(ns, "Unknown command: %s", cmd);
+      await console(ns, "cmds: quit, list, add, edit, del, pause, resumel");
+      await console(ns, "Attributes: name, host, when, jitter, threads, proc, args");
   }
 }
 
@@ -163,6 +181,10 @@ async function checkCtl(ns) {
  * @param {Object} j
  */
 function printJob(ns, j) {
+  if (!j) {
+    return "Undefined job";
+  }
+  var now = Date.now();
   return ns.sprintf(
     "%s: on %s every %s (+-%s). Threads: %s, next: %s\n   %s %s",
     j.name,
@@ -170,7 +192,7 @@ function printJob(ns, j) {
     fmt.time(j.when),
     fmt.time(j.jitter),
     j.threads,
-    j.paused ? "paused" : fmt.time(j.nextRun),
+    j.paused ? "paused" : now > j.nextRun ? "soon" : fmt.time(j.nextRun-now),
     j.proc,
     j.args,
   );
