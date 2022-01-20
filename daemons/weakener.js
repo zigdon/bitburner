@@ -20,9 +20,9 @@ export async function main(ns) {
     while (true) {
         await ns.sleep(2000+Math.random()*10000);
         if (hostname != "home") {
-            await ns.scp("/lib/assignments.txt", "home", hostname);
+            await ns.scp("/conf/assignments.txt", "home", hostname);
         }
-        var data = ns.read("/lib/assignments.txt");
+        var data = ns.read("/conf/assignments.txt");
         if (!data) {
             await netLog(ns, "No assignments found, exiting");
             return;
@@ -42,7 +42,7 @@ export async function main(ns) {
         if (peer) {
             await netLog(ns, "Peer is running %s", peer);
             for (var i = 0; i<assignments.length-1; i++) {
-                if (assignments == peer) {
+                if (assignments[i] == peer) {
                     target = assignments[i+1]
                 }
             }

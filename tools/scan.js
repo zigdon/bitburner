@@ -235,5 +235,5 @@ async function saveDB(ns, found) {
   found.forEach((h) => {
     data.push([h.host, h.hack, h.max, h.ports, h.root, contains(h.host, pServers)].join("\t"));
   })
-  await ns.write("/lib/hosts.txt", data.join("\n"), "w");
+  await ns.write("/conf/hosts.txt", data.join("\n"), "w");
 }
