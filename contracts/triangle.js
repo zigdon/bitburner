@@ -13,6 +13,14 @@ export async function main(ns) {
    [9,8,7,6,3,1,2,5,9,7],
   [6,5,9,1,8,9,3,8,8,1,1],
     ];
+    
+    ns.tprint(trianglePath(tri));
+}
+
+/**
+ * @param {number[][]} tri
+ */
+export function trianglePath(tri) {
     var path = [];
     var max = 0;
     for (var l = 0; l < tri.length; l++) {
@@ -21,20 +29,20 @@ export async function main(ns) {
 
     while (true) {
         var l = tri.length - 1;
-        var sum = add(ns, tri, path);
+        var sum = add(tri, path);
         if (sum < max || max == 0) {
             max = sum;
         }
-        path = next(ns, tri, path);
+        path = next(tri, path);
         if (!path) {
             break
         }
     }
 
-    ns.tprint(max);
+    return max;
 }
 
-function next(ns, data, path) {
+function next(data, path) {
     var i = data.length - 1;
     // Walk up the path that went to the right
     while (i > 0 && path[i] == path[i - 1] + 1) {
@@ -61,7 +69,7 @@ function next(ns, data, path) {
     return path;
 }
 
-function add(ns, data, path) {
+function add(data, path) {
     var res = 0;
     for (var i = 0; i < data.length; i++) {
         res += 1*data[i][path[i]];
