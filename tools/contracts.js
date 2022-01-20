@@ -11,6 +11,7 @@ import { spiral } from "/contracts/spiral.js";
 import { factor } from "/contracts/factor.js";
 import { solveIntervals } from "/contracts/intervals.js";
 import { jump } from "/contracts/jump.js";
+import { trianglePath } from "/contracts/triangle.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -53,14 +54,16 @@ export async function handleContract(ns, file, host) {
     var res;
     switch (cType) {
         case "Algorithmic Stock Trader I":
-            level = 1;
+        case "Algorithmic Stock Trader II":
         case "Algorithmic Stock Trader III":
-            level = 3;
         case "Algorithmic Stock Trader IV":
-            var tx = [undefined, 1, undefined, 2];
+            var tx = [undefined, 1, 999, 2];
             switch(cType.split(" ")[3]) {
                 case "I":
                     level = 1;
+                    break;
+                case "II":
+                    level = 2;
                     break;
                 case "III":
                     level = 3;
@@ -105,6 +108,10 @@ export async function handleContract(ns, file, host) {
             var answer = subsum(cData).sum;
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
+        case "Minimum Path Sum in a Triangle":
+            var answer = trianglePath(cData);
+            res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
+            break;
         case "Spiralize Matrix":
             var answer = spiral(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
@@ -128,7 +135,7 @@ export async function handleContract(ns, file, host) {
             await console(ns, cDesc);
     }
     if (res) {
-        await console(ns, res);
+        await console(ns, "%s: %s", cType, res);
     } else {
         await console(ns, "*** Failed contract %s on n%s", file, host);
     }
