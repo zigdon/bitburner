@@ -1,7 +1,8 @@
-import {netLog, console} from "lib/log.js";
-import {installBatch, readAssignments} from "tools/install.js";
-import * as hosts from "lib/hosts.js";
-import * as fmt from "lib/fmt.js";
+import {netLog, console} from "/lib/log.js";
+import {installBatch} from "/tools/install.js";
+import {readAssignments} from "/lib/assignments.js";
+import * as hosts from "/lib/hosts.js";
+import * as fmt from "/lib/fmt.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -17,6 +18,10 @@ export async function main(ns) {
     hs.sort((a, b) => { return b.max - a.max })
     var servers = ns.getPurchasedServers();
     var assignments = readAssignments(ns);
+    var used = new Map();
+    assignments.forEach((a) => {
+        used.set(a.worker, true);
+    });
     var minVal = 0;
     if (hs.length > servers.length) {
         minVal = hs[servers.length].max;
@@ -24,14 +29,12 @@ export async function main(ns) {
     var missing = [];
     var free = [];
     var idle = [];
-    var used = new Map();
 
     // Find servers to free up
     if (minVal > 0) {
         await console(ns, "abandoning servers worth less than $%s", fmt.int(minVal));
         var msgs = [];
         assignments.forEach((a) => {
-            used.set(a.worker, true);
             var h = hosts.getHost(ns, a.target);
             if (!h || Number(h.max) <= minVal) {
                 msgs.push(["Freeing up %s, was working on %s", a.worker, a.target]);
@@ -107,5 +110,5 @@ export async function main(ns) {
 async function saveAssignments(ns, assignments) {
     var data = [];
     assignments.forEach((a) => {data.push([a.worker, a.target].join("\t"))});
-    await ns.write("/lib/assignments.txt", data.join("\n"), "w");
+    await ns.write("/conf/assignments.txt", data.join("\n"), "w");
 }
