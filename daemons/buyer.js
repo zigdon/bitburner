@@ -13,11 +13,11 @@ export async function main(ns) {
 	ns.disableLog("sleep");
 	var req = ns.getScriptRam(script);
 
-	if (ns.fileExists("/lib/buyerReserve.txt", "home")) {
-		reserve = Math.floor(ns.read("/lib/buyerReserve.txt"));
+	if (ns.fileExists("/conf/buyerReserve.txt", "home")) {
+		reserve = Math.floor(ns.read("/conf/buyerReserve.txt"));
 	}
-	if (ns.fileExists("/lib/buyerMode.txt", "home")) {
-		mode = ns.read("/lib/buyerMode.txt");
+	if (ns.fileExists("/conf/buyerMode.txt", "home")) {
+		mode = ns.read("/conf/buyerMode.txt");
 	}
 
 	ns.print("req: " + req);
@@ -159,12 +159,12 @@ async function checkControl(ns, need, reserve) {
 		case "reserve":
 			reserve = parseMoney(words[1]);
 			await console(ns, "Setting reserve to $%s", fmt.int(reserve));
-			await ns.write("/lib/buyerReserve.txt", reserve, "w");
+			await ns.write("/conf/buyerReserve.txt", reserve, "w");
 			break;
 		case "mode":
 			mode = words[1];
 			await console(ns, "Setting mode to %s", mode);
-			await ns.write("/lib/buyerMode.txt", mode, "w");
+			await ns.write("/conf/buyerMode.txt", mode, "w");
 			break;
 		case "report":
 			await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
