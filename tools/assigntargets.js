@@ -1,8 +1,12 @@
 import {netLog, console} from "/lib/log.js";
-import {installBatch} from "/tools/install.js";
+import {installBatch, installContractProxy} from "/tools/install.js";
 import {readAssignments} from "/lib/assignments.js";
 import * as hosts from "/lib/hosts.js";
 import * as fmt from "/lib/fmt.js";
+
+var hs;
+var assignments;
+var custom;
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -13,15 +17,26 @@ export async function main(ns) {
     } else {
         await netLog(ns, "Starting all tasks");
     }
-    var hs = hosts.hosts(ns);
+    hs = hosts.hosts(ns);
+    assignments = readAssignments(ns);
+    custom = new Map();
     hs = hs.filter((h) => { return h.root && h.max > 0 });
     hs.sort((a, b) => { return b.max - a.max })
+    await netLog(ns, "Found %d targets:", hs.length);
+    for (var h of hs) {
+        await netLog(ns, "  %20s: %s", h.host, fmt.int(h.max));
+    }
     var servers = ns.getPurchasedServers();
-    var assignments = readAssignments(ns);
     var used = new Map();
     assignments.forEach((a) => {
+        if (a.target.startsWith("<")) {
+            custom.set(a.target.substring(1, a.target.length-2), a.worker);
+        }
         used.set(a.worker, true);
     });
+    for (var c of custom) {
+        await netLog(ns, "Found existing custom assignment: %s -> %s", c[0], c[1])
+    }
     var minVal = 0;
     if (hs.length > servers.length) {
         minVal = hs[servers.length].max;
@@ -35,6 +50,9 @@ export async function main(ns) {
         await console(ns, "abandoning servers worth less than $%s", fmt.int(minVal));
         var msgs = [];
         assignments.forEach((a) => {
+            if (a.target.startsWith("<") || !a.worker.startsWith("pserv-")) {
+                return;
+            }
             var h = hosts.getHost(ns, a.target);
             if (!h || Number(h.max) <= minVal) {
                 msgs.push(["Freeing up %s, was working on %s", a.worker, a.target]);
@@ -85,12 +103,22 @@ export async function main(ns) {
         assignments.push({worker: worker, target: target});
     }
 
-    await saveAssignments(ns, assignments);
+    await saveAssignments(ns);
 
     // Make sure the assigned servers are actually running
     for (var i=0; i<assignments.length; i++) {
         await ns.sleep(100);
         var a = assignments[i];
+        if (a.target.startsWith("<")) {
+            switch(a.target) {
+                case "<contractProxy>":
+                    await installContractProxy(ns, a.worker);
+                    break;
+                default:
+                    await console(ns, "Unknown assignment %s for %s", a.target, a.worker);
+            }
+            continue
+        }
         if (ns.isRunning("/daemons/batch.js", a.worker, a.target)) {
             continue;
         }
@@ -105,10 +133,26 @@ export async function main(ns) {
 
 /**
  * @param {NS} ns
- * @param {Object[]} assignments
  */
-async function saveAssignments(ns, assignments) {
+async function saveAssignments(ns) {
     var data = [];
     assignments.forEach((a) => {data.push([a.worker, a.target].join("\t"))});
     await ns.write("/conf/assignments.txt", data.join("\n"), "w");
+}
+
+/**
+ * @param {NS} ns
+ * @param {string} daemon
+ */
+function assignCustom(ns, daemon) {
+    if (!custom.get(daemon)) {
+        var need = ns.getScriptRam("/daemons/" + daemon + ".js");
+        for (var i = hs.length-1; i>0; i--) {
+            if (ns.getServerMaxRam(hs[i].host) > need) {
+                custom.set(daemon, hs[i].host);
+                assignments.push({worker: hs[i].host, target: "<"+daemon+">"});
+                break;
+            }
+        }
+    }
 }
