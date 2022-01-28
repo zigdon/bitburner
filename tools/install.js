@@ -4,6 +4,8 @@ import {readAssignments} from "/lib/assignments.js";
 var libs = [
     "/lib/log.js",
     "/lib/fmt.js",
+    "/lib/ports.js",
+    "/lib/ui.js",
     "/lib/assignments.js",
 ];
 
@@ -15,20 +17,29 @@ export async function main(ns) {
 
     if (!target || target == "all") {
         var hs = hosts.hosts(ns).filter((h) => {return !h.host.startsWith("pserv-")});
-        var req = ns.getScriptRam("/daemons/weakener.js");
+        var wReq = ns.getScriptRam("/daemons/weakener.js");
+        var sReq = ns.getScriptRam("/daemons/sharer.js");
         for (var i in hs) {
             var h = hs[i];
             if (h.host == "home") {
                 continue;
             }
-            if (ns.getServerMoneyAvailable("home") < 1000000000000) { // $1t
-                ns.tprintf("installing weakener on %s", h.host);
-                if (ns.getServerMaxRam(h.host) > req) {
-                    await installWeaken(ns, h.host);
+            var homeRam = ns.getServerMaxRam("home");
+            if (homeRam > 1000) {  // 1TB
+                if (ns.getServerMoneyAvailable("home") < 1000000000) { // $1b
+                    if (ns.getServerMaxRam(h.host) > wReq) {
+                        ns.tprintf("installing weakener on %s", h.host);
+                        await installWeaken(ns, h.host);
+                    }
+                } else {
+                    if (ns.getServerMaxRam(h.host) > sReq) {
+                        ns.tprintf("installing sharer on %s", h.host);
+                        await installSharer(ns, h.host);
+                    }
                 }
             } else {
-                ns.tprintf("installing sharer on %s", h.host);
-                await installSharer(ns, h.host);
+                ns.tprintf("installing worker on %s", h.host);
+                await installWorker(ns, h.host);
             }
         }
         return;
@@ -37,6 +48,11 @@ export async function main(ns) {
         var req = ns.getScriptRam("/daemons/batch.js");
         var a = readAssignments(ns);
         for (var i in hs) {
+            if (tool == "sharer") {
+                ns.tprintf("installing sharer on %s", hs[i].host);
+                await installSharer(ns, hs[i].host);
+                continue;
+            }
             var h = a.find((h) => {return h.worker == hs[i].host});
             if (h && ns.getServerMaxRam(h.worker) > req) {
                 ns.tprintf("Installing batch on %s to hack %s", h.worker, h.target);
@@ -82,7 +98,7 @@ export async function main(ns) {
 
 export async function installBatch(ns, worker, target) {
     if (target != "home") {
-        var files = ["weaken.js", "hack.js", "grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
+        var files = ["/bin/weaken.js", "/bin/hack.js", "/bin/grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
         files.push(libs);
         await ns.scp(files, "home", worker);
         ns.killall(worker);
@@ -154,17 +170,39 @@ export async function installSharer(ns, worker) {
     if (worker != "home") {
         var files = [
             "/daemons/share.js",
-            "/tools/share.js",
+            "/bin/share.js",
         ];
         files.push(libs);
         await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
     var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
-    var req = ns.getScriptRam("/daemons/share.js") + ns.getScriptRam("/tools/share.js");
+    var req = ns.getScriptRam("/daemons/share.js") + ns.getScriptRam("/bin/share.js");
     if (ram > req) {
         if (!ns.exec("/daemons/share.js", worker)) {
             ns.tprintf("Failed to launch sharer on %s", worker);
+        }
+    }
+}
+
+/**
+ * @param {NS} ns
+ * @param {string} worker
+ */
+export async function installContractProxy(ns, worker) {
+    if (worker != "home") {
+        var files = [
+            "/daemons/contractProxy.js",
+        ];
+        files.push(libs);
+        await ns.scp(files, "home", worker);
+        ns.killall(worker);
+    }
+    var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
+    var req = ns.getScriptRam("/daemons/contractProxy.js");
+    if (ram > req) {
+        if (!ns.exec("/daemons/contractProxy.js", worker)) {
+            ns.tprintf("Failed to launch contractProxy on %s", worker);
         }
     }
 }
