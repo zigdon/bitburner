@@ -14,7 +14,7 @@ export async function main(ns) {
         reserve = 0;
     }
 
-    var script = "weaken.js";
+    var script = "/bin/weaken.js";
     var hostname = ns.getHostname();
     var sRam = ns.getScriptRam(script);
     while (true) {
@@ -30,6 +30,9 @@ export async function main(ns) {
         var assignments = [];
         data.split("\n").forEach((l) => {
             var bits = l.trim().split("\t");
+            if (bits[1].startsWith("<")) {
+                return;
+            }
             assignments.push(bits[1]);
         })
 
@@ -54,7 +57,8 @@ export async function main(ns) {
         }
         await ns.tryWritePort(6, target);
 
-        var threads = Math.floor(ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname) - reserve)/sRam;
+        var threads = Math.floor(
+            ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname) - reserve)/sRam;
         if (threads == 0) {
             await netLog(ns, "Not enough memory to run with %d reserved", reserve);
             if (reserve == 0) {
