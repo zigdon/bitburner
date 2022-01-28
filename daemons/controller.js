@@ -1,8 +1,10 @@
 import * as fmt from "/lib/fmt.js";
-import {log, loglvl, netLog} from "/lib/log.js";
+import {getPorts} from "/lib/ports.js";
+import {log, loglvl, console, netLog} from "/lib/log.js";
 
 var workers = new Map();
 var targets = new Map();
+var ports = getPorts();
 var script = "/daemons/worker.js";
 var reqVersion = 11;
 
@@ -77,19 +79,21 @@ async function saveTargets(ns, path) {
  **/
 async function init(ns) {
     var ts = [];
-    ns.read("targets.txt").split(" ").forEach(function (target) {
-        ts.push(target);
-    });
-    await addTargets(ns, ts);
-    ts.forEach((target) => {
-        updateTarget(target);
-    })
+    if (ns.fileExists("/conf/targets.txt")) {
+        ns.read("/conf/targets.txt").split(" ").forEach(function (target) {
+            ts.push(target);
+        });
+        await addTargets(ns, ts);
+        ts.forEach((target) => {
+            updateTarget(target);
+        })
+    }
 
-    ns.clearPort(1);  // incoming
-    ns.clearPort(2);  // outgoing
+    ns.clearPort(ports.WORKERS);  // incoming
+    ns.clearPort(ports.CONTROLLER);  // outgoing
     await send(ns, "", "ping");
     await ns.sleep(8000);
-    ns.clearPort(2);  // outgoing again
+    ns.clearPort(ports.CONTROLLER);  // outgoing again
 }
 
 /**
@@ -177,11 +181,11 @@ async function unclogFor(ns, host) {
         } else if (head.startsWith(host)) {
             return true;
         }
-        var msg = ns.readPort(2);
+        var msg = ns.readPort(ports.CONTROLLER);
         if (msg == first) {
             return false;
         } else {
-            await ns.writePort(2, msg);
+            await ns.writePort(ports.CONTROLLER, msg);
         }
     }
 }
@@ -233,14 +237,14 @@ async function send(ns, host, msg) {
     } else {
         loglvl(ns, 2, "sending '%s' to ALL", msg);
     }
-    while (!await ns.tryWritePort(2, msg)) {
+    while (!await ns.tryWritePort(ports.CONTROLLER, msg)) {
         loglvl(ns, 1, "outgoing queue full, retrying...");
         // check the head of the queue for obsolete messages
         var head = ns.peek(2);
         var words = head.split(" ");
         if (Date.now() - words[1] > 20000) {
             loglvl(ns, 1, "removing obsolete message '%s'", head);
-            ns.readPort(2);
+            ns.readPort(ports.CONTROLLER);
         }
         await ns.sleep(100);
     }
@@ -251,7 +255,7 @@ async function send(ns, host, msg) {
  */
 async function checkControl(ns) {
     while (true) {
-        var msg = await ns.readPort(3);
+        var msg = await ns.readPort(ports.CONTROLLER_CTL);
         if (msg == "NULL PORT DATA") {
             return;
         }
@@ -264,7 +268,7 @@ async function checkControl(ns) {
                     await netLog(ns, "removing target '%s'", words[2]);
                     targets.delete(words[2]);
                 }
-                await saveTargets(ns, "targets.txt");
+                await saveTargets(ns, "/conf/targets.txt");
                 break;
             case "ping":
                 if (words[1]) {
@@ -297,21 +301,27 @@ async function checkControl(ns) {
  */
 async function wait(ns) {
     loglvl(ns, 2, "waiting...");
+    var lastActivity = Date.now();
     while (true) {
+        var now = Date.now();
         await checkControl(ns);
-        if (Date.now() - lastReport > 10000) {
-            lastReport = Date.now();
+        if (now - lastReport > 10000) {
+            lastReport = now;
             await report(ns, log);
         }
-        if (Date.now() - lastNetReport > 300000) {
-            lastNetReport = Date.now();
+        if (now - lastNetReport > 300000) {
+            if (now - lastActivity > 300000) {
+                await console(ns, "Controller: No activity for %s.", fmt.time(now - lastActivity));
+            }
+            lastNetReport = now;
             await report(ns, netLog);
         }
-        var msg = await ns.readPort(1);
+        var msg = await ns.readPort(ports.WORKERS);
         if (msg == "NULL PORT DATA") {
             await ns.sleep(100);
             continue;
         }
+        lastActivity = now;
         loglvl(ns, 2, "read: '%s'", msg);
         var data = msg.split(": ", 2);
         return { host: data[0], text: data[1] };
