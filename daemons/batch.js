@@ -1,23 +1,33 @@
 import * as fmt from "/lib/fmt.js";
-import { log, netLog } from "/lib/log.js";
+import { console, batchReport, log, netLog } from "/lib/log.js";
 
-var wScript = "weaken.js";
-var gScript = "grow.js";
-var hScript = "hack.js";
+var wScript = "/bin/weaken.js";
+var gScript = "/bin/grow.js";
+var hScript = "/bin/hack.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
+    ns.disableLog("getServerUsedRam");
     var target = ns.args[0];
     var reserve = ns.args[1];
     reserve = parseMemory(reserve);
-    if (!reserve) {
+    if (reserve) {
+        await console(ns, "Reserving %s GB", fmt.int(reserve));
+    } else {
         reserve = 0;
+    }
+
+    // If we have an obsolete marker, just quit
+    if (ns.fileExists("/obsolete.txt")) {
+        await netLog(ns, "Server obsolete, quitting.");
+        ns.exit();
     }
 
     // Wait a random pause at startup, to avoid thundering on reboot
     var pause = 1000 + Math.random() * 9000;
     await netLog(ns, "[%s] Starting up batcher, sleeping for %.2fs", target, pause / 1000);
+    await batchReport(ns, target, "batch", 0);
     await ns.sleep(pause);
 
     // 1. Get server to max value, min secutiry
@@ -32,7 +42,7 @@ export async function main(ns) {
     var hRam = ns.getScriptRam(hScript);
     var gRam = ns.getScriptRam(gScript);
     var wRam = ns.getScriptRam(wScript);
-    var availRam = maxRam - ns.getServerUsedRam(hostname);
+    var availRam = maxRam - ns.getServerUsedRam(hostname) - reserve;
     var scriptRam = ns.getScriptRam(ns.getScriptName());
     var maxW = Math.floor((maxRam - scriptRam) / wRam);
     var maxG = Math.floor((maxRam - scriptRam) / gRam);
@@ -42,8 +52,9 @@ export async function main(ns) {
         target, fmt.int(scriptRam), fmt.int(reserve), fmt.int(maxRam));
     pause = 1000;
     while (availRam < maxRam - scriptRam - reserve - 2) {
-        await netLog(ns, "[%s] Unexpected memory use, waiting %s: %s/%s",
-            target, fmt.time(pause), fmt.int(availRam), fmt.int(maxRam - scriptRam - reserve -2));
+        await netLog(ns, "[%s] Unexpected memory use, waiting %s: %s/%s (%s)",
+            target, fmt.time(pause), fmt.int(availRam), fmt.int(maxRam - scriptRam - reserve - 2),
+            fmt.int(maxRam - availRam - scriptRam - reserve - 2));
         await ns.sleep(pause);
         availRam = maxRam - ns.getServerUsedRam(hostname);
         pause *= 2;
@@ -64,8 +75,9 @@ export async function main(ns) {
     var threads;
     while (batches < 100) {
         await ns.sleep(100);
-        var solution = await getThreads(ns, target, availRam / batches, hRam, gRam, wRam);
+        var solution = await getThreads(ns, target, Math.floor(availRam / batches), hRam, gRam, wRam);
         if (!solution) {
+            batches--;
             break
         }
         threads = solution;
@@ -135,8 +147,9 @@ export async function main(ns) {
     while (true) {
         var curVal = ns.getServerMoneyAvailable(target);
         await runBatch(ns, Date.now() + schedule[0].time, target, schedule);
-        log(ns, "Waiting %s before starting another set...", fmt.time(growTime * 2));
-        await ns.sleep(growTime * 2);
+        log(ns, "Waiting %s before starting another set...", fmt.time(hackTime + 10000));
+        await ns.sleep(hackTime + 10000);
+        /* If we wanted to wait until the previous batch was entirely done...
         var pss = ns.ps(hostname);
         var wait = true;
         while (wait) {
@@ -160,12 +173,17 @@ export async function main(ns) {
             await ns.sleep(5000);
             continue;
         }
+        */
         
-        atSec = false;
-        atVal = false;
-        while (!atSec || !atVal) {
-            atSec = await getToMinSec(ns, target, maxW);
-            atVal = await getToMaxVal(ns, target, maxG);
+        if ((ns.getServerSecurityLevel(target) > ns.getServerMinSecurityLevel(target) + 5) ||
+            (ns.getServerMoneyAvailable(target) < ns.getServerMaxMoney(target) * 0.90)) {
+            await netLog(ns, "Resetting before starting new batch");
+            atSec = false;
+            atVal = false;
+            while (!atSec || !atVal) {
+                atSec = await getToMinSec(ns, target, maxW);
+                atVal = await getToMaxVal(ns, target, maxG);
+            }
         }
     }
 }
@@ -185,7 +203,10 @@ async function runBatch(ns, start, target, schedule) {
             await ns.sleep(start + s.time - Date.now());
         }
         log(ns, "Launching %s for batch #%d", s.proc, s.batch);
-        ns.exec(s.proc, hostname, s.threads, target, s.time);
+        var t = s.threads;
+        while (t>0 && !ns.exec(s.proc, hostname, t, target, s.time)) {
+            t--;
+        }
     }
 }
 
@@ -213,14 +234,18 @@ async function getThreads(ns, target, availRam, hRam, gRam, wRam) {
         weakGrowThreads = Math.ceil(getWeakThreads(ns, secGrowDmg));
         var reqRam = Number(growThreads * gRam) +
             Number(hackThreads * hRam) +
-            Number(weakHackThreads + weakGrowThreads) * wRam;
+            (Number(weakHackThreads) + Number(weakGrowThreads)) * wRam;
 
         log(ns, "[%s] considering hacking %d%%, with %d/%d/%d/%d threads, using %s GB out of %s GB", target,
             targetHack, hackThreads, weakHackThreads, growThreads, weakGrowThreads, fmt.int(reqRam), fmt.int(availRam));
         if (reqRam < availRam && growThreads*hackThreads*weakHackThreads*weakGrowThreads > 0) {
             break;
         }
-        targetHack-=5;
+        if (targetHack > 5) {
+            targetHack-=5;
+        } else {
+            targetHack--;
+        }
         await ns.sleep(100);
     }
     if (targetHack == 0) {
@@ -358,7 +383,7 @@ async function threadsForWeaken(ns, target, max) {
 }
 
 function parseMemory(n) {
-    if (typeof(n) == "number") {
+    if (n == Number(n)) {
         return n;
     }
     if (!n) {
