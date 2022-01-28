@@ -1,8 +1,12 @@
-import * as fmt from "lib/fmt.js";
+import * as fmt from "/lib/fmt.js";
+import {readAssignments} from "/lib/assignments.js";
+
+var assignments;
 
 /** @param {NS} ns **/
 export async function main(ns) {
   var found = new Map();
+  assignments = readAssignments(ns);
   var cmd = ns.args[0];
   if (!cmd) {
     cmd = "contracts";
@@ -35,7 +39,9 @@ export async function main(ns) {
     case "values":
       var list = [];
       eachFunc = function(v) {
-        list.push(v);
+        if (!v.host.startsWith("pserv-")) {
+          list.push(v);
+        }
       }
       showFunc = function() {
         list.sort((a,b) => {return a.max - b.max});
@@ -46,7 +52,7 @@ export async function main(ns) {
       eachFunc = function(v) {
         v.files.forEach(function(f) {
           if (f.endsWith(".cct")) {
-            ns.tprintf("Found a contract on %s: %s", v.host, ns.codingcontract.getContractType(f, v.host));
+            ns.tprintf("Found a contract %s on %s: %s", f, v.host, ns.codingcontract.getContractType(f, v.host));
           }
         })
       }
@@ -89,9 +95,17 @@ export async function main(ns) {
         ns.tprintf(trailTo(ns, found, v) + ";");
       }
       break;
+    case "unalias":
+      eachFunc = function(v) {
+        if (v.host == "home" || v.host.startsWith("pserv-")) {
+          return;
+        }
+        ns.tprintf("unalias go-%s;", v.host);
+      }
+      break;
     default:
       ns.tprintf("Unknown command %s", cmd);
-      ns.tprintf("cmds: contracts (default), map, hacked, values, files, orgs, reset, mkaliases");
+      ns.tprintf("cmds: contracts (default), map, hacked, values, files, orgs, reset, mkaliases, unalias");
       ns.exit();
   }
 
@@ -134,15 +148,24 @@ function trailTo(ns, found, h) {
   return ns.sprintf("alias go-%s=\"connect %s\"", name, res.join(";connect "));
 }
 
+var header = false;
 /**
  * @param {NS} ns
  * @param {Object} host
  */
 function printHost(ns, host) {
+    if (!header) {
+      header = true;
+      ns.tprintf("%-35s: %5s %4s %5s %17s %9s %s",
+          "  NAME", "ROOT", "HACK", "RAM", "VALUE  ", "SECURITY", "WORKER")
+    }
     var prefix = " ".repeat(host.depth);
-    ns.tprintf("%s%s: %s %d %s",
-      prefix, host.host, host.root, host.hack,
-      fmt.int(host.max));
+    var postfix = " ".repeat(35-host.depth-host.host.length);
+    var assigned = assignments.map((a) => {if (a.target == host.host) { return a.worker }}).filter((a) => { return a });
+    ns.tprintf("%s%s%s: %5s %4d %3dGB %8s/%8s %5.2f/%3d %s",
+      prefix, host.host, postfix, host.root, host.hack, host.ram,
+      fmt.money(host.curVal), fmt.money(host.max),
+      host.curSec, host.minSec, assigned.length ? "(" + assigned + ")" : "");
 }
 
 /**
@@ -187,25 +210,35 @@ function printFrom(ns, host, found, limit) {
  *  @param {Map} found
  *  **/
 async function scanFrom(ns, host, parent, depth, found) {
-  var hra = eval("ns.hasRootAccess(host)");
-  var rhl = eval("ns.getServerRequiredHackingLevel(host)");
-  var smm = eval("ns.getServerMaxMoney(host)");
+  var hacked = eval("ns.hasRootAccess(host)");
+  var level = eval("ns.getServerRequiredHackingLevel(host)");
+  var maxVal = eval("ns.getServerMaxMoney(host)");
+  var ram = eval("ns.getServerMaxRam(host)");
   var ports = eval("ns.getServerNumPortsRequired(host)");
+  var minSec = eval("ns.getServerMinSecurityLevel(host)");
+  var curSec = eval("ns.getServerSecurityLevel(host)");
+  var curVal = eval("ns.getServerMoneyAvailable(host)");
   var files = eval("ns.ls(host)");
   found.set(host, {
     depth: depth,
     host: host,
-    root: hra,
-    hack: rhl,
-    max: smm,
+    root: hacked,
+    hack: level,
+    max: maxVal,
+    curVal: curVal,
+    minSec: minSec,
+    curSec: curSec,
     ports: ports,
+    ram: ram,
     children: [],
     parent: parent,
+    path: [],
     files: files,
   });
 
   if (found.has(parent)) {
     found.get(parent).children.unshift(host);
+    found.get(host).path.unshift(...found.get(parent).path, parent)
   }
 
   var hosts = eval("ns.scan(host)");
@@ -233,7 +266,7 @@ async function saveDB(ns, found) {
     return found;
   }
   found.forEach((h) => {
-    data.push([h.host, h.hack, h.max, h.ports, h.root, contains(h.host, pServers)].join("\t"));
+    data.push([h.host, h.hack, h.max, h.ports, h.root, contains(h.host, pServers), h.path].join("\t"));
   })
   await ns.write("/conf/hosts.txt", data.join("\n"), "w");
 }
