@@ -1,9 +1,20 @@
+import * as cp from "/lib/contracts.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
-    var data = ns.args[0].split(",");
+    var host = ns.args[0];
+    var file = ns.args[1];
+    var data = await cp.proxyReqData(ns, host, file, "Array Jumping Game");
+    if (!data) {
+        ns.tail();
+        ns.tprint("Couldn't get data from proxy!");
+        ns.exit();
+    }
     // 7,0,8,7,4,0,2,6,7,8,3
+    ns.tprint(typeof(data));
     ns.tprint(data);
-    ns.tprint(jump(data));
+    var res = jump(data);
+    ns.tprint(await cp.proxyPostAnswer(ns, host, file, res));
 }
 
 /**

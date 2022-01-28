@@ -1,64 +1,74 @@
 /** @param {NS} ns **/
 export async function main(ns) {
+    ns.disableLog("sleep");
     var data = eval(ns.args[0]);
     if (!data) {
         ns.tprint("No data");
         return;
     }
-    // ["948481", -76]
-    // ["827206835052", -74]
+    // data = ["948481",-76];
+    // data = ["827206835052",-74];
+    // data = ["7011847149",-92] -> 117 matches;
 
     var digits = data[0];
     var target = data[1];
 
     ns.tprint(digits, " ", target);
+    
+    var res = await allSums(digits, target);
+    ns.tprint(res.length);
+    ns.tprint(res);
+}
 
-    var opts = await maths(ns, digits);
+/**
+ * @param {string} digits
+ * @param {number} target
+ */
+export async function allSums(digits, target) {
+    var cache = new Map();
+    var opts = await maths(String(digits), cache);
     var res = [];
     opts.forEach((o) => {
-        // ns.tprint(o);
         if (eval(o) == target) {
             res.push(o);
         }
     });
-    ns.tprint(res);
+
+    return res;
 }
 
-// var cache = new Map();
 
 /**
- * @param {NS} ns
  * @param {string} digits
- * @param {int} target
+ * @param {Map<string,strung[]} cache
  */
-async function maths(ns, digits) {
-    /*
+async function maths(digits, cache) {
+    var opts = [];
     if (cache.has(digits)) {
-        ns.tprint("cache hit: ", digits);
         return cache.get(digits);
-    } */
-    ns.tprint(digits);
-    var res = [];
+    }
     for (var i = 1; i <= digits.length; i++) {
-        await ns.sleep(10);
         var n = digits.substr(0, i);
 
         if (i == digits.length) {
-            res.push(n);
+            opts.push(n);
             continue;
         }
 
         var sub = [];
-        sub = await maths(ns, digits.substr(i));
+        sub = await maths(digits.substr(i), cache);
         sub.forEach((s) => {
             // s = Number(s);
-            res.push(n + "+" + s);
-            res.push(n + "-" + s);
-            res.push(n + "*" + s);
+            opts.push(n + "+" + s);
+            opts.push(n + "-" + s);
+            opts.push(n + "*" + s);
         })
     }
 
-    // cache.set(digits, res);
+    var res = [];
+    var invalid = /[-+*]0\d/;
+    res = opts.filter((o) => { return !invalid.test(o) });
 
+    cache.set(digits, res);
     return res;
 }

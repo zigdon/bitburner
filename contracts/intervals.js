@@ -1,7 +1,19 @@
+import * as cp from "/lib/contracts.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
-    var data = eval(ns.args[0]);
-    ns.tprint(solveIntervals(data));
+    var host = ns.args[0];
+    var file = ns.args[1];
+    var data = await cp.proxyReqData(ns, host, file, "Merge Overlapping Intervals");
+    if (!data) {
+        ns.tail();
+        ns.tprint("Couldn't get data from proxy!");
+        ns.exit();
+    }
+    ns.tprint(typeof(data));
+    ns.tprint(data);
+    var res = solveIntervals(data);
+    ns.tprint(await cp.proxyPostAnswer(ns, host, file, res));
 }
 
 /**
