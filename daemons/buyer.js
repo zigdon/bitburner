@@ -1,10 +1,13 @@
 import * as fmt from "/lib/fmt.js";
 import {console} from "/lib/log.js";
+import {getPorts} from "/lib/ports.js";
 
 var script = "worker.js";
 var installer = "/tools/install.js";
+var assigner = "/tools/assigntargets.js";
 var reserve = 0;
 var mode = "none";
+var ports = getPorts();
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -35,6 +38,7 @@ export async function main(ns) {
 	await ns.sleep(60000);
 	var max = ns.getPurchasedServerMaxRam();
 
+	var idle = [];
 	while (ram <= max) {
 		var newReq = ns.getScriptRam(script);
 		if (req != newReq) {
@@ -43,6 +47,10 @@ export async function main(ns) {
 		}
 
 		var next = getNextServer(ns, ram);
+		if (next == "<waiting>") {
+			await ns.sleep(1000);
+			continue;
+		}
 		if (next == "") {
 			if (ram == max) {
 				break;
@@ -69,7 +77,26 @@ export async function main(ns) {
 		var need = ns.getPurchasedServerCost(ram);
 		await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
 		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
-			await checkControl(ns, need, reserve);
+			if (idle.length > 0) {
+				var pid = ns.exec(assigner, "home");
+				while (ns.isRunning(pid, "home")) {
+					await ns.sleep(500);
+				}
+			}
+			while (idle.length > 0) {
+				var h = idle.shift();
+				switch (mode) {
+					case "batch":
+						ns.exec(installer, "home", 1, h);
+						break;
+					case "worker":
+						ns.exec(installer, "home", 1, h, "worker");
+						break;
+					default:
+						await console(ns, "bought new server %s with %s GB RAM, leaving idle", h, fmt.int(ram));
+				}
+			}
+			await checkControl(ns, need);
 			await ns.sleep(10000);
 		}
 
@@ -81,19 +108,7 @@ export async function main(ns) {
 		}
 		
 		next = ns.purchaseServer(next, ram);
-		switch (mode) {
-			case "batch":
-				await console(ns, "bought new server %s with %s GB RAM, installing batch", next, fmt.int(ram));
-				ns.exec(installer, "home", 1, next);
-				break;
-			case "worker":
-				await console(ns, "bought new server %s with %s GB RAM, launching %d threads", next, fmt.int(ram), ram/req);
-				await ns.scp(script, next);
-				ns.exec(script, next, ram/req);
-				break;
-			default:
-				await console(ns, "bought new server %s with %s GB RAM, leaving idle", next, fmt.int(ram));
-		}
+		idle.push(next);
 		await ns.sleep(1000);
 	}
 
@@ -105,7 +120,8 @@ export async function main(ns) {
  * @param {int} ram
  */
 function getNextServer(ns, ram) {
-	// Find the next server to buy - either missing (less than limit), or has less than our target memory
+	// Find the next server to buy:
+	// - missing
 	var maxServers = ns.getPurchasedServerLimit();
 	for (var i = 0; i < maxServers; i++) {
 		var name = "pserv-" + i;
@@ -113,14 +129,32 @@ function getNextServer(ns, ram) {
 			return name;
 		}
 	}
+
+	// - too small, and idle
+	var found = false;
+	var turndown = [];
 	for (var i = 0; i < maxServers; i++) {
 		var name = "pserv-" + i;
 		if (ns.getServerMaxRam(name) < ram) {
-			return name;
+			if (ns.ps(name).filter((p) => { return p.filename.startsWith("/bin") }).length == 0) {
+				ns.print(name, " is idle, upgrading.");
+				return name;
+			} else if (!ns.fileExists("/conf/assignments.txt", name)) {
+				found = true;
+				turndown.push(name);
+			} else {
+				ns.print(name, " is obsolete, turning down.");
+				ns.mv(name, "/conf/assignments.txt", "/obsolete.txt");
+				ns.scriptKill("/daemons/batch.js", name);
+				found = true;
+			}
 		}
 	}
 
-	return "";
+	if (!found) {
+		ns.print("No available servers, servers spinning down: ", turndown);
+	}
+	return found ? "<waiting>" : "";
 }
 
 /**
@@ -150,8 +184,8 @@ function parseMoney(s) {
  * @param {number} need
  * @param {number} reserve
  **/
-async function checkControl(ns, need, reserve) {
-	var words = ns.readPort(4).split(" ");
+async function checkControl(ns, need) {
+	var words = ns.readPort(ports.BUYER_CTL).split(" ");
 	switch (words[0]) {
 		case "NULL":
 			return
@@ -171,7 +205,7 @@ async function checkControl(ns, need, reserve) {
 			break;
 		case "quit":
 			await console(ns, "quitting");
-			ns.quit();
+			ns.exit();
 		default:
 			ns.tprintf("Unknown control command: " + words.join(" "));
 			ns.tprintf("cmds: reserve, quit, report");
