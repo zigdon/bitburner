@@ -139,7 +139,34 @@ async function checkCtl(ns) {
       }
       break;
     case "edit":
-      await console(ns, "edit not implemented");
+      var name = words.shift();
+      if (!schedule.has(name)) {
+        await console(ns, "No job named '%s'", name);
+        break;
+      }
+      var j = schedule.get(name);
+      var invalid = [];
+      while (words.length > 1) {
+        var k = words.shift();
+        var v = words.shift();
+        if (["host", "when", "jitter", "threads", "proc", "args"].indexOf(k) == -1) {
+          invalid.push(k);
+          continue;
+        }
+        j[k] = v;
+      }
+      if (invalid.length > 0) {
+        await console(ns, "Invalid fields: %s", invalid);
+      } else {
+        var res = await ns.prompt("Save changes to job?\n" + printJob(ns, j));
+        if (res) {
+          schedule.set(j.name, j)
+          await saveSchedule(ns);
+          await console(ns, "Updated!");
+        } else {
+          await console(ns, "Aborted!");
+        }
+      }
       break;
     case "pause":
       var name = words.shift()
@@ -168,6 +195,10 @@ async function checkCtl(ns) {
       break;
     case "del":
       await console(ns, "del not implemented");
+      break;
+    case "restart":
+      await console(ns, "Restarting cron!");
+      ns.spawn(ns.getRunningScript().filename);
       break;
     default:
       await console(ns, "Unknown command: %s", cmd);
