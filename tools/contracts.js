@@ -12,6 +12,7 @@ import { factor } from "/contracts/factor.js";
 import { solveIntervals } from "/contracts/intervals.js";
 import { jump } from "/contracts/jump.js";
 import { trianglePath } from "/contracts/triangle.js";
+import { allSums } from "/contracts/maths.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -108,6 +109,10 @@ export async function handleContract(ns, file, host) {
             var answer = subsum(cData).sum;
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
+        case "Find All Valid Math Expressions":
+            var answer = await allSums(String(cData[0]), cData[1]);
+            res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
+            break;
         case "Minimum Path Sum in a Triangle":
             var answer = trianglePath(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
@@ -137,7 +142,8 @@ export async function handleContract(ns, file, host) {
     if (res) {
         await console(ns, "%s: %s", cType, res);
     } else {
-        await console(ns, "*** Failed contract %s on n%s", file, host);
+        await console(ns, "*** Failed contract %s on n%s (%s): %s %s",
+            file, host, cType, typeof(cData), cData);
     }
 
 }
