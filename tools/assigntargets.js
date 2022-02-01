@@ -119,7 +119,8 @@ export async function main(ns) {
             }
             continue
         }
-        if (ns.isRunning("/daemons/batch.js", a.worker, a.target)) {
+        if (ns.isRunning("/daemons/batch.js", a.worker, a.target) ||
+            ns.fileExists("obsolete.txt", a.worker)) {
             continue;
         }
         if (startCnt-- < 0) {
