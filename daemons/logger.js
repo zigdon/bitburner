@@ -1,3 +1,4 @@
+var lastDate = new Map();
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
@@ -39,7 +40,9 @@ async function log(ns, ffunc, data) {
     if (ffunc(data)) {
         ns.print(data.raw);
     }
-    var date = new Date().toLocaleTimeString("en-US", { timeZone: "PST" });
+    var ts = new Date().toLocaleTimeString("en-US", { timeZone: "PST" });
+    var fname = "/log/log.txt";
+    var msg =  ts + " - " + data.text+"\n";
     if (data.host) {
         if (data.proc) {
             var proc = data.proc.split(".")[0];
@@ -52,13 +55,17 @@ async function log(ns, ffunc, data) {
                     host = "dot";
                     break;
             }
-            await ns.write("/log/"+host+"/"+proc+".txt", date + " - " + data.text+"\n", "a");
+            fname = "/log/"+host+"/"+proc+".txt";
         } else {
-            await ns.write("/log/"+host+"/default.txt", date + " - " + data.text+"\n", "a");
+           fname = "/log/"+host+"/default.txt"
         }
-    } else {
-        await ns.write("/log/log.txt", date + " - " + data.text+"\n", "a");
     }
+    var date = new Date().toISOString().split("T")[0];
+    if (date != lastDate.get(fname)) {
+        lastDate.set(fname, date);
+        await ns.write(fname, "====== "+date+"\n", "a");
+    }
+    await ns.write(fname, msg, "a");
 }
 
 function mkFilter(ns, filter) {
