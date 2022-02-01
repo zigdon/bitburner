@@ -106,17 +106,6 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     found.get(parent).children.unshift(host);
   }
   if (h.root) {
-    try {
-      if (!h.backdoor && !h.host.startsWith("pserv-") && h.max == 0) {
-        await console(ns, "installing backdoor on %s", h.host);
-        if (go(ns, h.host)) {
-          await ns.installBackdoor()
-          go(ns, "home");
-        }
-      }
-    } catch (error) {
-      await console(ns, "error installing backdoor on %s: %s", h.host, error);
-    }
     if (!ns.scriptRunning(workerScript, host) &&
       !ns.scriptRunning(batchScript, host) &&
       host.startsWith("pserv-")) {
@@ -187,12 +176,12 @@ async function doHack(ns, host, openers) {
         await ns.installBackdoor();
       } else {
         await console(ns, "Failed to go to %s", host);
-        ns.connect("home");
         ns.toast("Install backdoor on " + host, "info", null);
       }
     } catch (error) {
       await console(ns, "Error installing backdoor on %s: %s", h.host, error);
       ns.toast("Install backdoor on " + host, "info", null);
     }
+    ns.connect("home");
   }
 }
