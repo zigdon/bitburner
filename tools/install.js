@@ -14,6 +14,10 @@ export async function main(ns) {
     var target = ns.args[0];
     var tool = ns.args[1];
     var args = ns.args.splice(2);
+    var installs = new Map();
+    for (var t of ["weakener", "sharer", "batch"]) {
+        installs.set(t, []);
+    }
 
     if (!target || target == "all") {
         var hs = hosts.hosts(ns).filter((h) => {return !h.host.startsWith("pserv-")});
@@ -21,25 +25,30 @@ export async function main(ns) {
         var sReq = ns.getScriptRam("/daemons/sharer.js");
         for (var i in hs) {
             var h = hs[i];
-            if (h.host == "home") {
+            if (h.host == "home" || !ns.hasRootAccess(h.host)) {
                 continue;
             }
             var homeRam = ns.getServerMaxRam("home");
             if (homeRam > 1000) {  // 1TB
                 if (ns.getServerMoneyAvailable("home") < 1000000000) { // $1b
                     if (ns.getServerMaxRam(h.host) > wReq) {
-                        ns.tprintf("installing weakener on %s", h.host);
+                        installs.get("weakener").push(h.host);
                         await installWeaken(ns, h.host);
                     }
                 } else {
                     if (ns.getServerMaxRam(h.host) > sReq) {
-                        ns.tprintf("installing sharer on %s", h.host);
+                        installs.get("sharer").push(h.host);
                         await installSharer(ns, h.host);
                     }
                 }
             } else {
-                ns.tprintf("installing worker on %s", h.host);
+                installs.get("worker").push(h.host);
                 await installWorker(ns, h.host);
+            }
+        }
+        for (var i of installs) {
+            if (i[1].length > 0) {
+                ns.tprintf("%s: %s", i[0], i[1].join(", "));
             }
         }
         return;
@@ -49,17 +58,22 @@ export async function main(ns) {
         var a = readAssignments(ns);
         for (var i in hs) {
             if (tool == "sharer") {
-                ns.tprintf("installing sharer on %s", hs[i].host);
+                installs.get("sharer").push(hs[i].host);
                 await installSharer(ns, hs[i].host);
                 continue;
             }
             var h = a.find((h) => {return h.worker == hs[i].host});
             if (h && ns.getServerMaxRam(h.worker) > req) {
-                ns.tprintf("Installing batch on %s to hack %s", h.worker, h.target);
+                installs.get("batch").push(h.worker);
                 await installBatch(ns, h.worker, h.target);
             } else {
-                ns.tprintf("Installing weakener on %s", hs[i].host);
+                installs.get("weakener").push(hs[i].worker);
                 await installWeaken(ns, hs[i].host);
+            }
+        }
+        for (var i of installs) {
+            if (i[1].length > 0) {
+                ns.tprintf("%s: %s", i[0], i[1].join(", "));
             }
         }
         return;
@@ -97,6 +111,10 @@ export async function main(ns) {
 }
 
 export async function installBatch(ns, worker, target) {
+    if (ns.fileExists("/obsolete.txt", target)) {
+        await console(ns, "%s is obsokete, not installing batch.", target)
+        return
+    }
     if (target != "home") {
         var files = ["/bin/weaken.js", "/bin/hack.js", "/bin/grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
         files.push(libs);
