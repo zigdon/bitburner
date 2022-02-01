@@ -1,6 +1,7 @@
 import * as fmt from "/lib/fmt.js";
-import {console} from "/lib/log.js";
-import {getPorts} from "/lib/ports.js";
+import { console, netLog } from "/lib/log.js";
+import { getPorts } from "/lib/ports.js";
+import * as zui from "/lib/ui.js"
 
 var script = "worker.js";
 var installer = "/tools/install.js";
@@ -33,7 +34,15 @@ export async function main(ns) {
 	while (ram < batchRam) {
 		ram *= 2;
 	}
-	await console(ns, "Buying servers with %s GB RAM for $%s", fmt.int(ram), fmt.int(ns.getPurchasedServerCost(ram)));
+	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
+	zui.customOverview("buyer", "Buyer");
+	var updateUI = function(m = "") {
+		var t = ns.sprintf("%s (%s)%s", fmt.money(ns.getPurchasedServerCost(ram)), fmt.memory(ram), m);
+		zui.setCustomOverview("buyer", t);
+	}
+	updateUI();
+    ns.atExit(function() {zui.rmCustomOverview("buyer")});
+
 	await console(ns, "Waiting 1 minute before starting...");
 	await ns.sleep(60000);
 	var max = ns.getPurchasedServerMaxRam();
@@ -46,6 +55,7 @@ export async function main(ns) {
 			req = newReq;
 		}
 
+		await checkControl(ns, need);
 		var next = getNextServer(ns, ram);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
@@ -62,20 +72,21 @@ export async function main(ns) {
 				ram *= 4;
 			} else {
 				ram *= 8;
-			} 
+			}
 			if (ram > max) {
 				ram = max;
 			}
-			while (ns.getServerMoneyAvailable("home") > ns.getPurchasedServerCost(ram*2)*2 && ram < max) {
+			while (ns.getServerMoneyAvailable("home") > ns.getPurchasedServerCost(ram * 2) * 2 && ram < max) {
 				ram *= 2;
 			}
-			await console(ns, "Increasing server ram to %s GB ($%s)", fmt.int(ram), fmt.int(ns.getPurchasedServerCost(ram)));
+			await console(ns, "Increasing server ram to %s GB (%s)", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
+			updateUI();
 			continue;
 		}
 
 		// wait until we have enough money
 		var need = ns.getPurchasedServerCost(ram);
-		await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
+		await netLog(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
 		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
 			if (idle.length > 0) {
 				var pid = ns.exec(assigner, "home");
@@ -102,17 +113,21 @@ export async function main(ns) {
 
 		// if the server exists, delete it
 		if (ns.serverExists(next)) {
-			await console(ns, "deleting obsolete server %s", next);
+			await netLog(ns, "deleting obsolete server %s", next);
 			ns.killall(next);
 			ns.deleteServer(next);
 		}
-		
+
+		updateUI(".");
 		next = ns.purchaseServer(next, ram);
+		await netLog(ns, "bought new server %s with %s GB RAM", next, fmt.int(ram));
 		idle.push(next);
 		await ns.sleep(1000);
+		updateUI();
 	}
 
 	await console(ns, "Bought max servers with max memory, done");
+	zui.removeCustomOverview("buyer");
 }
 
 /**
@@ -142,10 +157,11 @@ function getNextServer(ns, ram) {
 			} else if (!ns.fileExists("/conf/assignments.txt", name)) {
 				found = true;
 				turndown.push(name);
-			} else {
+			} else if (!found) {
 				ns.print(name, " is obsolete, turning down.");
-				ns.mv(name, "/conf/assignments.txt", "/obsolete.txt");
+				ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
 				ns.scriptKill("/daemons/batch.js", name);
+				turndown.push(name);
 				found = true;
 			}
 		}
@@ -161,11 +177,11 @@ function getNextServer(ns, ram) {
  * @param {string} s
  */
 function parseMoney(s) {
-	if (1*s == s) {
-		return 1*s;
+	if (1 * s == s) {
+		return 1 * s;
 	}
 	var unit = s.substr(-1);
-	var val = s.substr(0, s.length-1);
+	var val = s.substr(0, s.length - 1);
 	switch (unit) {
 		case "t":
 			val *= 1000
@@ -192,7 +208,7 @@ async function checkControl(ns, need) {
 			break;
 		case "reserve":
 			reserve = parseMoney(words[1]);
-			await console(ns, "Setting reserve to $%s", fmt.int(reserve));
+			await console(ns, "Setting reserve to %s", fmt.money(reserve));
 			await ns.write("/conf/buyerReserve.txt", reserve, "w");
 			break;
 		case "mode":
@@ -201,11 +217,14 @@ async function checkControl(ns, need) {
 			await ns.write("/conf/buyerMode.txt", mode, "w");
 			break;
 		case "report":
-			await console(ns, "Waiting for $%s, leaving $%s in reserve", fmt.int(need), fmt.int(reserve));
+			await console(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
 			break;
 		case "quit":
 			await console(ns, "quitting");
 			ns.exit();
+		case "restart":
+			await console(ns, "restarting...");
+			ns.spawn(ns.getScriptName());
 		default:
 			ns.tprintf("Unknown control command: " + words.join(" "));
 			ns.tprintf("cmds: reserve, quit, report");
