@@ -4,7 +4,9 @@ export async function main(ns) {
     var data = ns.args[0];
     // (a)()a(())))a)()
     // ())((()a()(()()(aa((
+    // (aa))a)a)((())((a(((
 
+    ns.tprintf("starting parens: %s -> [%d, %d, %d]", data, ...count(data));
     var res = makeValid(data);
     ns.tprint("========");
     res.forEach((r) => {ns.tprint(r)});
@@ -35,26 +37,26 @@ function count(data) {
 
 /**
  * @param {string} data
- * @param {number} cnt
+ * @param {number} best
  * @returns {string[]}
  */
-export function makeValid(data) {
-    var [cnt, min, max] = count(data);
-    if (cnt == 0) {
-        return [data];
-    }
-
+export function makeValid(data, best) {
     data = trim(data);
-    [cnt, min, max] = count(data);
-
+    if (best && data.length < best) {
+        return [];
+    }
+    var [cnt, min, max] = count(data);
+    // console.log(sprintf("count: %s -> [%d, %d, %d], best = %d", data, cnt, min, max, best));
     if (cnt == 0) {
+        // console.log(sprintf("%s valid", data));
         return [data];
     }
 
     var res = [];
     var subRes = new Map()
     for (var i=0; i<data.length; i++) {
-        var newCnt = cnt;
+        [cnt, min, max] = count(data);
+        // console.log(sprintf("data: %s, [%d, %d]", data, min, max));
         if ("()".indexOf(data[i]) == -1) {
             continue;
         } else if (cnt > 0 && data[i] == ")") {
@@ -62,33 +64,29 @@ export function makeValid(data) {
                 continue;
             }
             min++;
+            // console.log(sprintf("removing ) (%d remain) from %s*)*%s at %d", min, data.slice(0, i), data.slice(i+1), i));
         } else if (cnt < 0 && data[i] == "(") {
             if (max <= 0) {
                 continue;
             }
             max--;
-        }
-        if (data[i] == ")") {
-            newCnt++;
-        } else {
-            newCnt--;
+            // console.log(sprintf("removing ( (%d remain) from %s*(*%s at %d", max, data.slice(0, i), data.slice(i+1), i));
         }
         var fix = data.slice(0,i) + data.slice(i+1);
         fix = trim(fix)
-        var [nc] = count(fix);
-        newCnt = nc;
 
-        if (newCnt == 0) {
-            subRes.set(fix, true);
-            continue
-        }
-
-        var sub = makeValid(fix);
-        sub.forEach((s) => {subRes.set(s, true)})
+        var sub = makeValid(fix, best);
+        sub.forEach((s) => {
+            if (!best || s.length > best) {
+                best = s.length;
+                // console.log("best length: ", best);
+            }
+            if (s.length == best) {
+                subRes.set(s, true);
+            }
+        })
     }
 
-    var best = 0;
-    subRes.forEach((_, r) => {if (r.length>best) { best = r.length } });
     subRes.forEach((_, r) => {if (r.length == best) {res.push(r)}});
 
     return res.filter(invalid);
