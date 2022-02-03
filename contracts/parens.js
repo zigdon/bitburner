@@ -3,10 +3,12 @@ export async function main(ns) {
     ns.disableLog("sleep");
     var data = ns.args[0];
     // (a)()a(())))a)()
+    // ())((()a()(()()(aa((
 
     var res = makeValid(data);
     ns.tprint("========");
     res.forEach((r) => {ns.tprint(r)});
+    ns.tprintf("[%s]", res.join(","));
 }
 
 /**
@@ -15,6 +17,8 @@ export async function main(ns) {
  */
 function count(data) {
     var cnt = 0;
+    var min = 0;
+    var max = 0;
     for (var i=0; i<data.length; i++) {
         var c = data[i];
         if (c == "(") {
@@ -22,9 +26,11 @@ function count(data) {
         } else if (c == ")") {
             cnt--;
         }
+        if (cnt > max) { max = cnt }
+        if (cnt < min) { min = cnt }
     }
 
-    return cnt;
+    return [cnt, min, max];
 }
 
 /**
@@ -33,13 +39,13 @@ function count(data) {
  * @returns {string[]}
  */
 export function makeValid(data) {
-    var cnt = count(data);
+    var [cnt, min, max] = count(data);
     if (cnt == 0) {
         return [data];
     }
 
     data = trim(data);
-    cnt = count(data);
+    [cnt, min, max] = count(data);
 
     if (cnt == 0) {
         return [data];
@@ -52,9 +58,15 @@ export function makeValid(data) {
         if ("()".indexOf(data[i]) == -1) {
             continue;
         } else if (cnt > 0 && data[i] == ")") {
-            continue;
+            if (min >= 0) {
+                continue;
+            }
+            min++;
         } else if (cnt < 0 && data[i] == "(") {
-            continue;
+            if (max <= 0) {
+                continue;
+            }
+            max--;
         }
         if (data[i] == ")") {
             newCnt++;
@@ -63,7 +75,8 @@ export function makeValid(data) {
         }
         var fix = data.slice(0,i) + data.slice(i+1);
         fix = trim(fix)
-        newCnt = count(fix);
+        var [nc] = count(fix);
+        newCnt = nc;
 
         if (newCnt == 0) {
             subRes.set(fix, true);
