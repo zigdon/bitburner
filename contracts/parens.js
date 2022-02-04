@@ -5,9 +5,11 @@ export async function main(ns) {
     // (a)()a(())))a)()
     // ())((()a()(()()(aa((
     // (aa))a)a)((())((a(((
+    // ))))()a))()))((()
+    //     ()a))()))((()
 
     ns.tprintf("starting parens: %s -> [%d, %d, %d]", data, ...count(data));
-    var res = makeValid(data);
+    var res = await makeValid(ns, data);
     ns.tprint("========");
     res.forEach((r) => {ns.tprint(r)});
     ns.tprintf("[%s]", res.join(","));
@@ -35,19 +37,28 @@ function count(data) {
     return [cnt, min, max];
 }
 
+var seen = [];
+
 /**
+ * @param {NS} ns
  * @param {string} data
  * @param {number} best
  * @returns {string[]}
  */
-export function makeValid(data, best) {
+export async function makeValid(ns, data, best) {
+    await ns.sleep(1);
     data = trim(data);
     if (best && data.length < best) {
         return [];
     }
+    if (seen.indexOf(data) >= 0) {
+        return [];
+    }
+    seen.push(data);
+    // console.log("seen: ", seen.length);
     var [cnt, min, max] = count(data);
-    // console.log(sprintf("count: %s -> [%d, %d, %d], best = %d", data, cnt, min, max, best));
-    if (cnt == 0) {
+    // console.log(sprintf("count: %s -> [%d, %d, %d], best = %d", data, cnt, min, max, best || 0));
+    if (cnt == 0 && min >= 0) {
         // console.log(sprintf("%s valid", data));
         return [data];
     }
@@ -55,6 +66,11 @@ export function makeValid(data, best) {
     var res = [];
     var subRes = new Map()
     for (var i=0; i<data.length; i++) {
+        // If this character is the same as the one before, no point in looking at it.
+        if (i>0 && data[i] == data[i-1]) {
+            continue;
+        }
+
         [cnt, min, max] = count(data);
         // console.log(sprintf("data: %s, [%d, %d]", data, min, max));
         if ("()".indexOf(data[i]) == -1) {
@@ -73,9 +89,7 @@ export function makeValid(data, best) {
             // console.log(sprintf("removing ( (%d remain) from %s*(*%s at %d", max, data.slice(0, i), data.slice(i+1), i));
         }
         var fix = data.slice(0,i) + data.slice(i+1);
-        fix = trim(fix)
-
-        var sub = makeValid(fix, best);
+        var sub = await makeValid(ns, fix, best);
         sub.forEach((s) => {
             if (!best || s.length > best) {
                 best = s.length;
@@ -89,10 +103,10 @@ export function makeValid(data, best) {
 
     subRes.forEach((_, r) => {if (r.length == best) {res.push(r)}});
 
-    return res.filter(invalid);
+    return res.filter(valid);
 }
 
-function invalid(data) {
+function valid(data) {
     var cnt = 0;
     for (var i=0; i< data.length; i++) {
         if (data[i] == "(") {
