@@ -1,5 +1,5 @@
 import * as fmt from "/lib/fmt.js";
-import { console, netLog } from "/lib/log.js";
+import { console, netLog, toast } from "/lib/log.js";
 import { getPorts } from "/lib/ports.js";
 import * as zui from "/lib/ui.js"
 
@@ -37,18 +37,25 @@ export async function main(ns) {
 	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
 	zui.customOverview("buyer", "Buyer");
 	var updateUI = function(m = "") {
-		var t = ns.sprintf("%s (%s)%s", fmt.money(ns.getPurchasedServerCost(ram)), fmt.memory(ram), m);
+		var obs = 0;
+		var cur = 0;
+		ns.getPurchasedServers().forEach(srv => ns.getServer(srv).maxRam == ram ? cur++ : obs++);
+		var t = ns.sprintf("%s\n(%s)\n%d/%d%s",
+	 	  fmt.money(ns.getPurchasedServerCost(ram)),
+		  fmt.memory(ram),
+		  obs, cur, m);
 		zui.setCustomOverview("buyer", t);
 	}
 	updateUI();
     ns.atExit(function() {zui.rmCustomOverview("buyer")});
 
 	await console(ns, "Waiting 1 minute before starting...");
-	await ns.sleep(60000);
+	var start = Date.now();
 	var max = ns.getPurchasedServerMaxRam();
 
 	var idle = [];
 	while (ram <= max) {
+		var need = ns.getPurchasedServerCost(ram);
 		var newReq = ns.getScriptRam(script);
 		if (req != newReq) {
 			await console(ns, "Updating required memory from %s GB to %s GB", fmt.int(req), fmt.int(newReq));
@@ -56,6 +63,10 @@ export async function main(ns) {
 		}
 
 		await checkControl(ns, need);
+		if (Date.now() - start < 60000) {
+			await ns.sleep(1000);
+			continue;
+		}
 		var next = getNextServer(ns, ram);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
@@ -79,13 +90,12 @@ export async function main(ns) {
 			while (ns.getServerMoneyAvailable("home") > ns.getPurchasedServerCost(ram * 2) * 2 && ram < max) {
 				ram *= 2;
 			}
-			await console(ns, "Increasing server ram to %s GB (%s)", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
+			await toast(ns, "Increasing server ram to %s GB (%s)", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
 			updateUI();
 			continue;
 		}
 
 		// wait until we have enough money
-		var need = ns.getPurchasedServerCost(ram);
 		await netLog(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
 		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
 			if (idle.length > 0) {
@@ -98,7 +108,7 @@ export async function main(ns) {
 				var h = idle.shift();
 				switch (mode) {
 					case "batch":
-						ns.exec(installer, "home", 1, h);
+						ns.exec(installer, "home", 1, h, "batch");
 						break;
 					case "worker":
 						ns.exec(installer, "home", 1, h, "worker");
@@ -109,6 +119,12 @@ export async function main(ns) {
 			}
 			await checkControl(ns, need);
 			await ns.sleep(10000);
+		}
+
+		next = getNextServer(ns, ram);
+		if (next == "<waiting>") {
+			await ns.sleep(1000);
+			continue;
 		}
 
 		// if the server exists, delete it
@@ -127,7 +143,7 @@ export async function main(ns) {
 	}
 
 	await console(ns, "Bought max servers with max memory, done");
-	zui.removeCustomOverview("buyer");
+	zui.rmCustomOverview("buyer");
 }
 
 /**
