@@ -11,10 +11,16 @@ export async function main(ns) {
     ns.tail(pid, "home");
     ns.exec("/daemons/buyer.js", "home");
     ns.exec("/daemons/cron.js", "home");
+    ns.exec("/daemons/joiner.js", "home");
     ns.exec("/daemons/monitor.js", "home");
+    ns.exec("/daemons/gangmgr.js", "home");
+    ns.exec("/daemons/controller.js", "home");
     ns.exec("/tools/scan.js", "home");
-    ns.exec("/tools/search-and-hack.js", "home");
     ns.exec("/tools/buyprogs.js", "home");
-    var reserve = Math.ceil(ns.getServerUsedRam("home")/10)*10;
-    ns.exec("/daemons/batch.js", "home", 1, "foodnstuff");
+    pid = ns.exec("/tools/search-and-hack.js", "home");
+    while (ns.isRunning(pid, "home")) {
+        await ns.sleep(500);
+    }
+    ns.exec("/tools/install.js", "home");
+    // ns.exec("/tools/home-batch.js", "home")
 }

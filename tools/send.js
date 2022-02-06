@@ -20,6 +20,9 @@ export async function main(ns) {
         case "cron":
             port = ports.CRON_CTL;
             break;
+        case "gang":
+            port = ports.GANGMGR;
+            break;
     }
     var ph = ns.getPortHandle(port);
     var msg = ns.args.slice(1).join(" ");

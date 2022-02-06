@@ -22,6 +22,7 @@ export async function main(ns) {
         ["relaySMTP", 15],
         ["HTTPWorm", 30],
         ["SQLInject", 250],
+        ["Formulas", 5000],
     ];
     while (progs.length > 0) {
         var e = progs.shift();
