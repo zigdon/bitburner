@@ -1,4 +1,4 @@
-import { log, console } from "/lib/log.js";
+import { log, console, toast } from "/lib/log.js";
 import { getHost, hosts } from "/lib/hosts.js";
 import { getTrades, pickTrades } from "/contracts/trader.js";
 import { mkIPs } from "/contracts/ips.js";
@@ -13,6 +13,9 @@ import { solveIntervals } from "/contracts/intervals.js";
 import { jump } from "/contracts/jump.js";
 import { trianglePath } from "/contracts/triangle.js";
 import { allSums } from "/contracts/maths.js";
+import { getPorts } from "/lib/ports.js";
+
+var ports = getPorts();
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -53,6 +56,7 @@ export async function handleContract(ns, file, host) {
 
     var level = 0;
     var res;
+    var answer;
     switch (cType) {
         case "Algorithmic Stock Trader I":
         case "Algorithmic Stock Trader II":
@@ -78,7 +82,7 @@ export async function handleContract(ns, file, host) {
 
             var trades = getTrades(ns, cData);
             var picks = await pickTrades(ns, trades, tx[level]);
-            var answer = 0;
+            answer = 0;
             for (var p in picks) {
                 answer += picks[p].sell - picks[p].buy;
                 await log(ns, "buy: %d, sell: %d", picks[p].buy, picks[p].sell);
@@ -86,64 +90,67 @@ export async function handleContract(ns, file, host) {
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Unique Paths in a Grid I":
-            var answer = paths(cData);
+            answer = paths(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Unique Paths in a Grid II":
-            var answer = blockedPaths(ns, cData);
+            answer = blockedPaths(ns, cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Sanitize Parentheses in Expression":
-            var answer = makeValid(cData)
+            answer = await makeValid(ns, cData)
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Generate IP Addresses":
-            var answer = mkIPs(ns, cData, 4);
+            answer = mkIPs(ns, cData, 4);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Total Ways to Sum":
-            var answer = getSum(cData)-1;
+            answer = getSum(cData)-1;
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Subarray with Maximum Sum":
-            var answer = subsum(cData).sum;
+            answer = subsum(cData).sum;
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Find All Valid Math Expressions":
-            var answer = await allSums(String(cData[0]), cData[1]);
+            answer = await allSums(String(cData[0]), cData[1]);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Minimum Path Sum in a Triangle":
-            var answer = trianglePath(cData);
+            answer = trianglePath(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Spiralize Matrix":
-            var answer = spiral(cData);
+            answer = spiral(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Find Largest Prime Factor":
-            var answer = await factor(ns, cData);
+            answer = await factor(ns, cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Merge Overlapping Intervals":
-            var answer = solveIntervals(cData);
+            answer = solveIntervals(cData);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Array Jumping Game":
-            var answer = jump(cData);
+            answer = jump(cData);
             res = ns.codingcontract.attempt(answer ? 1 : 0, file, host, { returnReward: true })
             break;
 
         default:
+            await toast(ns, "Unknown contract type %s", cType, {level: "error", timeout: 0});
             await console(ns, "========\nDon't know how to handle %s on %s:", file, host);
             await console(ns, cType);
             await console(ns, cDesc);
     }
     if (res) {
-        await console(ns, "%s: %s", cType, res);
+        await toast(ns, "%s: %s", cType, res);
     } else {
-        await console(ns, "*** Failed contract %s on n%s (%s): %s %s",
-            file, host, cType, typeof(cData), cData);
+        await toast(ns, "Failed to solve %s contract! Pausing contracts job.", cType, {level: "error", timeout: "0"});
+        await console(ns, "*** Failed contract %s on %s (%s): %s, submitted: %s",
+            file, host, cType, cData, answer);
+        ns.writePort(ports.CRON_CTL, "pause contracts");
     }
 
 }
