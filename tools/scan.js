@@ -36,6 +36,13 @@ export async function main(ns) {
         }
       }
       break;
+    case "assigned":
+      eachFunc = function(v) {
+        if (!assignments.every(a => a.target != v.host)) {
+          printHost(ns, v);
+        }
+      }
+      break;
     case "values":
       var list = [];
       eachFunc = function(v) {
@@ -105,12 +112,8 @@ export async function main(ns) {
       break;
     default:
       ns.tprintf("Unknown command %s", cmd);
-      ns.tprintf("cmds: contracts (default), map, hacked, values, files, orgs, reset, mkaliases, unalias");
+      ns.tprintf("cmds: contracts (default), map, hacked, assigned, values, files, orgs, reset, mkaliases, unalias");
       ns.exit();
-  }
-
-  if (start != "home") {
-    ns.tprintf(trailTo(ns, found, found.get(start)));
   }
 
   if (eachFunc) {

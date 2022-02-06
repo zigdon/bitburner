@@ -1,5 +1,5 @@
 import * as fmt from "/lib/fmt.js";
-import {log, console} from "/lib/log.js";
+import {log, console, toast} from "/lib/log.js";
 import {installWeaken, installWorker, installSharer} from "/tools/install.js";
 import {go} from "/lib/hosts.js";
 
@@ -12,9 +12,18 @@ var sharerScript = "/daemons/sharer.js";
 var controllerScript = "/daemons/controller.js";
 var scanScript = "/tools/scan.js";
 var droneMode = "worker";
+var msg = console;
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    var flags = ns.flags([
+        ["quiet", false],
+    ])
+    if (flags.quiet) {
+        log(ns, "Applying --quiet flag");
+        msg = log;
+    }
+    
   if (ns.args[0]) {
     droneMode = ns.args[0];
   } else {
@@ -26,13 +35,13 @@ export async function main(ns) {
       droneMode = "weaken";
     }
   }
-  await console(ns, "Drone mode: %s", droneMode);
+  await msg(ns, "Drone mode: %s", droneMode);
   var found = new Map();
   var openers = [];
-  nextHack = [];
+  nextHack = [0, 0, 0, 0, 0, 0];
 
   if (found.length > 0) {
-    await console(ns, "previous instance not reset");
+    await msg(ns, "previous instance not reset");
     ns.exit();
   }
   ns.disableLog("ALL");
@@ -56,22 +65,27 @@ export async function main(ns) {
   var hacked = await scanFrom(ns, "home", "", 0, found, openers);
 
   if (hacked.length > 0) {
-    await console(ns, "hacked %d hosts:", hacked.length);
+    await msg(ns, "hacked %d hosts:", hacked.length);
     for (var h in hacked) {
       var host = hacked[h];
-      await console(ns, "%s: %d $%s", host.host, host.hack, fmt.int(host.max));
+      await msg(ns, "%s: %d $%s", host.host, host.hack, fmt.int(host.max));
     };
     ns.exec(scanScript, "home");
   }
 
-
-  await console(ns, "*** Next hacking levels:");
-  var out = [];
-  nextHack.forEach(function(l, i) {
-    out.push(["  %d: %d (%s)", i, l.lvl, l.host]);
-  })
-  for (var o in out) {
-    await console(ns, ...out[o]);
+  if (!nextHack.every(p => p == 0)) {
+    await msg(ns, "*** Next hacking levels:");
+    var out = [];
+    nextHack.forEach(function(l, i) {
+      if (l.lvl) { out.push(["  %d: %d (%s)", i, l.lvl, l.host]) };
+    })
+    for (var o in out) {
+      var line = out[o];
+      await msg(ns, ...line)
+    }
+  } else {
+    await toast(ns, "*** Nothing left to hack. Disabling job.", {level: "success", timeout: 0});
+    ns.exec("/tools/send.js", "home", 1, "cron", "pause", "search");
   }
 }
 
@@ -129,6 +143,7 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     await doHack(ns, host, openers);
     hacked.push(h);
   } else if (!nextHack[h.ports] || nextHack[h.ports].lvl > h.hack) {
+    await log(ns, "Can't hack %s, need %d ports", host, h.ports);
     nextHack[h.ports] = {lvl: h.hack, host: host};
   }
 
@@ -154,32 +169,32 @@ async function doHack(ns, host, openers) {
   log(ns, "Trying " + openers.legnth + " openers on " + host);
   openers.forEach(function (f) {
     if (f(host) <= 0) {
-      console(ns, "can't run %s on %s", f, host);
+      msg(ns, "can't run %s on %s", f, host);
       return;
     }
     ports--;
   });
 
   if (ports > 0) {
-    await console(ns, "couldn't open enough ports on %s", host);
+    await msg(ns, "couldn't open enough ports on %s", host);
     return;
   }
 
   log(ns, "running nuke on " + host);
   ns.nuke(host);
-  await console(ns, "hacked %s", host);
+  await msg(ns, "hacked %s", host);
 
   if (ns.getServerMaxMoney(host) == 0 && host != "darkweb") {
     try {
       if (go(ns, host)) {
-        await console(ns, "installing backdoor on %s", host);
+        await msg(ns, "installing backdoor on %s", host);
         await ns.installBackdoor();
       } else {
-        await console(ns, "Failed to go to %s", host);
+        await msg(ns, "Failed to go to %s", host);
         ns.toast("Install backdoor on " + host, "info", null);
       }
     } catch (error) {
-      await console(ns, "Error installing backdoor on %s: %s", h.host, error);
+      await msg(ns, "Error installing backdoor on %s: %s", h.host, error);
       ns.toast("Install backdoor on " + host, "info", null);
     }
     ns.connect("home");

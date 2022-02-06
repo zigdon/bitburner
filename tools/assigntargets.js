@@ -8,24 +8,31 @@ var hs;
 var assignments;
 var custom;
 
+var out = console;
+
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
+    var flags = ns.flags([
+        ["quiet", false],
+    ])
+    if (flags.quiet) {
+        out = netLog;
+    }
+    
     var startCnt = Number(ns.args[0]);
     if (startCnt > 0) {
-        await netLog(ns, "Starting at most %d tasks", startCnt);
+        await out(ns, "Starting at most %d tasks", startCnt);
     } else {
-        await netLog(ns, "Starting all tasks");
+        await out(ns, "Starting all tasks");
     }
     hs = hosts.hosts(ns);
     assignments = readAssignments(ns);
     custom = new Map();
     hs = hs.filter((h) => { return h.root && h.max > 0 });
     hs.sort((a, b) => { return b.max - a.max })
-    await netLog(ns, "Found %d targets:", hs.length);
-    for (var h of hs) {
-        await netLog(ns, "  %20s: %s", h.host, fmt.int(h.max));
-    }
+    var data = hs.map(h => [h.host, fmt.large(h.max)]);
+    await out(ns, "Found %d targets:\n%s", hs.length, fmt.table(data));
     var servers = ns.getPurchasedServers();
     var used = new Map();
     assignments.forEach((a) => {
@@ -35,7 +42,7 @@ export async function main(ns) {
         used.set(a.worker, true);
     });
     for (var c of custom) {
-        await netLog(ns, "Found existing custom assignment: %s -> %s", c[0], c[1])
+        await out(ns, "Found existing custom assignment: %s -> %s", c[0], c[1])
     }
     var minVal = 0;
     if (hs.length > servers.length) {
@@ -47,8 +54,8 @@ export async function main(ns) {
 
     // Find servers to free up
     if (minVal > 0) {
-        await console(ns, "abandoning servers worth less than $%s", fmt.int(minVal));
         var msgs = [];
+        msgs.push(["abandoning servers worth less than %s", fmt.money(minVal)]);
         assignments.forEach((a) => {
             if (a.target.startsWith("<") || !a.worker.startsWith("pserv-")) {
                 return;
@@ -59,18 +66,22 @@ export async function main(ns) {
                 free.push(a.worker);
             }
         });
-        for (var i in msgs) {
-            await netLog(ns, ...msgs[i]);
+        if (msgs.length > 1) {
+            for (var i in msgs) {
+                await out(ns, ...msgs[i]);
+            }
         }
     }
 
     // Find idle servers
     servers.forEach((s) => { if (!used.has(s)) { idle.push(s) }});
-    await console(ns, "Found %d idle servers: %s", idle.length, idle);
-    idle.forEach((s) => { free.push(s) });
+    if (idle.length > 0) {
+        await out(ns, "Found %d idle servers: %s", idle.length, idle);
+    }
+    free.push(...idle);
 
     // Find unused targets
-    await netLog(ns, "Looking for old targets in %d servers", servers.length);
+    await out(ns, "Looking for old targets in %d servers", servers.length);
     for (var i=0; i<servers.length; i++) {
         var target = hs.shift();
         if (!target) {
@@ -82,22 +93,24 @@ export async function main(ns) {
         missing.push(target);
     }
 
-    await console(ns, "%d targets missing workers: %s",
-        missing.length, missing.map((t) => {return t.host}));
+    if (missing.length > 0) {
+        await out(ns, "%d targets missing workers: %s",
+            missing.length, missing.map((t) => {return t.host}));
+    }
 
     while (missing.length > 0) {
         var target = missing.shift().host;
         var worker = free.shift();
         if (!worker) {
-            await console(ns, "Can't find worker for %s!", target);
+            await out(ns, "Can't find worker for %s!", target);
             break;
         }
         assignments = assignments.filter((a) => { return a.worker != worker });
-        await console(ns, "directing %s to work on %s", worker, target);
+        await out(ns, "directing %s to work on %s", worker, target);
         if (startCnt-- < 0) {
-            await netLog(ns, "Not starting batch on %s for %s", worker, target);
+            await out(ns, "Not starting batch on %s for %s", worker, target);
         } else {
-            await netLog(ns, "Starting batch on %s for %s", worker, target);
+            await out(ns, "Starting batch on %s for %s", worker, target);
             await installBatch(ns, worker, target);
         }
         assignments.push({worker: worker, target: target});
@@ -115,7 +128,7 @@ export async function main(ns) {
                     await installContractProxy(ns, a.worker);
                     break;
                 default:
-                    await console(ns, "Unknown assignment %s for %s", a.target, a.worker);
+                    await out(ns, "Unknown assignment %s for %s", a.target, a.worker);
             }
             continue
         }
@@ -124,9 +137,9 @@ export async function main(ns) {
             continue;
         }
         if (startCnt-- < 0) {
-            await netLog(ns, "Not restarting batch on %s for %s", a.worker, a.target);
+            await out(ns, "Not restarting batch on %s for %s", a.worker, a.target);
         } else {
-            await console(ns, "Restarting batch on %s for %s", a.worker, a.target);
+            await out(ns, "Restarting batch on %s for %s", a.worker, a.target);
             await installBatch(ns, a.worker, a.target);
         }
     }

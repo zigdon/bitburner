@@ -1,5 +1,6 @@
 import * as hosts from "/lib/hosts.js";
-import {readAssignments} from "/lib/assignments.js";
+import { readAssignments } from "/lib/assignments.js";
+import { netLog, console } from "/lib/log.js";
 
 var libs = [
     "/lib/log.js",
@@ -9,18 +10,21 @@ var libs = [
     "/lib/assignments.js",
 ];
 
+var out = netLog;
+
 /** @param {NS} ns **/
 export async function main(ns) {
     var target = ns.args[0];
     var tool = ns.args[1];
     var args = ns.args.splice(2);
     var installs = new Map();
-    for (var t of ["weakener", "sharer", "batch"]) {
+    for (var t of ["weakener", "sharer", "batch", "worker"]) {
         installs.set(t, []);
     }
+    out = console;
 
     if (!target || target == "all") {
-        var hs = hosts.hosts(ns).filter((h) => {return !h.host.startsWith("pserv-")});
+        var hs = hosts.hosts(ns).filter((h) => { return !h.host.startsWith("pserv-") });
         var wReq = ns.getScriptRam("/daemons/weakener.js");
         var sReq = ns.getScriptRam("/daemons/sharer.js");
         for (var i in hs) {
@@ -28,32 +32,30 @@ export async function main(ns) {
             if (h.host == "home" || !ns.hasRootAccess(h.host)) {
                 continue;
             }
-            var homeRam = ns.getServerMaxRam("home");
-            if (homeRam > 1000) {  // 1TB
-                if (ns.getServerMoneyAvailable("home") < 1000000000) { // $1b
-                    if (ns.getServerMaxRam(h.host) > wReq) {
-                        installs.get("weakener").push(h.host);
-                        await installWeaken(ns, h.host);
-                    }
-                } else {
-                    if (ns.getServerMaxRam(h.host) > sReq) {
-                        installs.get("sharer").push(h.host);
-                        await installSharer(ns, h.host);
-                    }
-                }
-            } else {
+            if (ns.isRunning("/daemons/controller.js")) {
                 installs.get("worker").push(h.host);
                 await installWorker(ns, h.host);
+            } else if (ns.isRunning("/daemons/share.js")) {
+                if (ns.getServerMaxRam(h.host) > sReq) {
+                    installs.get("sharer").push(h.host);
+                    await installSharer(ns, h.host);
+                } else {
+                    installs.get("weakener").push(h.host);
+                    await installWeaken(ns, h.host);
+                }
+            } else {
+                installs.get("weakener").push(h.host);
+                await installWeaken(ns, h.host);
             }
         }
         for (var i of installs) {
             if (i[1].length > 0) {
-                ns.tprintf("%s: %s", i[0], i[1].join(", "));
+                await out(ns, "%s: %s", i[0], i[1].join(", "));
             }
         }
         return;
     } else if (target == "pserv") {
-        var hs = hosts.hosts(ns).filter((h) => {return h.host.startsWith("pserv-")});
+        var hs = hosts.hosts(ns).filter((h) => { return h.host.startsWith("pserv-") });
         var req = ns.getScriptRam("/daemons/batch.js");
         var a = readAssignments(ns);
         for (var i in hs) {
@@ -62,18 +64,18 @@ export async function main(ns) {
                 await installSharer(ns, hs[i].host);
                 continue;
             }
-            var h = a.find((h) => {return h.worker == hs[i].host});
+            var h = a.find((h) => { return h.worker == hs[i].host });
             if (h && ns.getServerMaxRam(h.worker) > req) {
                 installs.get("batch").push(h.worker);
                 await installBatch(ns, h.worker, h.target);
             } else {
-                installs.get("weakener").push(hs[i].worker);
+                installs.get("weakener").push(hs[i].host);
                 await installWeaken(ns, hs[i].host);
             }
         }
         for (var i of installs) {
             if (i[1].length > 0) {
-                ns.tprintf("%s: %s", i[0], i[1].join(", "));
+                await out(ns, "%s: %s", i[0], i[1].join(", "));
             }
         }
         return;
@@ -96,23 +98,18 @@ export async function main(ns) {
             await installWorker(ns, target);
             break;
         default:
-            ns.tprintf("Looking up what should be installed on %s", target);
-            var a = readAssignments(ns);
-            var h = a.find((h) => {return h.worker == target});
-            if (h) {
-                ns.tprintf("Installing batch on %s to hack %s", h.worker, h.target);
-                await installBatch(ns, h.worker, h.target);
-            } else {
-                ns.tprintf("Installing weakener on %s", target);
-                await installWeaken(ns, target);
-            }
+            await installDefault(ns, target);
     }
 
 }
 
 export async function installBatch(ns, worker, target) {
+    if (!target) {
+        await installDefault(ns, worker);
+        return;
+    }
     if (ns.fileExists("/obsolete.txt", target)) {
-        await console(ns, "%s is obsokete, not installing batch.", target)
+        await out(ns, "%s is obsokete, not installing batch.", target)
         return
     }
     if (target != "home") {
@@ -121,8 +118,8 @@ export async function installBatch(ns, worker, target) {
         await ns.scp(files, "home", worker);
         ns.killall(worker);
     }
-    if (!ns.exec("daemons/batch.js", worker, 1, target)) {
-        ns.tprintf("Failed to launch batch on %s", worker);
+    if (!ns.exec("/daemons/batch.js", worker, 1, target)) {
+        await out(ns, "Failed to launch batch on %s", worker);
     }
 }
 
@@ -135,7 +132,7 @@ export async function installWeaken(ns, worker) {
     }
     if (ns.getServerMaxRam(worker) > ns.getScriptRam("/daemons/weakener.js")) {
         if (!ns.exec("/daemons/weakener.js", worker)) {
-            ns.tprintf("Failed to launch weakener on %s", worker);
+            await out(ns, "Failed to launch weakener on %s", worker);
         }
     }
 }
@@ -155,7 +152,7 @@ export async function installController(ns, worker) {
     var req = ns.getScriptRam("/daemons/controller.js");
     if (ram > req) {
         if (!ns.exec("/daemons/controller.js", worker)) {
-            ns.tprintf("Failed to launch controller on %s", worker);
+            await out(ns, "Failed to launch controller on %s", worker);
         }
     }
 }
@@ -174,8 +171,8 @@ export async function installWorker(ns, worker) {
     var ram = ns.getServerMaxRam(worker) - ns.getServerUsedRam(worker);
     var req = ns.getScriptRam("/daemons/worker.js");
     if (ram > req) {
-        if (!ns.exec("/daemons/worker.js", worker, ram/req)) {
-            ns.tprintf("Failed to launch worker on %s", worker);
+        if (!ns.exec("/daemons/worker.js", worker, ram / req)) {
+            await out(ns, "Failed to launch worker on %s", worker);
         }
     }
 }
@@ -198,7 +195,7 @@ export async function installSharer(ns, worker) {
     var req = ns.getScriptRam("/daemons/share.js") + ns.getScriptRam("/bin/share.js");
     if (ram > req) {
         if (!ns.exec("/daemons/share.js", worker)) {
-            ns.tprintf("Failed to launch sharer on %s", worker);
+            await out(ns, "Failed to launch sharer on %s", worker);
         }
     }
 }
@@ -220,7 +217,24 @@ export async function installContractProxy(ns, worker) {
     var req = ns.getScriptRam("/daemons/contractProxy.js");
     if (ram > req) {
         if (!ns.exec("/daemons/contractProxy.js", worker)) {
-            ns.tprintf("Failed to launch contractProxy on %s", worker);
+            await out(ns, "Failed to launch contractProxy on %s", worker);
         }
+    }
+}
+
+/**
+ * @param {NS} ns
+ * @param {string} worker
+ */
+async function installDefault(ns, worker) {
+    await out(ns, "Looking up what should be installed on %s", worker);
+    var a = readAssignments(ns);
+    var h = a.find((h) => { return h.worker == worker });
+    if (h) {
+        await out(ns, "Installing batch on %s to hack %s", h.worker, h.target);
+        await installBatch(ns, h.worker, h.target);
+    } else {
+        await out(ns, "Installing weakener on %s", worker);
+        await installWeaken(ns, worker);
     }
 }
