@@ -9,7 +9,7 @@ export async function main(ns) {
     // How much ram to leave unused
     var reserve = ns.args[0];
     if (reserve) {
-        reserve = parseMem(reserve);
+        reserve = fmt.parseMem(reserve);
     } else {
         reserve = 0;
     }
@@ -59,7 +59,7 @@ export async function main(ns) {
 
         var threads = Math.floor(
             ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname) - reserve)/sRam;
-        if (threads == 0) {
+        if (threads <= 0) {
             await netLog(ns, "Not enough memory to run with %d reserved", reserve);
             if (reserve == 0) {
                 return;
@@ -82,15 +82,4 @@ export async function main(ns) {
         }
     }
 
-}
-
-function parseMem(n) {
-    var suffix = n[n.length-1];
-    n = n.splice(0, n.length-1);
-    switch(suffix) {
-        case "pb":
-            n *= 1000;
-        case "tb":
-            n *= 1000;
-    }
 }
