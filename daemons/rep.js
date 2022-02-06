@@ -1,6 +1,7 @@
 import { getFactions } from "/lib/constants.js";
 import * as fmt from "/lib/fmt.js";
-import { netLog } from "/lib/log.js";
+import * as zui from "/lib/ui.js";
+import { console, netLog } from "/lib/log.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -9,11 +10,17 @@ export async function main(ns) {
   var reps = new Map();
   var canGet = new Map();
   var donation = ns.getFavorToDonate();
+  var owned = ns.getOwnedAugmentations(true);
+  var rate = 0;
+  zui.customOverview("rep", "Rep");
+  ns.atExit(() => zui.rmCustomOverview("rep"));
   while (true) {
-
     for (var f of facts) {
       var need = 0;
       for (var a of ns.getAugmentationsFromFaction(f)) {
+        if (owned.indexOf(a) >= 0) {
+          continue
+        }
         var n = ns.getAugmentationRepReq(a);
         if (n > need && canGet.has(a)) {
           need = n;
@@ -55,18 +62,19 @@ export async function main(ns) {
       }
     }
 
-    if (delta > 0) {
-      await netLog(ns, "selected %s, need: %s", sel, fmt.int(delta));
-      ns.workForFaction(sel, "hacking", ns.isFocused())
-    } else if (favDelta > 0) {
-      await netLog(ns, "selected %s, need: %s", favSel, fmt.int(favDelta));
-      ns.workForFaction(favSel, "hacking", ns.isFocused())
-    } else {
-      await netLog(ns, "done: %d", delta)
-      return
+    if (delta <= 0 && favDelta <= 0) {
+      await console(ns, "No augs require rep, done.");
+      return;
     }
+    var target = delta > 0 ? sel : favSel;
+    delta = delta > 0 ? delta : favDelta;
+    zui.setCustomOverview("rep", sprintf("%s\n%s", fmt.int(delta), fmt.time(delta/rate)));
+    await netLog(ns, "selected %s, need: %s (%s estimated)", target, fmt.int(delta), fmt.time(delta / rate));
+    ns.workForFaction(target, "hacking", ns.isFocused())
 
-    await ns.sleep(60000)
+    await ns.sleep(300000)
+    delta = ns.getFactionRep(target) - reps.get(target).rep;
+    rate = delta / 300000;
   }
 
 }
