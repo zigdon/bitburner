@@ -1,11 +1,32 @@
+import * as cp from "/lib/contracts.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
-    var data = eval(ns.args[0]);
+    var host = ns.args[0];
+    var file = ns.args[1];
+    var lvl = ns.args[2];
     var tx = 1;
-    if (typeof(data[1]) == "object") {
-      tx = data[0];
-      data = data[1];
+    var name = "Algorithmic Stock Trader";
+    switch (lvl) {
+        case 1:
+            name += " I";
+            break;
+        case 2:
+            name += " II";
+            tx = 99;
+            break;
+        default:
+            ns.tprintf("Not implemented.");
+            return;
     }
+    var data = await cp.proxyReqData(ns, host, file, name);
+    if (!data) {
+        ns.tail();
+        ns.tprint("Couldn't get data from proxy!");
+        return;
+    }
+    ns.tprint(typeof(data));
+    ns.tprint(data);
 
     var trades = getTrades(ns, data);
     var picks = await pickTrades(ns, trades, tx);
@@ -14,6 +35,8 @@ export async function main(ns) {
     var profit = 0;
     picks.forEach((p) => { profit += p.sell - p.buy })
     ns.tprintf("profit: %d", profit);
+
+    ns.tprint(await cp.proxyPostAnswer(ns, host, file, profit));
 }
 
 /**
