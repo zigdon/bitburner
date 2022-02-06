@@ -148,7 +148,13 @@ async function checkCtl(ns) {
       var invalid = [];
       while (words.length > 1) {
         var k = words.shift();
-        var v = words.shift();
+        var v;
+        if (k == "args") {
+          v = words.join(" ");
+          words = [];
+        } else {
+          v = words.shift();
+        }
         if (["host", "when", "jitter", "threads", "proc", "args"].indexOf(k) == -1) {
           invalid.push(k);
           continue;
@@ -181,7 +187,7 @@ async function checkCtl(ns) {
       var name = words.shift()
       if (schedule.has(name)) {
         var j = schedule.get(name);
-        j.paused = true;
+        j.paused = false;
         schedule.set(name, j);
         var next = j.nextRun;
         var now = Date.now();
@@ -217,7 +223,7 @@ function printJob(ns, j) {
   }
   var now = Date.now();
   return ns.sprintf(
-    "%s: on %s every %s (+-%s). Threads: %s, next: %s\n   %s %s",
+    "%s: on %s every %s (+-%s). Threads: %s, next: %s cmd: '%s' '%s'",
     j.name,
     j.host,
     fmt.time(j.when),
