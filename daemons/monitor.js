@@ -61,6 +61,7 @@ function postUpdate(ns) {
     hosts = hosts.sort((a,b) => {
         return Math.floor(a[1]) - Math.floor(b[1]);
     })
+    var data = [];
     for (var h of hosts) {
         var ent = state.get(h.join("-"));
         while (ent.recent.length > 10) {
@@ -71,23 +72,29 @@ function postUpdate(ns) {
         if (delta > 1200000) {
             continue;
         } else if (delta > 600000) {
+            if (ent.host == "home") {
+                continue;
+            }
             delta = "MIA";
         }
         var age = now-ent.firstSeen;
         age -= age % 1000;
-        ns.print(ns.sprintf(
-            "%9s | %"+ longest + "s | " +
-            "%-10s | %9s / %6s | %8s / %8s / %8s",
+        data.push([
             ent.host, ent.target, ent.recent.join(""),
-            fmt.time(age),
-            fmt.time(delta),
-            fmt.money(ent.loot[0]),
-            fmt.money(ent.loot[1]),
-            fmt.money(ent.loot[2]),
-        ))
+            age,
+            delta,
+            ent.loot[0],
+            ent.loot[1],
+            ent.loot[2],
+        ])
     }
+    ns.print(fmt.table(
+        data,
+        ["NAME", "TARGET", "OPS", "START", "LAST", "$LAST", "$RUN", "$TOTAL"],
+        [null, null, null, fmt.time, fmt.time, fmt.money, fmt.money, fmt.money],
+    ))
     if (hist.length != 0) {
-        ns.print(plot(hist, { height: 5, format: format }));
+        ns.print("\n"+plot(hist, { height: 5, format: format }));
     }
 }
 
