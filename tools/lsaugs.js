@@ -3,8 +3,13 @@ import * as fmt from "/lib/fmt.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    var flags = ns.flags([
+        ["quiet", false],
+    ])
+    ns.disableLog("sleep");
 
     var mode = ns.args[0] || "list";
+    var priority = ns.args[1] || "none";
     var owned = ns.getOwnedAugmentations(true);
     var donateThresh = ns.getFavorToDonate();
     var augs = [];
@@ -16,22 +21,25 @@ export async function main(ns) {
         }
         for (var a of ns.getAugmentationsFromFaction(f)) {
             await ns.sleep(5);
-            var has = owned.indexOf(a) >= 0;
-            var price = ns.getAugmentationPrice(a);
             var rep = ns.getAugmentationRepReq(a);
-            var req = ns.getAugmentationPrereq(a);
             augs.push({
                 faction: f,
                 name: a,
-                owned: has,
-                price: price,
+                owned: owned.indexOf(a) >= 0,
+                price: ns.getAugmentationPrice(a),
                 rep: rep,
-                req: req,
+                req: ns.getAugmentationPrereq(a),
+                hackVal: ns.getAugmentationStats(a).hacking_mult || ns.getAugmentationStats(a).hacking_exp_mult || 0,
                 hasRep: curRep > 0 && rep <= curRep,
             })
         }
     }
-    augs.sort((a,b) => a.name > b.name ? 1 : -1);
+
+    var sorter = {
+        byName: (a, b) => a.name > b.name ? 1 : -1,
+        byPrice: (a, b) => a.price - b.price,
+        byHack: (a, b) => a.hackVal - b.hackVal,
+    };
 
     switch (mode) {
         case "list":
@@ -39,13 +47,23 @@ export async function main(ns) {
         case "donate":
             // List only from factions we have rep with
             augs = augs.filter(a => factions.indexOf(a.faction) >= 0)
-            augs = augs.sort((a, b) => { return a.price - b.price });
+
+            switch (priority) {
+                case "none":
+                    augs.sort(sorter.byPrice);
+                    break;
+                case "hack":
+                    augs.sort(sorter.byHack);
+                    break;
+            }
             break;
         case "all":
             // No filters
+            augs.sort(sorter.byName);
             break;
         default:
             // Filter by name
+            augs.sort(sorter.byName);
             augs = augs.filter(a => a.name.includes(mode));
     }
 
@@ -54,12 +72,17 @@ export async function main(ns) {
     for (a of augs) {
         if (mode != "all" && a.owned) { continue }
         legend.set(shortFact(a.faction), a.faction);
+        var stats = ns.getAugmentationStats(a.name);
         data.push([
             a.name, shortFact(a.faction), a.owned ? "✓" : "x", fmt.money(a.price), a.hasRep ? "✓" : fmt.large(a.rep), a.req,
+            [
+                stats.hacking_mult,
+                stats.hacking_exp_mult,
+            ].map(s => s ? fmt.gain(s, { fmtstring: true }) : "-"),
         ])
     }
     ns.tprintf(fmt.table(data,
-        ["NAME", "FACTION", "OWNED", "COST", "REP", "PREREQ"]),
+        ["NAME", "FACTION", "OWNED", "COST", "REP", "PREREQ", "HACK"]),
     );
     data = [];
     for (var k of legend) {
@@ -135,7 +158,7 @@ export async function main(ns) {
                 var amt = r * 1e6 / repMult;
                 ns.tprintf("  %s: %s (%s)", f, fmt.large(r), fmt.money(amt));
                 if (mode == "donate" && ns.getServerMoneyAvailable("home") >= amt &&
-                    await ns.prompt(sprintf("Donate %s to %s?", fmt.money(amt), f))) {
+                    (flags.quiet || await ns.prompt(sprintf("Donate %s to %s?", fmt.money(amt), f)))) {
                     if (!ns.donateToFaction(f, amt)) {
                         ns.tprintf("Failed to donate!");
                     } else {
@@ -149,7 +172,7 @@ export async function main(ns) {
     }
 
     if ((needRep.size == 0 && toBuy.length > 0 && cantAfford.length == 0 || mode == "buy") &&
-        await ns.prompt(sprintf("Buy these %d augs for %s?", toBuy.length, fmt.money(cost)))) {
+        (flags.quiet || await ns.prompt(sprintf("Buy these %d augs for %s?", toBuy.length, fmt.money(cost))))) {
         while (toBuy.length > 0) {
             var a = toBuy.shift();
             if (ns.purchaseAugmentation(a[0], a[1])) {
