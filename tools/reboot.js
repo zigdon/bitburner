@@ -1,4 +1,4 @@
-import {getFactions} from "/lib/constants.js";
+import {getFactions, longFact} from "/lib/constants.js";
 import * as fmt from "/lib/fmt.js";
 
 /** @param {NS} ns **/
@@ -8,6 +8,8 @@ export async function main(ns) {
         ["time", null],
         ["money", null],
         ["hack", null],
+        ["rep", null],
+        ["now", null],
     ])
     var waitDesc = [];
     var waitFuncs = [];
@@ -33,6 +35,30 @@ export async function main(ns) {
             return ns.getPlayer().hacking > waitHack;
         })
     }
+    if (flags.rep) {
+        var [factName, rep] = flags.rep.split("=");
+        var fact = longFact(factName);
+        if (!fact) {
+            ns.tprintf("Unknown faction %s!", factName);
+            return;
+        }
+        waitDesc.push(`${fact}@${rep}`);
+        waitFuncs.push(function() {
+            return ns.getFactionRep(fact) > rep;
+        })
+    }
+    if (flags.donate) {
+        var fact = longFact(flags.donate);
+        if (!fact) {
+            ns.tprintf("Unknown faction %s!", flags.donate);
+            return;
+        }
+        waitDesc.push(`can donate to ${fact}`);
+        waitFuncs.push(function() {
+            return ns.getFactionFavorGain(fact) + ns.getFactionFavor(fact) > ns.getFavorToDonate();
+        })
+    }
+
     var msg = "";
     if (waitDesc.length > 0) {
         msg = "Waiting for " + waitDesc.join(", ") + " then install augs and reboot?";
@@ -52,8 +78,6 @@ export async function main(ns) {
         }
         ns.toast(`Wait complete, after ${fmt.time(Date.now()-startWait)}`, "success", 30000);
     }
-    ns.toast("Reboot in 1 minute!", "warning", 60000);
-    await ns.sleep(60000);
 
     var pid = ns.run("/tools/lsaugs.js", 1, "buy", "hack", "--quiet");
     while (ns.isRunning(pid, "home")) {
@@ -93,6 +117,17 @@ export async function main(ns) {
         }
     }
 
+    if (!flags.now) {
+        ns.toast("Reboot in 1 minute!", "warning", 30000);
+        await ns.sleep(30000);
+        ns.toast("Reboot in 30 seconds!", "warning", 20000);
+        await ns.sleep(20000);
+        for (var i=10; i>0; i--) {
+            ns.toast(`Reboot in ${i} seconds!`, "warning", 1000);
+            await ns.sleep(1000);
+        }
+    }
+
     // Install any augs
-    ns.installAugmentations("/tools/init.js");
+    ns.installAugmentations("/bin/reboot-init.js");
 }
