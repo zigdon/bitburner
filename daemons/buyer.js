@@ -15,7 +15,6 @@ export async function main(ns) {
 	ns.disableLog("getServerMoneyAvailable");
 	ns.disableLog("getServerMaxRam");
 	ns.disableLog("sleep");
-	var req = ns.getScriptRam(script);
 
 	if (ns.fileExists("/conf/buyerReserve.txt", "home")) {
 		reserve = Math.floor(ns.read("/conf/buyerReserve.txt"));
@@ -23,8 +22,6 @@ export async function main(ns) {
 	if (ns.fileExists("/conf/buyerMode.txt", "home")) {
 		mode = ns.read("/conf/buyerMode.txt");
 	}
-
-	ns.print("req: " + req);
 
 	var ram = 2;
 	if (ns.serverExists("pserv-0")) {
@@ -36,18 +33,18 @@ export async function main(ns) {
 	}
 	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
 	zui.customOverview("buyer", "Buyer");
-	var updateUI = function(m = "") {
+	var updateUI = function (m = "") {
 		var obs = 0;
 		var cur = 0;
 		ns.getPurchasedServers().forEach(srv => ns.getServer(srv).maxRam == ram ? cur++ : obs++);
 		var t = ns.sprintf("%s\n(%s)\n%d/%d%s",
-	 	  fmt.money(ns.getPurchasedServerCost(ram)),
-		  fmt.memory(ram),
-		  obs, cur, m);
+			fmt.money(ns.getPurchasedServerCost(ram)),
+			fmt.memory(ram),
+			obs, cur, m);
 		zui.setCustomOverview("buyer", t);
 	}
 	updateUI();
-    ns.atExit(function() {zui.rmCustomOverview("buyer")});
+	ns.atExit(function () { zui.rmCustomOverview("buyer") });
 
 	await console(ns, "Waiting 1 minute before starting...");
 	var start = Date.now();
@@ -56,18 +53,13 @@ export async function main(ns) {
 	var idle = [];
 	while (ram <= max) {
 		var need = ns.getPurchasedServerCost(ram);
-		var newReq = ns.getScriptRam(script);
-		if (req != newReq) {
-			await console(ns, "Updating required memory from %s GB to %s GB", fmt.int(req), fmt.int(newReq));
-			req = newReq;
-		}
 
 		await checkControl(ns, need);
 		if (Date.now() - start < 60000) {
 			await ns.sleep(1000);
 			continue;
 		}
-		var next = getNextServer(ns, ram);
+		var next = getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
 			continue;
@@ -76,6 +68,7 @@ export async function main(ns) {
 			if (ram == max) {
 				break;
 			}
+			var oldRam = ram;
 			var rate = Math.log2(ram);
 			if (rate < 10) {
 				ram *= 2;
@@ -90,7 +83,8 @@ export async function main(ns) {
 			while (ns.getServerMoneyAvailable("home") > ns.getPurchasedServerCost(ram * 2) * 2 && ram < max) {
 				ram *= 2;
 			}
-			await toast(ns, "Increasing server ram to %s GB (%s)", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
+			await toast(ns, "Increasing server ram from %s to %s (%s)",
+				fmt.memory(oldRam), fmt.memory(ram), fmt.money(ns.getPurchasedServerCost(ram)));
 			updateUI();
 			continue;
 		}
@@ -121,7 +115,7 @@ export async function main(ns) {
 			await ns.sleep(10000);
 		}
 
-		next = getNextServer(ns, ram);
+		next = getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
 			continue;
@@ -148,9 +142,10 @@ export async function main(ns) {
 
 /**
  * @param {NS} ns
- * @param {int} ram
+ * @param {number} ram
+ * @param {number} qty
  */
-function getNextServer(ns, ram) {
+function getNextServer(ns, ram, qty = 1) {
 	// Find the next server to buy:
 	// - missing
 	var maxServers = ns.getPurchasedServerLimit();
@@ -162,7 +157,9 @@ function getNextServer(ns, ram) {
 	}
 
 	// - too small, and idle
-	var found = false;
+	qty = Math.floor(qty);
+	ns.print("Turning down up to %d servers", qty)
+	var found = 0;
 	var turndown = [];
 	for (var i = 0; i < maxServers; i++) {
 		var name = "pserv-" + i;
@@ -173,12 +170,12 @@ function getNextServer(ns, ram) {
 			} else if (!ns.fileExists("/conf/assignments.txt", name)) {
 				found = true;
 				turndown.push(name);
-			} else if (!found) {
+			} else if (found < qty) {
 				ns.print(name, " is obsolete, turning down.");
 				ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
 				ns.scriptKill("/daemons/batch.js", name);
 				turndown.push(name);
-				found = true;
+				found++;
 			}
 		}
 	}
