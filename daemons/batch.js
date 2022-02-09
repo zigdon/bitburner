@@ -93,8 +93,8 @@ export async function main(ns) {
     await netLog(ns, "[%s] each hack yields $%s", target, fmt.int(ns.hackAnalyze(target) * threads.ht * maxVal));
 
     var gap = hackTime / batches / 5;
-    if (gap < 500) {
-        gap = 500;
+    if (gap < 250) {
+        gap = 250;
     }
     await netLog(ns, "[%s] Running %d batches of %s each (1 hack = %s, gap = %.2fs) with %s GB", target,
         batches, fmt.time(gap * 6), fmt.time(hackTime), gap / 1000, fmt.int(availRam));
