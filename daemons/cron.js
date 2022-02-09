@@ -1,5 +1,5 @@
 import * as fmt from "/lib/fmt.js";
-import { console, netLog } from "/lib/log.js";
+import { toast, console, netLog } from "/lib/log.js";
 
 var schedule = new Map();
 
@@ -24,7 +24,7 @@ export async function main(ns) {
 
     while (toRun.length > 0) {
       var j = toRun.shift();
-      await netLog(ns, "launching %s on %s", j.name, j.host);
+      await toast(ns, "launching %s on %s", j.name, j.host);
       j.lastRun = now;
       j.nextRun = now + j.when + Math.random() * j.jitter;
       ns.exec(j.proc, j.host, j.threads, ...j.args);
