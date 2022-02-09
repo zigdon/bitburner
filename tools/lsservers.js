@@ -3,24 +3,35 @@ import * as fmt from "/lib/fmt.js";
 export async function main(ns) {
     var srvs = ns.getPurchasedServers();
     srvs.sort();
+    var data = [];
     for (var s of srvs.sort((a, b) => { return b.substring(b.indexOf("-")) - a.substring(a.indexOf("-")) })) {
         var maxRam = ns.getServerMaxRam(s);
         var usedRam = ns.getServerUsedRam(s);
-        var obs = ns.fileExists("/obsolete.txt", s) ? "[obsolete] " : "";
+        var current = ns.fileExists("/obsolete.txt", s) ? "x" : "✓";
         var procs = ns.ps(s)
-        ns.tprintf("%8s: %6s/%6s GB, %s%s",
-            s, fmt.int(usedRam),
-            fmt.int(maxRam), 
+        data.push([
+            s, usedRam, maxRam, current, summarise(procs),
+        ]);
+        /*
+        ns.tprintf("%8s: %6s/%6s, %s%s",
+            s, fmt.memory(usedRam),
+            fmt.memory(maxRam), 
             obs, 
             await summarise(ns, procs));
+            */
     }
+    ns.tprintf(fmt.table(
+        data,
+        ["HOST", "USED", "TOTAL", "CURRENT", "PROCS"],
+        [null, fmt.memory, fmt.memory],
+    ))
 }
 
-async function summarise(ns, procs) {
+function summarise(procs) {
     var c = new Map();
     for (var p of procs) {
         var f = p.filename.substring(p.filename.indexOf("/", 1) + 1);
-        await ns.sleep(5);
+        // await ns.sleep(5);
         if (!c.has(f)) {
             c.set(f, 0);
         }

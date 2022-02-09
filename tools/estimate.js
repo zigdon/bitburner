@@ -4,7 +4,7 @@ import * as zui from "/lib/ui.js";
 /** @param {NS} ns **/
 export async function main(ns) {
     var skill = ns.args[0].toLowerCase();
-    var target = ns.args[1];
+    var target = fmt.parseNum(ns.args[1]);
 
     var p = ns.getPlayer();
     var getCur;
@@ -18,10 +18,11 @@ export async function main(ns) {
             ns.tprintf("Dunno how to look up %s", skill);
     }
     var id = "est-" + skill;
-    zui.customOverview(id, "Hack " + target);
+    zui.customOverview(id, "Hack " + fmt.large(target, {digits: 0}));
     ns.atExit(() => zui.rmCustomOverview(id));
 
-    var xpNeeded = ns.formulas.skills.calculateExp(target, mult);
+    var xpNeeded = ns.formulas.skills.calculateExp(target, mult)*mult;
+    ns.tprintf("XP for %s@%s: %s/%s with %s multiplier.", skill, fmt.int(target), fmt.large(getCur()), fmt.large(xpNeeded), fmt.int(mult));
     var cur = getCur();
     var last = [cur];
     while (cur < xpNeeded) {
@@ -37,7 +38,7 @@ export async function main(ns) {
         zui.setCustomOverview(
             id,
             sprintf("+%s\n%s",
-            fmt.large(rate(cur, last)),
+            fmt.large(rate(cur, last), {digits: 3}),
             fmt.time((xpNeeded - cur) / rate(cur, last) * 1000)));
         await ns.sleep(1000);
         p = ns.getPlayer();

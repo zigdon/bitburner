@@ -133,7 +133,7 @@ async function doHack(ns, host, openers) {
   log(ns, "Trying " + openers.legnth + " openers on " + host);
   openers.forEach(function (f) {
     if (f(host) <= 0) {
-      msg(ns, "can't run %s on %s", f, host);
+      log(ns, "can't run %s on %s", f, host);
       return;
     }
     ports--;

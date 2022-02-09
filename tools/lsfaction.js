@@ -1,5 +1,4 @@
 import { getFactions, longFact, shortFact } from "/lib/constants.js";
-import * as zui from "/lib/ui.js";
 import * as fmt from "/lib/fmt.js";
 
 /** @param {NS} ns **/
@@ -42,7 +41,7 @@ export async function main(ns) {
             a.hacking_speed_mult,
         ])
     }
-    ns.tprintf(zui.table(
+    ns.tprintf(fmt.table(
         data,
         ["#", "NAME", "OWNED", "PRICE", "REP", "PREREQ", "H Mult", "H Chance", "H Exp", "H Grow", "H Money", "H Speed"],
         [null, null, null, fmt.money, fmt.large, null, percent, percent, percent, percent, percent, percent],
@@ -67,7 +66,7 @@ function lsFacts(ns) {
                 ns.getAugmentationsFromFaction(f).length),
         ])
     }
-    ns.tprintf(zui.table(
+    ns.tprintf(fmt.table(
         data,
         ["NAME", "INIT", "REP", "FAVOR", "GAIN", "AUGS"],
         [null, null, fmt.large, fmt.large, fmt.large]));

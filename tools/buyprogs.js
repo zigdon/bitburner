@@ -1,4 +1,5 @@
 import * as fmt from "/lib/fmt.js";
+import {toast} from "/lib/log.js";
 /*
 BruteSSH.exe - [OWNED] - Opens up SSH Ports.
 FTPCrack.exe - [OWNED] - Opens up FTP Ports.
@@ -14,7 +15,7 @@ export async function main(ns) {
         while (!ns.purchaseTor()) {
             await ns.sleep(1000);
         }
-        ns.tprint("Bought TOR");
+        await toast(ns, "Bought TOR", {level: "success", timeout: 0});
     }
     var progs = [
         ["BruteSSH", 1.5],
@@ -36,5 +37,6 @@ export async function main(ns) {
             await ns.sleep(1000);
         }
         ns.tprintf("Bought %s", name);
+        await toast(ns, "Bought %s", name, {level: "success", timeout: 0});
     }
 }

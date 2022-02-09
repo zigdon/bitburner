@@ -12,12 +12,13 @@ export async function main(ns) {
             var owned = ns.getOwnedAugmentations(true);
             var missing = ns.getAugmentationsFromFaction(i).filter(a => owned.indexOf(a) == -1);
             if (missing.length > 0) {
-                await toast(ns, "Accepting new invitation from %s, %d augs missing", i, missing.length);
+                await toast(ns, "Accepting new invitation from %s, %d augs missing",
+                 i, missing.length, {level: "success", timeout: 0});
                 if (!ns.joinFaction(i)) {
-                    await toast(ns, "Failed to join %s for some reasons!", i, {level: "error", timeout: 10000});
+                    await toast(ns, "Failed to join %s for some reasons!", i, {level: "error", timeout: 0});
                 }
             } else {
-                await toast(ns, "Rejecting new invitation from %s", i);
+                await toast(ns, "Rejecting new invitation from %s", i, {level: "info"});
                 rejected.push(i)
             }
         }

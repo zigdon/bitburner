@@ -52,7 +52,7 @@ export async function main(ns) {
       }
       showFunc = function() {
         list.sort((a,b) => {return a.max - b.max});
-        list.forEach((h) => {ns.tprintf("%25s: $%s", h.host, fmt.int(h.max))});
+        list.forEach((h) => {ns.tprintf("%25s: $%s %s", h.host, fmt.int(h.max), assignments.filter(a => a.target == h.host).map(a => a.worker))});
       }
       break;
     case "contracts":
@@ -165,8 +165,8 @@ function printHost(ns, host) {
     var prefix = " ".repeat(host.depth);
     var postfix = " ".repeat(35-host.depth-host.host.length);
     var assigned = assignments.map((a) => {if (a.target == host.host) { return a.worker }}).filter((a) => { return a });
-    ns.tprintf("%s%s%s: %5s %4d %3dGB %8s/%8s %5.2f/%3d %s",
-      prefix, host.host, postfix, host.root, host.hack, host.ram,
+    ns.tprintf("%s%s%s: %5s %4d %5s %8s/%8s %5.2f/%3d %s",
+      prefix, host.host, postfix, host.root, host.hack, fmt.memory(host.ram),
       fmt.money(host.curVal), fmt.money(host.max),
       host.curSec, host.minSec, assigned.length ? "(" + assigned + ")" : "");
 }

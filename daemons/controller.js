@@ -36,7 +36,7 @@ async function report(ns, f) {
     targets.forEach((t) => {
         lines.push(ns.sprintf("%s: %d weaken (%d->%d), %d grow (%s->%s), %d hack",
             t.host, t.weakenCount, t.curSec, t.minSec,
-            t.growCount, fmt.int(t.curVal), fmt.int(t.maxVal), t.hackCount,
+            t.growCount, fmt.money(t.curVal), fmt.money(t.maxVal), t.hackCount,
         ));
     })
     for (var l in lines) {
@@ -394,7 +394,7 @@ function selectTarget(ns, threads) {
         case "grow":
             t.growCount += threads;
             loglvl(ns, 1, "grow: +%d threads = %d; val: %s -> %s",
-                threads, t.growCount, fmt.int(t.curVal), fmt.int(t.maxVal));
+                threads, t.growCount, fmt.money(t.curVal), fmt.money(t.maxVal));
             break;
         case "hack":
             t.hackCount += threads;

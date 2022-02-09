@@ -2,7 +2,7 @@
 export async function main(ns) {
     var path = ["", "/tools", "/daemons"];
     var file = ns.args[0];
-    var all = ns.ls("home", file);
+    var all = ns.ls("home", file).filter(f => f.endsWith(".js"));
     var opts = [];
     var full = "";
     while (path.length > 0) {
