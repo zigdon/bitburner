@@ -31,7 +31,7 @@ export async function main(ns) {
  */
 export function subsum(data) {
     var res = {len:0, sum:0};
-    for (var l=1; l<data.length; l++) {
+    for (var l=1; l<=data.length; l++) {
         for (var s=0; s+l<=data.length; s++) {
             var sum = 0;
             var sl =  data.slice(s, s+l);
