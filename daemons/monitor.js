@@ -13,6 +13,13 @@ var format = function(n) {
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
+    ns.disableLog("getServerMoneyAvailable");
+    ns.disableLog("getServerMaxMoney");
+    ns.disableLog("getServerSecurityLevel");
+    ns.disableLog("getServerMinSecurityLevel");
+    ns.disableLog("getServerMaxRam");
+    ns.disableLog("getServerUsedRam");
+
     ns.tail();
     var ports = getPorts();
     var lastUpdate = 0;
@@ -44,18 +51,11 @@ function postUpdate(ns) {
     })
     avg = avg.filter((a) => { return now - a[0] < 10000 })
     hist.push(sum / 10);
-    while (hist.length > 82) {
-        hist.shift();
-    }
 
     var hosts = [];
-    var longest = 0;
     ns.clearLog();
     for (var h of state.keys()) {
-        hosts.push(h.split("-"));
-        if (state.get(h).target.length > longest) {
-            longest = state.get(h).target.length;
-        }
+        hosts.push(h.split("/"));
     }
     
     hosts = hosts.sort((a,b) => {
@@ -63,7 +63,7 @@ function postUpdate(ns) {
     })
     var data = [];
     for (var h of hosts) {
-        var ent = state.get(h.join("-"));
+        var ent = state.get(h.join("/"));
         while (ent.recent.length > 10) {
             ent.recent.pop();
         }
@@ -80,7 +80,11 @@ function postUpdate(ns) {
         var age = now-ent.firstSeen;
         age -= age % 1000;
         data.push([
-            ent.host, ent.target, ent.recent.join(""),
+            ent.host, ent.target,
+            ns.getServerUsedRam(ent.host)/ns.getServerMaxRam(ent.host),
+            ent.recent.join(""),
+            ent.security,
+            ent.value,
             age,
             delta,
             ent.loot[0],
@@ -88,11 +92,15 @@ function postUpdate(ns) {
             ent.loot[2],
         ])
     }
-    ns.print(fmt.table(
+    var tbl = fmt.table(
         data,
-        ["NAME", "TARGET", "OPS", "START", "LAST", "$LAST", "$RUN", "$TOTAL"],
-        [null, null, null, fmt.time, fmt.time, fmt.money, fmt.money, fmt.money],
-    ))
+        ["NAME", "TARGET", "MEM", "OPS", "SEC", "VALUE", "START", "LAST", "$LAST", "$RUN", "$TOTAL"],
+        [null, null, fmt.pct, null, fmt.int, fmt.pct, fmt.time, fmt.time, fmt.money, fmt.money, fmt.money],
+    );
+    ns.print(tbl);
+    while (hist.length > tbl.split("\n")[0].length - 10 && hist.length > 0) {
+        hist.shift();
+    }
     if (hist.length != 0) {
         ns.print("\n"+plot(hist, { height: 5, format: format }));
     }
@@ -125,19 +133,23 @@ function handleUpdate(ns, data) {
     var verb = words.shift();
     var target = words.shift();
     var value = words.shift();
-    if (host == "home") {
-        host = "h/" + target[0];
-    }
-    if (!state.has(host)) {
-        state.set(host, newHost(host));
+    var key = host.replace("-", "/")+"/"+target;
+    if (!state.has(key)) {
+        // Don't log hosts that just weaken
+        if (verb[0] == "w") {
+            return;
+        }
+        state.set(key, newHost(host));
     }
 
-    var entry = state.get(host);
+    var entry = state.get(key);
     if (target != entry.target) {
         entry.recent = [];
         entry.counts = [0, 0, 0, 0];
         entry.loot = [0, 0, 0];
     }
+    entry.value = ns.getServerMoneyAvailable(target)/ns.getServerMaxMoney(target);
+    entry.security = ns.getServerSecurityLevel(target)-ns.getServerMinSecurityLevel(target);
     entry.lastSeen = ts;
     entry.recent.unshift(verb[0]);
     entry.target = target;
@@ -162,5 +174,5 @@ function handleUpdate(ns, data) {
             entry.counts[3]++;
     }
 
-    state.set(host, entry);
+    state.set(key, entry);
 }
