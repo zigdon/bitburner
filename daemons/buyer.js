@@ -1,11 +1,10 @@
 import * as fmt from "/lib/fmt.js";
 import { console, netLog, toast } from "/lib/log.js";
 import { getPorts } from "/lib/ports.js";
-import * as zui from "/lib/ui.js"
 
-var script = "worker.js";
 var installer = "/tools/install.js";
 var assigner = "/tools/assigntargets.js";
+var ui = "/bin/ui.js";
 var reserve = 0;
 var mode = "none";
 var ports = getPorts();
@@ -23,16 +22,24 @@ export async function main(ns) {
 		mode = ns.read("/conf/buyerMode.txt");
 	}
 
-	var ram = 2;
-	if (ns.serverExists("pserv-0")) {
-		ram = ns.getServerMaxRam("pserv-0");
+	// start from whereever we stopped
+	var ram = 16;
+	if (ns.getPurchasedServers().length > 0) {
+		ram = ns.getPurchasedServers()
+			.map(s => ns.getServerMaxRam(s))
+			.reduce((m, c) => c < m ? c : m, ns.getPurchasedServerMaxRam());
 	}
+
 	var batchRam = ns.getScriptRam("/daemons/batch.js");
-	while (ram < batchRam) {
+	while (ram < batchRam 
+	    || ns.getPurchasedServerCost(ram) * 2 < ns.getServerMoneyAvailable("home")) {
 		ram *= 2;
 	}
+	if (ram > ns.getPurchasedServerMaxRam()) {
+		ram = ns.getPurchasedServerMaxRam();
+	}
 	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
-	zui.customOverview("buyer", "Buyer");
+	ns.run(ui, 1, "create", "buyer");
 	var updateUI = function (m = "") {
 		var obs = 0;
 		var cur = 0;
@@ -41,10 +48,10 @@ export async function main(ns) {
 			fmt.money(ns.getPurchasedServerCost(ram)),
 			fmt.memory(ram),
 			obs, cur, m);
-		zui.setCustomOverview("buyer", t);
+		ns.run(ui, 1, "update", "buyer", t);
 	}
 	updateUI();
-	ns.atExit(function () { zui.rmCustomOverview("buyer") });
+	// ns.atExit(function () { ns.run(ui, 1, "delete", "buyer") });
 
 	await console(ns, "Waiting 1 minute before starting...");
 	var start = Date.now();
@@ -59,7 +66,7 @@ export async function main(ns) {
 			await ns.sleep(1000);
 			continue;
 		}
-		var next = getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
+		var next = await getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
 			continue;
@@ -92,20 +99,23 @@ export async function main(ns) {
 		// wait until we have enough money
 		await netLog(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
 		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
-			if (idle.length > 0) {
-				var pid = ns.exec(assigner, "home");
-				while (ns.isRunning(pid, "home")) {
-					await ns.sleep(500);
-				}
-			}
 			while (idle.length > 0) {
 				var h = idle.shift();
 				switch (mode) {
 					case "batch":
+						if (idle.length > 0) {
+							var pid = ns.exec(assigner, "home", 1, "--quiet");
+							while (ns.isRunning(pid, "home")) {
+								await ns.sleep(500);
+							}
+						}
 						ns.exec(installer, "home", 1, h, "batch");
 						break;
 					case "worker":
 						ns.exec(installer, "home", 1, h, "worker");
+						break;
+					case "sharer":
+						ns.exec(installer, "home", 1, h, "sharer");
 						break;
 					default:
 						await console(ns, "bought new server %s with %s GB RAM, leaving idle", h, fmt.int(ram));
@@ -115,7 +125,7 @@ export async function main(ns) {
 			await ns.sleep(10000);
 		}
 
-		next = getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
+		next = await getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
 		if (next == "<waiting>") {
 			await ns.sleep(1000);
 			continue;
@@ -136,8 +146,7 @@ export async function main(ns) {
 		updateUI();
 	}
 
-	await console(ns, "Bought max servers with max memory, done");
-	zui.rmCustomOverview("buyer");
+	await toast(ns, "Bought max servers with max memory, done", { level: "success", timeout: 0 });
 }
 
 /**
@@ -145,7 +154,7 @@ export async function main(ns) {
  * @param {number} ram
  * @param {number} qty
  */
-function getNextServer(ns, ram, qty = 1) {
+async function getNextServer(ns, ram, qty = 1) {
 	// Find the next server to buy:
 	// - missing
 	var maxServers = ns.getPurchasedServerLimit();
@@ -158,20 +167,23 @@ function getNextServer(ns, ram, qty = 1) {
 
 	// - too small, and idle
 	qty = Math.floor(qty);
-	ns.print("Turning down up to %d servers", qty)
 	var found = 0;
 	var turndown = [];
-	for (var i = 0; i < maxServers; i++) {
-		var name = "pserv-" + i;
+	var servers = ns.getPurchasedServers()
+		.map(s => [s, ns.getServerMaxRam(s)])
+		.sort((a, b) => a[1] - b[1])
+		.map(s => s[0]);
+	for (var name of servers) {
 		if (ns.getServerMaxRam(name) < ram) {
 			if (ns.ps(name).filter((p) => { return p.filename.startsWith("/bin") }).length == 0) {
-				ns.print(name, " is idle, upgrading.");
+				await netLog(ns, "%s is idle, upgrading.", name);
 				return name;
 			} else if (!ns.fileExists("/conf/assignments.txt", name)) {
-				found = true;
+				await netLog(ns, "%s is shutting down.", name);
+				found++;
 				turndown.push(name);
 			} else if (found < qty) {
-				ns.print(name, " is obsolete, turning down.");
+				await netLog(ns, "%s is obsolete, turning down.", name);
 				ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
 				ns.scriptKill("/daemons/batch.js", name);
 				turndown.push(name);
@@ -181,7 +193,8 @@ function getNextServer(ns, ram, qty = 1) {
 	}
 
 	if (!found) {
-		ns.print("No available servers, servers spinning down: ", turndown);
+		await netLog(ns, "Turning down up to %d servers with less than %s", qty, fmt.memory(ram));
+		await netLog(ns, "No available servers, servers spinning down: ", turndown);
 	}
 	return found ? "<waiting>" : "";
 }
