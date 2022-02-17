@@ -13,7 +13,7 @@ export async function main(ns) {
  * @param {int} n
  */
 export function mkIPs(ns, digits, n) {
-    if (digits.length > n*3 || digits[0] == "0") {
+    if (digits.length > n*3) {
         return [];
     }
 
@@ -23,7 +23,7 @@ export function mkIPs(ns, digits, n) {
             break;
         }
         var oct = digits.substr(0, i+1);
-        if (oct > 255) {
+        if (oct > 255 || (oct.startsWith("0") && oct.length > 1)) {
             break;
         }
         if (n > 1) {
