@@ -1,11 +1,9 @@
-import {batchReport, netLog} from "/lib/log.js";
-import * as fmt from "/lib/fmt.js";
+import {execCmd} from "/lib/hack.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
     var target = ns.args[0];
-    var start = Date.now();
-    var growth = await ns.grow(target, {stock: true});
-    await netLog(ns, "grow %s finished, grew by %.2f%%, took %s", target, (growth-1)*100, fmt.time(Date.now()-start));
-    await batchReport(ns, target, "grow", growth);
+    var eta = ns.args[1];
+    var delta = ns.args[2];
+    await execCmd(ns, ns.grow, target, "grow", eta, delta);
 }
