@@ -24,10 +24,12 @@ export async function main(ns) {
 
     while (toRun.length > 0) {
       var j = toRun.shift();
-      await toast(ns, "launching %s on %s", j.name, j.host);
       j.lastRun = now;
       j.nextRun = now + j.when + Math.random() * j.jitter;
-      ns.exec(j.proc, j.host, j.threads, ...j.args);
+      var pid = ns.exec(j.proc, j.host, j.threads, ...j.args);
+      if (pid == 0) {
+        await toast(ns, "failed to launch %s on %s", j.name, j.host, {level: "error"});
+      }
       schedule.set(j.name, j);
     }
   }
