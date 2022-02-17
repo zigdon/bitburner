@@ -1,19 +1,23 @@
 import * as fmt from "/lib/fmt.js";
-import { console, batchReport, log, netLog } from "/lib/log.js";
+import { batchReport, log, netLog } from "/lib/log.js";
 
 var wScript = "/bin/weaken.js";
 var gScript = "/bin/grow.js";
 var hScript = "/bin/hack.js";
+var minGap = 250;
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
     ns.disableLog("getServerUsedRam");
+    var flags = ns.flags([
+        ["single", false],
+    ])
     var target = ns.args[0];
     var reserve = ns.args[1];
     reserve = parseMemory(reserve);
     if (reserve) {
-        await console(ns, "Reserving %s GB", fmt.int(reserve));
+        await log(ns, "Reserving %s GB", fmt.int(reserve));
     } else {
         reserve = 0;
     }
@@ -38,14 +42,14 @@ export async function main(ns) {
 
     var hostname = ns.getHostname();
     var maxRam = ns.getServerMaxRam(hostname);
-    var maxVal = ns.getServerMaxMoney(target);
     var hRam = ns.getScriptRam(hScript);
     var gRam = ns.getScriptRam(gScript);
     var wRam = ns.getScriptRam(wScript);
-    var availRam = maxRam - ns.getServerUsedRam(hostname) - reserve;
     var scriptRam = ns.getScriptRam(ns.getScriptName());
+    var availRam = maxRam - scriptRam - reserve;
     var maxW = Math.floor((maxRam - scriptRam) / wRam);
     var maxG = Math.floor((maxRam - scriptRam) / gRam);
+    var hackTime = ns.getHackTime(target);
 
     // If something else is running on the machine, wait for it to end.
     await netLog(ns, "[%s] Script needs %s GB, reserve %s GB, total ram: %s GB.",
@@ -57,7 +61,9 @@ export async function main(ns) {
             fmt.int(maxRam - availRam - scriptRam - reserve - 2));
         await ns.sleep(pause);
         availRam = maxRam - ns.getServerUsedRam(hostname);
-        pause *= 2;
+        if (pause < 60000) {
+            pause *= 2;
+        }
     }
 
     var atSec = false;
@@ -67,114 +73,23 @@ export async function main(ns) {
         atVal = await getToMaxVal(ns, target, maxG);
     }
 
-    var weakTime = ns.getWeakenTime(target);
-    var hackTime = ns.getHackTime(target);
-    var growTime = ns.getGrowTime(target);
-
-    var batches = 1;
     var threads;
-    while (batches < 100) {
-        await ns.sleep(100);
-        var solution = await getThreads(ns, target, Math.floor(availRam / batches), hRam, gRam, wRam);
-        if (!solution) {
-            batches--;
-            break
-        }
-        threads = solution;
-        batches++;
-    }
-    if (!threads) {
-        ns.tprintf("Can't figure out batches on %s for %s", hostname, target);
-        return;
-    }
-    await netLog(ns, "[%s] using %d growth threads to recover from hacking with %d threads", target, threads.gt, threads.ht);
-    await netLog(ns, "[%s] using %d weaken threads to recover from hack security damage", target, threads.wht);
-    await netLog(ns, "[%s] using %d weaken threads to recover from grow security damage", target, threads.wgt);
-    await netLog(ns, "[%s] each hack yields $%s", target, fmt.int(ns.hackAnalyze(target) * threads.ht * maxVal));
-
-    var gap = hackTime / batches / 5;
-    if (gap < 250) {
-        gap = 250;
-    }
-    await netLog(ns, "[%s] Running %d batches of %s each (1 hack = %s, gap = %.2fs) with %s GB", target,
-        batches, fmt.time(gap * 6), fmt.time(hackTime), gap / 1000, fmt.int(availRam));
-
-    var schedule = [];
-    var addBatch = function (i) {
-        var base = weakTime + gap * 3;
-        var t = (i - 1) * gap * 6;
-        schedule.push({ time: base + t - hackTime, proc: hScript, threads: threads.ht, batch: i, end: base + t });
-        t += gap;
-        schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wht, batch: i, end: base + t });
-        t += gap;
-        schedule.push({ time: base + t - growTime, proc: gScript, threads: threads.gt, batch: i, end: base + t });
-        t += gap;
-        schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wgt, batch: i, end: base + t });
-    }
-
-    for (var i = 1; i <= batches; i++) {
-        await ns.sleep(100);
-        addBatch(i)
-    }
-    schedule = schedule.sort((a, b) => {
-        return a.time - b.time;
-    })
-
-    // Count threads
-    var totals = new Map();
-    schedule.forEach((step) => {
-        if (!totals.has(step.proc)) {
-            totals.set(step.proc, 0);
-        }
-        totals.set(step.proc, totals.get(step.proc) + step.threads);
-    })
-
-    var sched = [];
-    schedule.forEach((s) => {
-        sched.push(ns.sprintf("%3.2fs: (%2d) run %s with %s threads", s.time, s.batch, s.proc, fmt.int(s.threads)));
-    })
-    for (var m in sched) {
-        await log(ns, "[%s] %s", target, sched[m]);
-        await ns.sleep(100);
-    }
-    await netLog(ns, "[%s] Total threads:", target);
-    await netLog(ns, "[%s]   grow: %d (%s GB)", target, totals.get(gScript), fmt.int(totals.get(gScript) * gRam));
-    await netLog(ns, "[%s]   weak: %d (%s GB)", target, totals.get(wScript), fmt.int(totals.get(wScript) * wRam));
-    await netLog(ns, "[%s]   hack: %d (%s GB)", target, totals.get(hScript), fmt.int(totals.get(hScript) * hRam));
-    await netLog(ns, "[%s] Total RAM: %s GB", target,
-        fmt.int(totals.get(gScript) * gRam + totals.get(wScript) * wRam + totals.get(hScript) * hRam));
-
+    var batches;
     while (true) {
-        var curVal = ns.getServerMoneyAvailable(target);
+        var schedule;
+        [schedule, batches, threads] = await designBatch(ns, target, availRam, hRam, gRam, wRam, batches, threads);
+        if (!schedule) {
+            ns.tprintf("Can't figure out batches on %s for %s", hostname, target);
+            break;
+        }
+
         await runBatch(ns, Date.now() + schedule[0].time, target, schedule);
+
+        if (flags.single) { break }
+
         log(ns, "Waiting %s before starting another set...", fmt.time(hackTime + 10000));
         await ns.sleep(hackTime + 10000);
-        /* If we wanted to wait until the previous batch was entirely done...
-        var pss = ns.ps(hostname);
-        var wait = true;
-        while (wait) {
-            wait = false;
-            var pCounts = [0, 0, 0];
-            pss.forEach((p) => {
-                var i = [wScript, gScript, hScript].indexOf(p.filename);
-                if (i == -1) {
-                    ns.print("Ignoring unrelated process %s", p.filename);
-                    return;
-                }
-                if (p.args[0] != target) {
-                    ns.print("Ignoring unrelated %s %s", p.filename, p.args[0]);
-                    return;
-                }
-                pCounts[i]++;
-                wait = true;
-            })
 
-            await netLog(ns, "batch scripts still running on %s: %s", target, pCounts);
-            await ns.sleep(5000);
-            continue;
-        }
-        */
-        
         if ((ns.getServerSecurityLevel(target) > ns.getServerMinSecurityLevel(target) + 5) ||
             (ns.getServerMoneyAvailable(target) < ns.getServerMaxMoney(target) * 0.90)) {
             await netLog(ns, "Resetting before starting new batch");
@@ -202,9 +117,9 @@ async function runBatch(ns, start, target, schedule) {
         if (Date.now() < start + s.time) {
             await ns.sleep(start + s.time - Date.now());
         }
-        log(ns, "Launching %s for batch #%d", s.proc, s.batch);
+        log(ns, "Launching %s for batch #%d (%dms off)", s.proc, s.batch, Date.now() - (start + s.time));
         var t = s.threads;
-        while (t>0 && !ns.exec(s.proc, hostname, t, target, s.time)) {
+        while (t > 0 && !ns.exec(s.proc, hostname, t, target, start + s.end, s.time)) {
             t--;
         }
     }
@@ -232,26 +147,24 @@ async function getThreads(ns, target, availRam, hRam, gRam, wRam) {
         weakHackThreads = Math.ceil(getWeakThreads(ns, secHackDmg));
         var secGrowDmg = ns.growthAnalyzeSecurity(growThreads);
         weakGrowThreads = Math.ceil(getWeakThreads(ns, secGrowDmg));
-        var reqRam = Number(growThreads * gRam) +
-            Number(hackThreads * hRam) +
-            (Number(weakHackThreads) + Number(weakGrowThreads)) * wRam;
+        var reqRam = growThreads * gRam + hackThreads * hRam + (weakHackThreads + weakGrowThreads) * wRam;
 
-        log(ns, "[%s] considering hacking %d%%, with %d/%d/%d/%d threads, using %s GB out of %s GB", target,
-            targetHack, hackThreads, weakHackThreads, growThreads, weakGrowThreads, fmt.int(reqRam), fmt.int(availRam));
-        if (reqRam < availRam && growThreads*hackThreads*weakHackThreads*weakGrowThreads > 0) {
+        if (reqRam < availRam && growThreads * hackThreads * weakHackThreads * weakGrowThreads > 0) {
             break;
         }
         if (targetHack > 5) {
-            targetHack-=5;
+            targetHack -= 5;
         } else {
             targetHack--;
         }
-        await ns.sleep(100);
+        await ns.sleep(10);
     }
     if (targetHack == 0) {
         await netLog(ns, "[%s] giving up", target);
         return false;
     }
+    log(ns, "[%s] hacking %d%%, with %d/%d/%d/%d threads, using %s out of %s", target,
+        targetHack, hackThreads, weakHackThreads, growThreads, weakGrowThreads, fmt.memory(reqRam), fmt.memory(availRam));
     return { gt: growThreads, ht: hackThreads, wht: weakHackThreads, wgt: weakGrowThreads };
 }
 
@@ -389,16 +302,113 @@ function parseMemory(n) {
     if (!n) {
         return 0;
     }
-    var unit = n.substring(n.length-2);
-    n = n.substring(0, n.length-2);
+    var unit = n.substring(n.length - 2);
+    n = n.substring(0, n.length - 2);
     switch (unit) {
         case "pb":
-            n*=1000;
+            n *= 1000;
         case "tb":
-            n*=1000;
+            n *= 1000;
         default:
-            n*=1;
+            n *= 1;
     }
 
     return n;
+}
+
+/**
+ * @param {NS} ns
+ * @param {string} target
+ * @param {number} availRam
+ * @param {number} hRam
+ * @param {number} gRam
+ * @param {number} wRam
+ * @param {number} batches
+ * @param {object} threads
+ */
+async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, threads) {
+    var weakTime = ns.getWeakenTime(target);
+    var hackTime = ns.getHackTime(target);
+    var growTime = ns.getGrowTime(target);
+    var maxVal = ns.getServerMaxMoney(target);
+
+    batches ||= 0;
+    if (!threads) {
+        await netLog(ns, "Attempting to solve with a max of %d batches", fmt.int(hackTime / (5 * minGap)));
+        while (batches < hackTime / (5 * minGap)) {
+            batches++;
+            await ns.sleep(10);
+            if (threads && (threads.gt * gRam + (threads.wgt + threads.wht) * wRam + threads.ht * hRam) < availRam / (batches+1)) {
+                continue;
+            }
+            var solution = await getThreads(ns, target, Math.floor(availRam / batches+1), hRam, gRam, wRam);
+            if (solution) {
+                threads = solution;
+                continue;
+            }
+            break;
+        }
+        if (!threads) {
+            return [null, null, null];
+        }
+    }
+    await netLog(ns, "[%s] using %d growth threads to recover from hacking with %d threads", target, threads.gt, threads.ht);
+    await netLog(ns, "[%s] using %d weaken threads to recover from hack security damage", target, threads.wht);
+    await netLog(ns, "[%s] using %d weaken threads to recover from grow security damage", target, threads.wgt);
+    await netLog(ns, "[%s] each hack yields $%s", target, fmt.int(ns.hackAnalyze(target) * threads.ht * maxVal));
+
+    var gap = hackTime / batches / 5;
+    if (gap < minGap) {
+        gap = minGap;
+    }
+    await netLog(ns, "[%s] Running %d batches of %s each (1 hack = %s, gap = %.2fs) with %s GB", target,
+        batches, fmt.time(gap * 6), fmt.time(hackTime), gap / 1000, fmt.int(availRam));
+
+    var schedule = [];
+    var addBatch = function (i) {
+        var base = weakTime + gap * 3;
+        var t = (i - 1) * gap * 6;
+        schedule.push({ time: base + t - hackTime, proc: hScript, threads: threads.ht, batch: i, end: base + t });
+        t += gap;
+        schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wht, batch: i, end: base + t });
+        t += gap;
+        schedule.push({ time: base + t - growTime, proc: gScript, threads: threads.gt, batch: i, end: base + t });
+        t += gap;
+        schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wgt, batch: i, end: base + t });
+    }
+
+    for (var i = 1; i <= batches; i++) {
+        await ns.sleep(100);
+        addBatch(i)
+    }
+    schedule = schedule.sort((a, b) => {
+        return a.time - b.time;
+    })
+
+    // Count threads
+    var totals = new Map();
+    schedule.forEach((step) => {
+        if (!totals.has(step.proc)) {
+            totals.set(step.proc, 0);
+        }
+        totals.set(step.proc, totals.get(step.proc) + step.threads);
+    })
+
+    var sched = [];
+    schedule.forEach((s) => {
+        sched.push(ns.sprintf("%3.2fs: (%2d) run %s with %s threads", s.time, s.batch, s.proc, fmt.int(s.threads)));
+    })
+    for (var m in sched) {
+        await log(ns, "[%s] %s", target, sched[m]);
+        await ns.sleep(100);
+    }
+    await netLog(ns, "[%s] Total threads:", target);
+    await netLog(ns, "[%s]   grow: %d (%s)", target, totals.get(gScript), fmt.memory(totals.get(gScript) * gRam));
+    await netLog(ns, "[%s]   weak: %d (%s)", target, totals.get(wScript), fmt.memory(totals.get(wScript) * wRam));
+    await netLog(ns, "[%s]   hack: %d (%s)", target, totals.get(hScript), fmt.memory(totals.get(hScript) * hRam));
+    await netLog(ns, "[%s] Total RAM: %s (of %s)", target,
+        fmt.memory(totals.get(gScript) * gRam + totals.get(wScript) * wRam + totals.get(hScript) * hRam),
+        fmt.memory(availRam));
+
+    return [schedule, batches, threads];
 }
