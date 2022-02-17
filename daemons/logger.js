@@ -167,12 +167,15 @@ async function ctrlFilter(ns, filter, line) {
             case "reset":
                 filter.set("-" + type, new Map());
                 filter.set("+" + type, new Map());
+                ns.tprint("Resetting filter");
                 break;
             case "add":
                 filter.get("+" + type).set(val, true);
+                ns.tprint(`Updating filter: add ${type}: ${val}`);
                 break;
             case "del":
                 filter.get("-" + type).set(val, true);
+                ns.tprint(`Updating filter: del ${type}: ${val}`);
                 break;
         }
     } else if (cmd == "toast") {
