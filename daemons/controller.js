@@ -1,28 +1,59 @@
 import * as fmt from "/lib/fmt.js";
 import {getPorts} from "/lib/ports.js";
 import {log, loglvl, console, netLog} from "/lib/log.js";
+import {readAssignments} from "/lib/assignments.js";
+import {hosts} from "/lib/hosts.js";
 
 var workers = new Map();
 var targets = new Map();
+var helping = {};
 var ports = getPorts();
 var script = "/daemons/worker.js";
 var reqVersion = 11;
+var autoTarget = false;
 
 var lastReport = Date.now();
 var lastNetReport = Date.now() - 280000;
+var lastIdle = 0;
 var debug = 0;
 
 /** @param {NS} ns **/
 export async function main(ns) {
-    ns.disableLog("sleep");
-    ns.disableLog("getServerMoneyAvailable");
-    ns.disableLog("getServerSecurityLevel");
-    ns.disableLog("getServerMaxRam");
+    ns.disableLog("ALL");
+    var lastTargetSelected = 0;
     await init(ns);
     while (true) {
+        if (autoTarget && Date.now() - lastTargetSelected > 30000) {
+            await selectTargets(ns);
+            lastTargetSelected = Date.now();
+        }
         var msg = await wait(ns);
         await process(ns, msg);
         await ns.sleep(100);
+    }
+}
+
+/*
+ * @param {NS} ns
+ */
+async function selectTargets(ns) {
+    var assignments = [];
+    readAssignments(ns).forEach(a => assignments.push(...a.targets));
+    var unassigned = hosts(ns)
+        .filter(h => h.max > 0 && h.root)
+        .filter(h => assignments.every(a => a != h.host))
+        .map(h => h.host);
+    for (var [v,_] of targets) {
+        if (unassigned.indexOf(v) == -1) {
+            await log(ns, "Removing %s as it has been assigned.", v);
+            targets.delete(v);
+        }
+    }
+    await log(ns, unassigned);
+    for (var h of unassigned) {
+        if (!targets.has(h)) {
+            await addTargets(ns, [h]);
+        }
     }
 }
 
@@ -39,6 +70,7 @@ async function report(ns, f) {
             t.growCount, fmt.money(t.curVal), fmt.money(t.maxVal), t.hackCount,
         ));
     })
+    lines.push(ns.sprintf("Helping: %d weaken, %d grow", helping["weaken"] || 0, helping["grow"] || 0))
     for (var l in lines) {
         await f(ns, lines[l]);
     }
@@ -87,6 +119,8 @@ async function init(ns) {
         ts.forEach((target) => {
             updateTarget(target);
         })
+    } else {
+        autoTarget = true;
     }
 
     ns.clearPort(ports.WORKERS);  // incoming
@@ -138,7 +172,14 @@ async function process(ns, msg) {
     } else if (words[0] == "done") {
         h.target = "none";
         h.cmd = "idle";
-        updateTarget(words[2]);
+        if (targets.has(words[2])) {
+            updateTarget(words[2]);
+        } else if (helping[words[1]] > 0) {
+            helping[words[1]] -= threads;
+            if (helping[words[1]] < 0) {
+                helping[words[1]] = 0;
+            }
+        }
     } else if (words[0] == "idle") {
         loglvl(ns, 1, "%s is idle for %d seconds, uncloging...",
             msg.host, words[1]);
@@ -153,8 +194,17 @@ async function process(ns, msg) {
 
     var inst = selectTarget(ns, threads);
     if (!inst) {
-        await netLog(ns, "No targets, idling.");
-        return;
+        inst = selectHelp(ns);
+        if (inst) {
+            helping[inst.cmd] ||= 0;
+            helping[inst.cmd] += threads;
+        } else {
+            if (Date.now() - lastIdle > 300000) {
+                await netLog(ns, "Nothing to do, idling.");
+                lastIdle = Date.now();
+            }
+            return;
+        }
     }
 
     h.cmd = inst.cmd;
@@ -167,6 +217,52 @@ async function process(ns, msg) {
     }
     workers.set(msg.host, h);
 }
+
+/**
+ * @param {NS} ns
+ */
+function selectHelp(ns) {
+    var hs = {};
+    readAssignments(ns) .forEach(a => a.targets .forEach(t => hs[t] = { host: t }));
+    for (var h of Object.keys(hs)) {
+        hs[h].curSec = ns.getServerSecurityLevel(h);
+        hs[h].minSec = ns.getServerMinSecurityLevel(h);
+        hs[h].sec = hs[h].curSec - hs[h].minSec;
+        hs[h].curVal = ns.getServerMoneyAvailable(h);
+        hs[h].maxVal = ns.getServerMaxMoney(h);
+        hs[h].val = hs[h].curVal/hs[h].maxVal;
+    }
+    var weakens = Object.values(hs)
+        .filter(h => h.sec > 5)
+        .sort((a,b) => b.sec - a.sec);
+
+    // Select entries earlier in the list more than later
+    if (weakens.length > 0) {
+        for (var h of weakens) {
+            if (Math.random()> 0.5) {
+                return {cmd: "weaken", host: h.host};
+            }
+        }
+        return {cmd: "weaken", host: weakens[0].host};
+    }
+    
+    var grows = Object.values(hs)
+        .filter(h => h.val < 0.9)
+        .sort((a,b) => a.sec - b.sec);
+
+    // Select entries earlier in the list more than later
+    if (grows.length > 0) {
+        for (var h of grows) {
+            if (Math.random()> 0.5) {
+                return {cmd: "grow", host: h.host};
+            }
+        }
+        return {cmd: "grow", host: grows[0].host};
+    }
+
+    return null
+}
+
 /**
  *  @param {NS} ns 
  *  @param {string} host
