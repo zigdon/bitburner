@@ -1,4 +1,4 @@
-import * as hosts from "/lib/hosts.js";
+import {hosts} from "/lib/hosts.js";
 import { readAssignments } from "/lib/assignments.js";
 import { netLog, console } from "/lib/log.js";
 
@@ -7,6 +7,7 @@ var libs = [
     "/lib/fmt.js",
     "/lib/ports.js",
     "/lib/ui.js",
+    "/lib/hack.js",
     "/lib/assignments.js",
 ];
 
@@ -17,65 +18,67 @@ export async function main(ns) {
     var target = ns.args[0];
     var tool = ns.args[1];
     var args = ns.args.splice(2);
-    var installs = new Map();
+    var installs = {}
     for (var t of ["weakener", "sharer", "batch", "worker"]) {
-        installs.set(t, []);
+        installs[t] = [];
     }
     out = console;
+    let openers = [ "BruteSSH.exe", "FTPCrack.exe", "HTTPWorm.exe", "relaySMTP.exe", "SQLInject.exe"]
+        .map(f => ns.fileExists(f, "home")).length;
 
     if (!target || target == "all") {
-        var hs = hosts.hosts(ns).filter((h) => { return !h.host.startsWith("pserv-") });
+        var hs = hosts(ns).filter((h) => { return !h.host.startsWith("pserv-") });
         var wReq = ns.getScriptRam("/daemons/weakener.js");
         var sReq = ns.getScriptRam("/daemons/sharer.js");
         for (var i in hs) {
             var h = hs[i];
-            if (h.host == "home" || !ns.hasRootAccess(h.host)) {
+            if (h.host == "home" || h.port > openers) { 
                 continue;
             }
             if (ns.isRunning("/daemons/controller.js")) {
-                installs.get("worker").push(h.host);
+                installs["worker"].push(h.host);
                 await installWorker(ns, h.host);
             } else if (ns.isRunning("/daemons/share.js")) {
                 if (ns.getServerMaxRam(h.host) > sReq) {
-                    installs.get("sharer").push(h.host);
+                    installs["sharer"].push(h.host);
                     await installSharer(ns, h.host);
                 } else {
-                    installs.get("weakener").push(h.host);
+                    installs["weakener"].push(h.host);
                     await installWeaken(ns, h.host);
                 }
             } else {
-                installs.get("weakener").push(h.host);
+                installs["weakener"].push(h.host);
                 await installWeaken(ns, h.host);
             }
         }
-        for (var i of installs) {
-            if (i[1].length > 0) {
-                await out(ns, "%s: %s", i[0], i[1].join(", "));
+        for (var i of Object.keys(installs)) {
+            if (installs[i].length > 0) {
+                await out(ns, "%s: %s", i, installs[i].join(", "));
             }
         }
         return;
     } else if (target == "pserv") {
-        var hs = hosts.hosts(ns).filter((h) => { return h.host.startsWith("pserv-") });
+        var hs = hosts(ns).filter((h) => { return h.host.startsWith("pserv-") });
         var req = ns.getScriptRam("/daemons/batch.js");
         var a = readAssignments(ns);
         for (var i in hs) {
             if (tool == "sharer") {
-                installs.get("sharer").push(hs[i].host);
+                installs["sharer"].push(hs[i].host);
                 await installSharer(ns, hs[i].host);
                 continue;
             }
             var h = a.find((h) => { return h.worker == hs[i].host });
             if (h && ns.getServerMaxRam(h.worker) > req) {
-                installs.get("batch").push(h.worker);
+                installs["batch"].push(h.worker);
                 await installBatch(ns, h.worker, h.target);
             } else {
-                installs.get("weakener").push(hs[i].host);
+                installs["weakener"].push(hs[i].host);
                 await installWeaken(ns, hs[i].host);
             }
         }
-        for (var i of installs) {
-            if (i[1].length > 0) {
-                await out(ns, "%s: %s", i[0], i[1].join(", "));
+        for (var i of Object.keys(installs)) {
+            if (installs[i].length > 0) {
+                await out(ns, "%s: %s", i, installs[i].join(", "));
             }
         }
         return;
@@ -103,6 +106,7 @@ export async function main(ns) {
 
 }
 
+/** @param {NS} ns **/
 export async function installBatch(ns, worker, target) {
     if (!target) {
         await installDefault(ns, worker);
@@ -112,20 +116,32 @@ export async function installBatch(ns, worker, target) {
         await out(ns, "%s is obsokete, not installing batch.", target)
         return
     }
-    if (target != "home") {
-        var files = ["/bin/weaken.js", "/bin/hack.js", "/bin/grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
-        files.push(libs);
-        await ns.scp(files, "home", worker);
-        ns.killall(worker);
+    var files = ["/bin/weaken.js", "/bin/hack.js", "/bin/grow.js", "/daemons/batch.js", "/conf/assignments.txt"];
+    files.push(libs);
+    var h = readAssignments(ns).find((h) => { return h.worker == worker });
+    var limit;
+    if (h.targets.length > 1) {
+        limit = ns.getServerMaxRam(worker) / h.targets.length;
     }
-    if (!ns.exec("/daemons/batch.js", worker, 1, target)) {
-        await out(ns, "Failed to launch batch on %s", worker);
+    if (target != "home") {
+        await ns.scp(files, "home", worker);
+        ns.scriptKill("/daemons/weakener.js", worker);
+        ns.scriptKill("/daemons/share.js", worker);
+        var args = [target];
+        if (limit) {
+            args.push(limit);
+        }
+        if (!ns.isRunning("/daemons/batch.js", worker, ...args)) {
+            if (!ns.exec("/daemons/batch.js", worker, 1, ...args)) {
+                await out(ns, "Failed to launch batch on %s", worker);
+            }
+        }
     }
 }
 
 export async function installWeaken(ns, worker) {
     if (worker != "home") {
-        var files = ["weaken.js", "/daemons/weakener.js", "/conf/assignments.txt"];
+        var files = ["weaken.js", "/bin/weaken.js", "/daemons/weakener.js", "/conf/assignments.txt"];
         files.push(libs);
         await ns.scp(files, "home", worker);
         ns.killall(worker);
