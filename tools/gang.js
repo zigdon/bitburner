@@ -1,8 +1,24 @@
 import * as fmt from "/lib/fmt.js";
+import {getManualCrimeNames} from "/lib/constants.js";
+
+/** @param {NS} ns **/
+function checkGang(ns) {
+    if (!ns.gang.inGang()) {
+        if (ns.gang.createGang("Slum Snakes")) {
+            ns.tprintf("Created gang");
+        } else {
+            ns.tprintf("Failed to create gang");
+        }
+        ns.exit();
+        return false;
+    }
+    return true;
+}
 
 /** @param {NS} ns **/
 export async function main(ns) {
     var cmd = ns.args.shift();
+    if (cmd != "crimes" && !checkGang(ns)) { return }
     switch (cmd) {
         case "list":
             var info = ns.gang.getOtherGangInformation();
@@ -53,6 +69,24 @@ export async function main(ns) {
             var name = ns.args.shift();
             ns.tprintf(fmt.object(ns.gang.getMemberInformation(name)))
             break;
+        case "crimes":
+            var data = [];
+            for (var c of getManualCrimeNames()) {
+                var stats = ns.getCrimeStats(c);
+                data.push([
+                    stats.name, stats.difficulty.toFixed(2), stats.time,
+                    stats.money, stats.karma, stats.kills,
+                    stats.strength_exp, stats.defense_exp, stats.dexterity_exp,
+                    stats.agility_exp, stats.charisma_exp, stats.intelligence_exp
+                ])
+            }
+            ns.tprintf(fmt.table(
+                data,
+                ["NAME", "DIFF", "TIME", "$", "KARMA", "KILLS", "STR", "DEF", "DEX",
+                 "AGI", "CHA", "INT"],
+                [null, null, fmt.time, fmt.money],
+            ))
+            break;
         case "tasks":
             var stats = ns.gang.getTaskNames().map(t => ns.gang.getTaskStats(t));
             var data = [];
@@ -78,7 +112,7 @@ export async function main(ns) {
                 var stats = ns.gang.getEquipmentStats(e);
                 var sText = [];
                 for (var [k,v] of Object.entries(stats)) {
-                    sText.push(sprintf("%s: %s", k, fmt.gain(v, 0, true)));
+                    sText.push(sprintf("%s: %s", k, fmt.gain(v, {digits: 0, fmtstring: true})));
                 }
                 data.push([
                     e, fmt.money(ns.gang.getEquipmentCost(e)),
