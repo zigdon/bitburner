@@ -4,7 +4,6 @@ import { getPorts } from "/lib/ports.js";
 
 var installer = "/tools/install.js";
 var assigner = "/tools/assigntargets.js";
-var ui = "/bin/ui.js";
 var reserve = 0;
 var mode = "none";
 var ports = getPorts();
@@ -30,17 +29,18 @@ export async function main(ns) {
 			.reduce((m, c) => c < m ? c : m, ns.getPurchasedServerMaxRam());
 	}
 
-	var batchRam = ns.getScriptRam("/daemons/batch.js");
-	while (ram < batchRam 
-	    || ns.getPurchasedServerCost(ram) * 2 < ns.getServerMoneyAvailable("home")) {
+	var batchRam = Math.max(ns.getScriptRam("/daemons/batch.js"), 64);
+	while (ram < batchRam
+	    || ns.getPurchasedServerCost(ram) * 10 < ns.getServerMoneyAvailable("home")) {
 		ram *= 2;
 	}
 	if (ram > ns.getPurchasedServerMaxRam()) {
 		ram = ns.getPurchasedServerMaxRam();
 	}
 	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
-	ns.run(ui, 1, "create", "buyer");
-	var updateUI = function (m = "") {
+	await ns.writePort(ports.UI, "create buyer Buyer");
+	await ns.writePort(ports.UI, "update buyer waiting...");
+	var updateUI = async function (m = "") {
 		var obs = 0;
 		var cur = 0;
 		ns.getPurchasedServers().forEach(srv => ns.getServer(srv).maxRam == ram ? cur++ : obs++);
@@ -48,10 +48,9 @@ export async function main(ns) {
 			fmt.money(ns.getPurchasedServerCost(ram)),
 			fmt.memory(ram),
 			obs, cur, m);
-		ns.run(ui, 1, "update", "buyer", t);
+		await ns.writePort(ports.UI, `update buyer ${t}`);
 	}
-	updateUI();
-	// ns.atExit(function () { ns.run(ui, 1, "delete", "buyer") });
+	await updateUI();
 
 	await console(ns, "Waiting 1 minute before starting...");
 	var start = Date.now();
@@ -92,7 +91,7 @@ export async function main(ns) {
 			}
 			await toast(ns, "Increasing server ram from %s to %s (%s)",
 				fmt.memory(oldRam), fmt.memory(ram), fmt.money(ns.getPurchasedServerCost(ram)));
-			updateUI();
+			await updateUI();
 			continue;
 		}
 
@@ -138,15 +137,16 @@ export async function main(ns) {
 			ns.deleteServer(next);
 		}
 
-		updateUI(".");
+		await updateUI(".");
 		next = ns.purchaseServer(next, ram);
 		await netLog(ns, "bought new server %s with %s GB RAM", next, fmt.int(ram));
 		idle.push(next);
 		await ns.sleep(1000);
-		updateUI();
+		await updateUI();
 	}
 
 	await toast(ns, "Bought max servers with max memory, done", { level: "success", timeout: 0 });
+	await ns.writePort(ports.UI, "delete buyer");
 }
 
 /**
@@ -247,6 +247,7 @@ async function checkControl(ns, need) {
 			break;
 		case "quit":
 			await console(ns, "quitting");
+			await ns.writePort(ports.UI, "delete buyer");
 			ns.exit();
 		case "restart":
 			await console(ns, "restarting...");
