@@ -1,5 +1,6 @@
 import { getPorts } from "/lib/ports.js";
 import * as fmt from "/lib/fmt.js";
+import { console } from "/lib/log.js";
 
 var lastDate = new Map();
 var toastHack = false;
