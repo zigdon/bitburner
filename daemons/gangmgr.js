@@ -5,10 +5,10 @@ import { getCrimes } from "/lib/constants.js";
 
 var nextTick = 0;
 var ports = getPorts();
-// money | respect | wanted
-var focus;
+// money | respect | wanted | auto
+var focus = "auto";
 var repGoal;
-var buyingEq = true;
+var buyingEq = 0;
 var showDetails = true;
 
 /** @param {NS} ns **/
@@ -25,16 +25,27 @@ export async function main(ns) {
 
     await findTick(ns);
 
+    let lastUI = 0;
+    await ns.writePort(ports.UI, "create gang Gang");
     while (true) {
         await checkRecruits(ns);
         await assignTasks(ns);
         await checkCtl(ns);
         await checkState(ns);
         await checkAsc(ns);
-        if (buyingEq) {
+        if (buyingEq > 0) {
             await buyEq(ns);
         }
         printStatus(ns);
+        if (Date.now() - lastUI > 5000) {
+            let profit = ns.gang.getGangInformation().moneyGainRate*5;
+            let territory = ns.gang.getGangInformation().territory;
+            let members = ns.gang.getMemberNames().length;
+            if (profit > 0 || Date.now() - lastUI > 10000) {
+                lastUI = Date.now();
+                await ns.writePort(ports.UI, `update gang ${members}, ${fmt.pct(territory, {digits:0})}\n${fmt.money(profit)}/s`)
+            }
+        }
         await ns.sleep(250);
     }
 }
@@ -43,9 +54,9 @@ export async function main(ns) {
  * @param {NS} ns
  */
 async function checkState(ns) {
-    if (buyingEq && ns.gang.getGangInformation().territory == 1) {
+    if (buyingEq > 0 && ns.gang.getGangInformation().territory == 1) {
         toast(ns, "Territory at 100%, disabling buying eq", { timeout: 30000 });
-        buyingEq = false;
+        buyingEq = 0;
     }
 }
 
@@ -53,7 +64,7 @@ async function checkState(ns) {
  * @param {NS} ns
  */
 async function saveSettings(ns) {
-    await ns.write("/conf/gangSettings.txt", JSON.stringify([focus, repGoal, buyingEq]), "w")
+    await ns.write("/conf/gangSettings.txt", JSON.stringify([focus, repGoal, buyingEq, showDetails]), "w")
 }
 
 /**
@@ -61,7 +72,7 @@ async function saveSettings(ns) {
  */
 function loadSettings(ns) {
     if (!ns.fileExists("/conf/gangSettings.txt")) { return }
-    [focus, repGoal, buyingEq] = JSON.parse(ns.read("/conf/gangSettings.txt"));
+    [focus, repGoal, buyingEq, showDetails] = JSON.parse(ns.read("/conf/gangSettings.txt"));
 }
 
 /**
@@ -72,7 +83,7 @@ async function buyEq(ns) {
     for (var n of equipmentByCombatValue(ns)) {
         if (!n) { continue }
         var cost = ns.gang.getEquipmentCost(n);
-        if (cost > 1000000000) { continue } // $1b
+        if (cost > buyingEq) { continue }
         for (var m of ns.gang.getMemberNames().map(m => [m, ns.gang.getMemberInformation(m)])) {
             if (m[1].augmentations.indexOf(n) == -1 && m[1].upgrades.indexOf(n) == -1 && ns.getServerMoneyAvailable("home") > cost) {
                 if (ns.gang.purchaseEquipment(m[0], n)) {
@@ -84,7 +95,7 @@ async function buyEq(ns) {
         }
     }
     if (bill > 0) {
-        await toast(ns, "Spend %s on equipment", fmt.money(bill));
+        await toast(ns, "Spend %s on gang equipment", fmt.money(bill));
     }
 }
 
@@ -146,8 +157,8 @@ async function checkCtl(ns) {
             await toast(ns, "Rep goal set to %s", fmt.large(repGoal));
             await saveSettings(ns);
             break;
-        case "buy":
-            buyingEq = !buyingEq;
+        case "limit":
+            buyingEq = fmt.parseNum(words[1]);
             break;
         case "details":
             showDetails = !showDetails;
@@ -205,7 +216,9 @@ async function assignTasks(ns) {
         if (gangInfo.territory < 1 && otherGangs.map(g => ns.gang.getChanceToWinClash(g)).every(c => c >= 0.5)) {
             ns.gang.setTerritoryWarfare(true);
         }
-        members.forEach(m => ns.gang.setMemberTask(m.name, "Territory Warfare"));
+        if (gangInfo.territory < 1) {
+            members.forEach(m => ns.gang.setMemberTask(m.name, "Territory Warfare"));
+        }
         return;
     }
     if (nextTick - now > 19700) {
@@ -276,8 +289,14 @@ function bestCrime(ns, g, m) {
         case "wanted":
             focusFunc = ns.formulas.gang.wantedLevelGain;
             break;
-        default:
+        case "money":
             focusFunc = ns.formulas.gang.moneyGain;
+        default:
+            if (ns.gang.getMemberNames().length < 12) {
+                focusFunc = ns.formulas.gang.respectGain;
+            } else {
+                focusFunc = ns.formulas.gang.moneyGain;
+            }
     }
     for (var c of crimes) {
         if (c.name.startsWith("Vigilante")) {
@@ -354,7 +373,6 @@ function printStatus(ns) {
     var oldRep = lastRep.reduce((p, c) => { return (!p || c[1] < p[1]) ? c : p });
     var repRate = oldRep ? (curRep - oldRep[0]) * 1000 / (Date.now() - oldRep[1]) : lastRep.length;
 
-    var size = ns.gang.getMemberNames().length;
     var chances = Object.keys(ns.gang.getOtherGangInformation())
         .filter(g => g != stats.faction)
         .map(g => sprintf("%s: %s", fmt.initial(g),
@@ -369,7 +387,7 @@ function printStatus(ns) {
         ],
         [
             "Respect", fmt.large(stats.respect),
-            "Gear", buyingEq ? "buying" : "saving",
+            "Gear", buyingEq > 0 ? fmt.money(buyingEq) : "-",
             "Wanted rate", (5 * stats.wantedLevelGainRate).toFixed(2) + "/s",
             "Next tick", fmt.time(nextTick - Date.now()),
             "Rep rate", fmt.large(repRate) + "/s",
