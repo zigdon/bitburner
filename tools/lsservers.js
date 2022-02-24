@@ -7,10 +7,10 @@ export async function main(ns) {
     for (var s of srvs.sort((a, b) => { return b.substring(b.indexOf("-")) - a.substring(a.indexOf("-")) })) {
         var maxRam = ns.getServerMaxRam(s);
         var usedRam = ns.getServerUsedRam(s);
-        var current = ns.fileExists("/obsolete.txt", s) ? "x" : "✓";
+        var current = !ns.fileExists("/obsolete.txt", s);
         var procs = ns.ps(s)
         data.push([
-            s, usedRam, maxRam, current, summarise(procs),
+            s, usedRam, maxRam, usedRam/maxRam, current, summarise(procs),
         ]);
         /*
         ns.tprintf("%8s: %6s/%6s, %s%s",
@@ -20,10 +20,10 @@ export async function main(ns) {
             await summarise(ns, procs));
             */
     }
+    var pct = (n) => fmt.pct(n, 0, true);
     ns.tprintf(fmt.table(
         data,
-        ["HOST", "USED", "TOTAL", "CURRENT", "PROCS"],
-        [null, fmt.memory, fmt.memory],
+        ["HOST", ["USED", fmt.memory], ["TOTAL", fmt.memory], ["%% MEM", pct], ["CURRENT", fmt.bool], "PROCS"],
     ))
 }
 
