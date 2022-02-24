@@ -14,6 +14,10 @@ var scanScript = "/tools/scan.js";
 var droneMode = "worker";
 var msg = console;
 
+let shouldBackdoor = (h) => 
+    h.host.includes("fitness") ||
+    h.max == 0 && !h.host.startsWith("pserv") && h.host != "home" && h.host != "darkweb";
+
 /** @param {NS} ns **/
 export async function main(ns) {
     var flags = ns.flags([
@@ -73,8 +77,10 @@ export async function main(ns) {
     ns.exec(scanScript, "home");
   }
 
+  let done = true;
   if (!nextHack.every(p => p == 0)) {
-    await msg(ns, "*** Next hacking levels:");
+    done = false;
+    await msg(ns, "*** Next hacking levels:",);
     var out = [];
     nextHack.forEach(function(l, i) {
       if (l.lvl) { out.push(["  %d: %d (%s)", i, l.lvl, l.host]) };
@@ -83,7 +89,9 @@ export async function main(ns) {
       var line = out[o];
       await msg(ns, ...line)
     }
-  } else {
+  }
+  
+  if (done) {
     await toast(ns, "*** Nothing left to hack. Disabling job.", {level: "success", timeout: 0});
     ns.exec("/tools/send.js", "home", 1, "cron", "pause", "search");
   }
@@ -122,6 +130,7 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
   if (h.root) {
     if (!ns.scriptRunning(workerScript, host) &&
       !ns.scriptRunning(batchScript, host) &&
+      !ns.scriptRunning(sharerScript, host) &&
       host.startsWith("pserv-")) {
       log(ns, "%s: can be hacking", host);
     } else if ( host != "home" && !host.startsWith("pserv-")) {
@@ -138,13 +147,21 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
         await installWorker(ns, host);
       }
     }
-  } else if (h.hack <= myHack && h.ports <= openers.length) {
-    // ns.tprint(host + ": should hack");
-    await doHack(ns, host, openers);
-    hacked.push(h);
-  } else if (!nextHack[h.ports] || nextHack[h.ports].lvl > h.hack) {
-    await log(ns, "Can't hack %s, need %d ports", host, h.ports);
-    nextHack[h.ports] = {lvl: h.hack, host: host};
+  } else if (h.ports <= openers.length) {
+    await doPorts(ns, host, openers);
+  }
+
+  if (!h.root) {
+    if (h.hack <= myHack && h.ports <= openers.length) {
+      await doHack(ns, host, openers);
+      hacked.push(h);
+    } else if (!nextHack[h.ports] || nextHack[h.ports].lvl > h.hack) {
+      await log(ns, "Can't hack %s, need %d ports", host, h.ports);
+      nextHack[h.ports] = {lvl: h.hack, host: host};
+    }
+  }
+  if (!h.backdoor && h.hack <= myHack && shouldBackdoor(h)) {
+    await doBackdoor(ns, host);
   }
 
   var hosts = ns.scan(host);
@@ -162,9 +179,29 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
 /**
  * @param {NS} ns
  * @param {string} host
+ */
+async function doBackdoor(ns, host) {
+  try {
+    if (go(ns, host)) {
+      await msg(ns, "installing backdoor on %s", host);
+      await ns.installBackdoor();
+    } else {
+      await msg(ns, "Failed to go to %s", host);
+      ns.toast("Install backdoor on " + host, "info", null);
+    }
+  } catch (error) {
+    await msg(ns, "Error installing backdoor on %s: %s", host, error);
+    ns.toast("Install backdoor on " + host, "info", null);
+  }
+  ns.connect("home");
+}
+
+/**
+ * @param {NS} ns
+ * @param {string} host
  * @param {Array} openers
  */
-async function doHack(ns, host, openers) {
+async function doPorts(ns, host, openers) {
   var ports = ns.getServerNumPortsRequired(host);
   log(ns, "Trying " + openers.legnth + " openers on " + host);
   openers.forEach(function (f) {
@@ -179,24 +216,15 @@ async function doHack(ns, host, openers) {
     await msg(ns, "couldn't open enough ports on %s", host);
     return;
   }
+}
 
+/**
+ * @param {NS} ns
+ * @param {string} host
+ */
+async function doHack(ns, host) {
   log(ns, "running nuke on " + host);
   ns.nuke(host);
   await msg(ns, "hacked %s", host);
 
-  if (ns.getServerMaxMoney(host) == 0 && host != "darkweb") {
-    try {
-      if (go(ns, host)) {
-        await msg(ns, "installing backdoor on %s", host);
-        await ns.installBackdoor();
-      } else {
-        await msg(ns, "Failed to go to %s", host);
-        ns.toast("Install backdoor on " + host, "info", null);
-      }
-    } catch (error) {
-      await msg(ns, "Error installing backdoor on %s: %s", h.host, error);
-      ns.toast("Install backdoor on " + host, "info", null);
-    }
-    ns.connect("home");
-  }
 }
