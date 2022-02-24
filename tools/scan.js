@@ -11,16 +11,35 @@ export async function main(ns) {
   if (!cmd) {
     cmd = "contracts";
   }
-  var start = ns.args[1];
-  if (!start) {
-    start = "home";
-  }
 
   ns.disableLog("ALL");
 
   await scanFrom(ns, "home", "", 0, found);
   await saveDB(ns, found);
 
+  var start = ns.args[1];
+  if (!start) {
+    start = "home";
+  }
+  if (!found.has(start)) {
+    let match = [];
+    for (let k of found.keys()) {
+      if (k.toLowerCase().includes(start.toLowerCase())) {
+        match.push(k);
+      }
+    }
+    if (match.length == 0) {
+      ns.tprintf("No matches %s", start);
+      return;
+    } else if (match.length == 1) {
+      start = match[0];
+      ns.tprintf("Single match: %s", start);
+    } else {
+      ns.tprintf("Multiple matches for %s: %s", start, match.join(", "))
+      return;
+    }
+  }
+  
   var eachFunc;
   var showFunc;
   var mapAcc = new Map();
@@ -159,14 +178,14 @@ var header = false;
 function printHost(ns, host) {
     if (!header) {
       header = true;
-      ns.tprintf("%-35s: %5s %4s %5s %17s %9s %s",
-          "  NAME", "ROOT", "HACK", "RAM", "VALUE  ", "SECURITY", "WORKER")
+      ns.tprintf("%-35s: %5s %8s %4s %5s %17s %9s %s",
+          "  NAME", "ROOT", "BACKDOOR", "HACK", "RAM", "VALUE  ", "SECURITY", "WORKER")
     }
     var prefix = " ".repeat(host.depth);
     var postfix = " ".repeat(35-host.depth-host.host.length);
     var assigned = assignments.map((a) => {if (a.target == host.host) { return a.worker }}).filter((a) => { return a });
-    ns.tprintf("%s%s%s: %5s %4d %5s %8s/%8s %5.2f/%3d %s",
-      prefix, host.host, postfix, host.root, host.hack, fmt.memory(host.ram),
+    ns.tprintf("%s%s%s: %5s %8s %4d %5s %8s/%8s %5.2f/%3d %s",
+      prefix, host.host, postfix, host.root, host.backdoor, host["hack"], fmt.memory(host.ram),
       fmt.money(host.curVal), fmt.money(host.max),
       host.curSec, host.minSec, assigned.length ? "(" + assigned + ")" : "");
 }
@@ -197,7 +216,7 @@ function printUp(ns, host, found) {
  */
 function printFrom(ns, host, found, limit) {
   var h = found.get(host);
-  if (!limit || limit > h.hack) {
+  if (!limit || limit > h["hack"]) {
     printHost(ns, h);
   }
   h.children.forEach(function (h) {
@@ -214,6 +233,7 @@ function printFrom(ns, host, found, limit) {
  *  **/
 async function scanFrom(ns, host, parent, depth, found) {
   var hacked = eval("ns.hasRootAccess(host)");
+  var backdoor = ns.getServer(host).backdoorInstalled;
   var level = eval("ns.getServerRequiredHackingLevel(host)");
   var maxVal = eval("ns.getServerMaxMoney(host)");
   var ram = eval("ns.getServerMaxRam(host)");
@@ -226,7 +246,8 @@ async function scanFrom(ns, host, parent, depth, found) {
     depth: depth,
     host: host,
     root: hacked,
-    hack: level,
+    backdoor: backdoor,
+    "hack": level,
     max: maxVal,
     curVal: curVal,
     minSec: minSec,
@@ -269,7 +290,7 @@ async function saveDB(ns, found) {
     return found;
   }
   found.forEach((h) => {
-    data.push([h.host, h.hack, h.max, h.ports, h.root, contains(h.host, pServers), h.path].join("\t"));
+    data.push([h.host, h["hack"], h.max, h.ports, h.root, contains(h.host, pServers), h.path].join("\t"));
   })
   await ns.write("/conf/hosts.txt", data.join("\n"), "w");
 }
