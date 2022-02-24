@@ -6,7 +6,7 @@ import { makeValid } from "/contracts/parens.js";
 import { paths } from "/contracts/paths.js";
 import { blockedPaths } from "/contracts/paths2.js";
 import { getSum } from "/contracts/sum.js";
-import { subsum } from "/contracts/subsub.js";
+import { subsum } from "/contracts/subsum.js";
 import { spiral } from "/contracts/spiral.js";
 import { factor } from "/contracts/factor.js";
 import { solveIntervals } from "/contracts/intervals.js";
