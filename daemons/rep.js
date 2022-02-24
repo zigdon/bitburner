@@ -1,4 +1,4 @@
-import { getFactions } from "/lib/constants.js";
+import { getFactions, longFact } from "/lib/constants.js";
 import * as fmt from "/lib/fmt.js";
 import * as zui from "/lib/ui.js";
 import { console, netLog } from "/lib/log.js";
@@ -6,6 +6,15 @@ import { console, netLog } from "/lib/log.js";
 /** @param {NS} ns **/
 export async function main(ns) {
   ns.disableLog("sleep")
+  var focus = ns.args[0];
+  if (focus) {
+    focus = longFact(focus);
+    if (!focus) {
+      ns.tprintf("Don't know who %d is", ns.args[0])
+      return;
+    }
+    ns.tprintf("Focusing on %s", focus);
+  }
   var facts = getFactions();
   var reps = new Map();
   var canGet = new Map();
@@ -43,21 +52,26 @@ export async function main(ns) {
     var favDelta = 0;
     var favSel;
     var sel;
-    for (f of reps) {
-      if (f[1].rep == 0) { continue }
-      var rec = f[1];
-      await netLog(ns, "%s: %s/%s (gained: %s)",
-        f[0], fmt.int(rec.rep), fmt.int(rec.need), fmt.int(rec.rep - rec.start));
-      var missing = rec.need - rec.rep
-      if (f[1].hasFavor) {
-        if ((missing < favDelta && missing > 0) || favDelta <= 0) {
-          favDelta = missing;
-          favSel = f[0]
-        }
-      } else {
-        if ((missing < delta && missing > 0) || delta <= 0) {
-          delta = missing;
-          sel = f[0]
+    if (focus && reps.get(focus).need > 0) {
+      sel = focus;
+      delta = reps.get(focus).need - reps.get(focus).rep;
+    } else {
+      for (f of reps) {
+        if (f[1].rep == 0) { continue }
+        var rec = f[1];
+        await netLog(ns, "%s: %s/%s (gained: %s)",
+          f[0], fmt.int(rec.rep), fmt.int(rec.need), fmt.int(rec.rep - rec.start));
+        var missing = rec.need - rec.rep
+        if (f[1].hasFavor) {
+          if ((missing < favDelta && missing > 0) || favDelta <= 0) {
+            favDelta = missing;
+            favSel = f[0]
+          }
+        } else {
+          if ((missing < delta && missing > 0) || delta <= 0) {
+            delta = missing;
+            sel = f[0]
+          }
         }
       }
     }
