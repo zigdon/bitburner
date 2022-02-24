@@ -3,6 +3,7 @@ import * as fmt from "/lib/fmt.js";
 import {getPorts} from "/lib/ports.js";
 
 var state = new Map();
+const ports = getPorts();
 var avg = [];
 var hist = [];
 var format = function(n) {
@@ -21,11 +22,11 @@ export async function main(ns) {
     ns.disableLog("getServerUsedRam");
 
     ns.tail();
-    var ports = getPorts();
     var lastUpdate = 0;
+    await ns.writePort(ports.UI, "create batch Batching");
     while(true) {
         if (Date.now() - lastUpdate > 1000) {
-            postUpdate(ns);
+            await postUpdate(ns);
             lastUpdate = Date.now();
         }
         var data = ns.readPort(ports.BATCHMON);
@@ -41,7 +42,7 @@ export async function main(ns) {
 /**
  * @param {NS} ns
  */
-function postUpdate(ns) {
+async function postUpdate(ns) {
     var sum = 0;
     var now = Date.now();
     avg.forEach((a) => {
@@ -103,6 +104,7 @@ function postUpdate(ns) {
     }
     if (hist.length != 0) {
         ns.print("\n"+plot(hist, { height: 5, format: format }));
+        await ns.writePort(ports.UI, `update batch ${fmt.money(hist.reduce((t, c) => t+c, 0)/hist.length)}/s`);
     }
 }
 
