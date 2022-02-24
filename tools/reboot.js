@@ -1,15 +1,10 @@
 import {getFactions, longFact} from "/lib/constants.js";
 import * as fmt from "/lib/fmt.js";
+import {keep, toast} from "/lib/log.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
-    var logFile = "/log/keep/reboot.txt";
-    async function log(t, ...args) {
-        var ts = new Date().toLocaleString();
-        t = "\n" + ts + " - " + t;
-        await ns.write(logFile, ns.sprintf(t, ...args), "a");
-    }
     var flags = ns.flags([
         ["time", null],
         ["money", null],
@@ -19,6 +14,7 @@ export async function main(ns) {
         ["now", false],
         ["batch", false],
         ["any", false],
+        ["noaugs", false],
     ])
 
     var [waitDesc, waitFuncs] = parseFlags(ns, flags);
@@ -43,7 +39,7 @@ export async function main(ns) {
             await ns.sleep(5000);
         }
         ns.toast(`Wait complete, after ${fmt.time(Date.now()-startWait)}`, "success", 30000);
-        await log("Wait complete after %s", fmt.time(Date.now()-startWait));
+        await keep(ns, "Wait complete after %s", fmt.time(Date.now()-startWait));
     }
 
     if (ns.isRunning("/daemons/buyer.js", "home")) {
@@ -62,7 +58,13 @@ export async function main(ns) {
             newAugs.push(a);
         }
     }
-    await log("New augs:\n%s", newAugs.join("\n"));
+    if (newAugs.length == 0 && !flags.noaugs) {
+        await toast(ns, "Couldn't buy any augs, and --noaugs wasn't passed!", {level: "error", timeout: 0});
+        return;
+    }
+    if (newAugs.length > 0) {
+        await keep(ns, "New augs:\n%s", newAugs.join("\n"));
+    }
 
     // Buy any server upgrades
     var c = 0;
@@ -72,8 +74,10 @@ export async function main(ns) {
         }
         c++;
     }
-    ns.toast(`Upgraded home cores ${c} times`, "success", null);
-    await log(`Upgraded home cores ${c} times`);
+    if (c) {
+        ns.toast(`Upgraded home cores ${c} times`, "success", null);
+        await keep(ns, `Upgraded home cores ${c} times`);
+    }
 
     c = 0;
     while (ns.getServerMoneyAvailable("home") > ns.getUpgradeHomeRamCost()) {
@@ -82,8 +86,10 @@ export async function main(ns) {
         }
         c++;
     }
-    ns.toast(`Upgraded RAM ${c} times`, "success", null);
-    await log(`Upgraded RAM ${c} times to ${fmt.memory(ns.getServerMaxRam("home"))}`);
+    if (c) {
+        ns.toast(`Upgraded RAM ${c} times`, "success", null);
+        await keep(ns, `Upgraded RAM ${c} times to ${fmt.memory(ns.getServerMaxRam("home"))}`);
+    }
 
     if (!flags.now) {
         ns.toast("Reboot in 1 minute!", "warning", 30000);
@@ -95,6 +101,8 @@ export async function main(ns) {
             await ns.sleep(1000);
         }
     }
+    
+    ns.stopAction();
 
     // Buy any possible NeuroFlux Governor
     // Find the faction with the most rep
@@ -105,9 +113,21 @@ export async function main(ns) {
         }
         if (c > 0) {
             ns.toast(`Bought NeuroFlux Governors from ${fact[0]} ${c} times`, "success", null);
-            await log(`Bought NeuroFlux Governors from ${fact[0]} ${c} times`);
+            await keep(ns, `Bought NeuroFlux Governors from ${fact[0]} ${c} times`);
             break;
         }
+    }
+
+    // Save progress
+    var player = ns.getPlayer();
+    await keep(ns, "Rebooting BN%d, %s since last reboot", player.bitNodeN, fmt.time(player.playtimeSinceLastAug));
+    if (player.numPeopleKilled) {
+        await keep(ns, "Current player kills: %s", player.numPeopleKilled);
+    }
+    if (flags.money) {
+        await ns.write("/conf/rebootState.txt", Math.floor(1.2 * Number(fmt.parseNum(flags.money))), "w");
+    } else {
+        ns.rm("/conf/rebootState.txt");
     }
 
     // Install any augs
