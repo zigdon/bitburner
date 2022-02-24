@@ -1,31 +1,10 @@
-import {getPorts} from "/lib/ports.js";
+import {portAlias, portName} from "/lib/ports.js";
 
-var ports = getPorts();
 /** @param {NS} ns **/
 export async function main(ns) {
-    var port = ns.args[0];
-    switch (port) {
-        case "worker":
-            port = ports.CONTROLLER;
-            break;
-        case "controller":
-            port = ports.CONTROLLER_CTL;
-            break;
-        case "buyer":
-            port = ports.BUYER_CTL;
-            break;
-        case "logger":
-            port = ports.LOGGER_CTL;
-            break;
-        case "cron":
-            port = ports.CRON_CTL;
-            break;
-        case "gang":
-            port = ports.GANGMGR;
-            break;
-    }
+    var port = portAlias(ns.args[0]);
     var ph = ns.getPortHandle(port);
     var msg = ns.args.slice(1).join(" ");
-    await ph.write(msg);
-    ns.tprintf("sent: '%s'", msg);
+    ph.write(msg);
+    ns.tprintf("sent: '%s' to %d (%s)", msg, port, portName(port));
 }

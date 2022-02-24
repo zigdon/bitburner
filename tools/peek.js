@@ -1,5 +1,8 @@
+import {portAlias, portName} from "/lib/ports.js";
+
 /** @param {NS} ns **/
 export async function main(ns) {
-    var port = ns.getPortHandle(ns.args[0]);
-    ns.tprintf("'%s'", port.peek());
+    var portNum = portAlias(ns.args[0]);
+    var port = ns.getPortHandle(portNum);
+    ns.tprintf("%s: '%s'", portName(portNum), port.peek());
 }
