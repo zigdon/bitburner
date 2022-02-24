@@ -14,8 +14,14 @@ export async function main(ns) {
         return;
     }
 
+    var p = ns.getPlayer();
     ns.tprintf("%s (%s)", fact, shortFact(fact));
-    ns.tprintf("Rep: %s,  Favor: %s,  Gain: %s", fmt.large(ns.getFactionRep(fact)), ns.getFactionFavor(fact), ns.getFactionFavorGain(fact));
+    ns.tprintf("Rep: %s,  Pending: %s,  Favor: %s,  Gain: %s",
+        fmt.large(ns.getFactionRep(fact)),
+        p.currentWorkFactionName == fact ? fmt.large(p.workRepGained) : "",
+        fmt.int(ns.getFactionFavor(fact)),
+        fmt.int(ns.getFactionFavorGain(fact)),
+    );
     var owned = ns.getOwnedAugmentations(true);
     var data = [];
     var augs = ns.getAugmentationsFromFaction(fact).sort();
@@ -54,11 +60,12 @@ export async function main(ns) {
 function lsFacts(ns) {
     var data = [];
     var owned = ns.getOwnedAugmentations(true);
+    var p = ns.getPlayer();
     for (var f of getFactions().sort()) {
         data.push([
             f,
             shortFact(f),
-            ns.getFactionRep(f),
+            ns.getFactionRep(f) + Number(p.currentWorkFactionName == f ? p.workRepGained : 0),
             ns.getFactionFavor(f),
             ns.getFactionFavorGain(f),
             sprintf("%d/%d",
