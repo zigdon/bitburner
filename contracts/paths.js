@@ -9,7 +9,7 @@ export function paths(data) {
     var w = data[0];
     var h = data[1];
     var moves = h + w;
-    return fact(moves - 2)/fact(w-1)/fact(h-1);
+    return Math.round(fact(moves - 2)/fact(w-1)/fact(h-1));
 }
 
 function fact(n) {
