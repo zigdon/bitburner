@@ -1,4 +1,5 @@
 import * as fmt from "/lib/fmt.js";
+import {getManualCrimeNames, getManualCrimeEV} from "/lib/constants.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -7,6 +8,11 @@ export async function main(ns) {
         case "list":
             listSleeves(ns);
             break;
+        case "info":
+            listSleeve(ns, ns.args.shift());
+            break;
+        case "ev":
+            listEV(ns, ns.args.shift());
         case "task":
             var id = ns.args.shift();
             var task = ns.args.shift();
@@ -15,6 +21,16 @@ export async function main(ns) {
         default:
             ns.tprintf("Dunno what to do with %s", cmd);
     }
+}
+
+/**
+ * @param {NS} ns
+ * @param {number} id
+ */
+function listEV(ns, id) {
+    var stats = ns.sleeve.getSleeveStats(id);
+    var crimes = getManualCrimeNames().map(c => [c, getManualCrimeEV(c, stats)]).sort((a,b) => b[1]-a[1]);
+    ns.tprintf(fmt.table(crimes, ["CRIME", ["EV", fmt.large]]));
 }
 
 /**
@@ -43,17 +59,9 @@ function assign(ns, id, task) {
 function listSleeves(ns) {
     var data = [];
     for (var s=0; s<ns.sleeve.getNumSleeves(); s++) {
+        listSleeve(ns, s)
         var stats = ns.sleeve.getSleeveStats(s);
-        var augs = ns.sleeve.getSleeveAugmentations(s);
-        var info = ns.sleeve.getInformation(s);
-        var buyable = ns.sleeve.getSleevePurchasableAugs(s);
         var task = ns.sleeve.getTask(s);
-        ns.tprintf("Sleeve #%d", s);
-        ns.tprint(fmt.object(stats));
-        ns.tprint(augs);
-        ns.tprint(fmt.object(buyable));
-        ns.tprint(fmt.object(info));
-        ns.tprint(fmt.object(task));
         data.push([
             s, task.task, task.task == "Crime" ? task.crime : "?", ...Object.values(stats),
         ])
@@ -63,4 +71,22 @@ function listSleeves(ns) {
         data,
         ["#", "TASK", "DETAILS", ...Object.keys(ns.sleeve.getSleeveStats(0))],
     ))
+}
+
+/**
+ * @param {NS} ns
+ * @param {number} id
+ */
+function listSleeve(ns, s) {
+    var stats = ns.sleeve.getSleeveStats(s);
+    var augs = ns.sleeve.getSleeveAugmentations(s);
+    var info = ns.sleeve.getInformation(s);
+    var buyable = ns.sleeve.getSleevePurchasableAugs(s);
+    var task = ns.sleeve.getTask(s);
+    ns.tprintf("Sleeve #%d", s);
+    ns.tprint(fmt.object(stats));
+    ns.tprint(augs);
+    ns.tprint(fmt.object(buyable));
+    ns.tprint(fmt.object(info));
+    ns.tprint(fmt.object(task));
 }
