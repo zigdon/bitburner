@@ -15,18 +15,19 @@ export async function main(ns) {
 
     ns.tprint(digits, " ", target);
     
-    var res = await allSums(digits, target);
+    var res = await allSums(ns, digits, target);
     ns.tprint(res.length);
     ns.tprint(res);
 }
 
 /**
+ * @param {NS} ns
  * @param {string} digits
  * @param {number} target
  */
-export async function allSums(digits, target) {
+export async function allSums(ns, digits, target) {
     var cache = new Map();
-    var opts = await maths(String(digits), cache);
+    var opts = await maths(ns, String(digits), cache);
     var res = [];
     opts.forEach((o) => {
         if (eval(o) == target) {
@@ -39,10 +40,12 @@ export async function allSums(digits, target) {
 
 
 /**
+ * @param {NS} ns
  * @param {string} digits
  * @param {Map<string,strung[]} cache
  */
-async function maths(digits, cache) {
+async function maths(ns, digits, cache) {
+    await ns.sleep(1);
     var opts = [];
     if (cache.has(digits)) {
         return cache.get(digits);
@@ -56,7 +59,7 @@ async function maths(digits, cache) {
         }
 
         var sub = [];
-        sub = await maths(digits.substr(i), cache);
+        sub = await maths(ns, digits.substr(i), cache);
         sub.forEach((s) => {
             // s = Number(s);
             opts.push(n + "+" + s);
