@@ -159,6 +159,7 @@ async function checkCtl(ns) {
             break;
         case "limit":
             buyingEq = fmt.parseNum(words[1]);
+            await saveSettings(ns);
             break;
         case "details":
             showDetails = !showDetails;
