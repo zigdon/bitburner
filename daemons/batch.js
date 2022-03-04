@@ -41,11 +41,11 @@ export async function main(ns) {
     // 5. Start a hack to end after the weaken (#2)
 
     var hostname = ns.getHostname();
-    var maxRam = ns.getServerMaxRam(hostname);
     var hRam = ns.getScriptRam(hScript);
     var gRam = ns.getScriptRam(gScript);
     var wRam = ns.getScriptRam(wScript);
     var scriptRam = ns.getScriptRam(ns.getScriptName());
+    var maxRam = ns.getServerMaxRam(hostname);
     var availRam = maxRam - scriptRam - reserve;
     var maxW = Math.floor((maxRam - scriptRam) / wRam);
     var maxG = Math.floor((maxRam - scriptRam) / gRam);
@@ -76,6 +76,12 @@ export async function main(ns) {
     var threads;
     var batches;
     while (true) {
+        // Update to make sure we have the latest memory numbers (things change!)
+        var maxRam = ns.getServerMaxRam(hostname);
+        var availRam = maxRam - scriptRam - reserve;
+        var maxW = Math.floor((maxRam - scriptRam) / wRam);
+        var maxG = Math.floor((maxRam - scriptRam) / gRam);
+        
         var schedule;
         [schedule, batches, threads] = await designBatch(ns, target, availRam, hRam, gRam, wRam, batches, threads);
         if (!schedule) {
