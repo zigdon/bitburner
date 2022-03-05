@@ -11,6 +11,11 @@ export async function main(ns) {
   ns.disableLog("ALL");
   ns.tail();
 
+  if (ns.corporation.getCorporation().divisions.length == 0) {
+    ns.tprintf("No divisions exist, exiting corpmon.");
+    return;
+  }
+
   let lastUpgrades = 0;
   let lastTick = 0;
   let utilReset = 0;
@@ -28,6 +33,7 @@ export async function main(ns) {
       util[d.name] ||= {};
       for (let c of d.cities) {
         util[d.name][c] ||= 0;
+        if (!ns.corporation.hasWarehouse(d.name, c)) { continue; }
         let w = ns.corporation.getWarehouse(d.name, c);
         if (w.sizeUsed / w.size > util[d.name][c]) {
           util[d.name][c] = w.sizeUsed / w.size;
@@ -289,7 +295,7 @@ async function devProducts(ns) {
 
     let pName = getNextProduct(products[type], div.products);
     if (!pName) {
-      return;
+      return progress;
     }
     let notice = ns.corporation.getCorporation().revenue < 1e9 ? toast : netLog;
     let productLimit = 3;
