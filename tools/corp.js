@@ -1,7 +1,7 @@
 import * as fmt from "/lib/fmt.js";
 import { cities, materials } from "/lib/constants.js";
 import { console, netLog } from "/lib/log.js";
-import { expandOffice, researchHardware } from "/lib/corp.js";
+import { getInvestment, buyHardware, levelUpgrade, unlockUpgrade, expandOffice, researchHardware } from "/lib/corp.js";
 
 let out;
 let log;
@@ -118,15 +118,6 @@ async function getDiv(ns, name) {
  */
 async function printProducts(ns, div) {
   let products = ns.corporation.getDivision(div).products;
-  /*
-               name | Total Heart 2000
-                dmd | 86.56664700889277
-                cmp | 3.3899999999998225
-              pCost | 12085.289344007258
-              sCost | MP*220
-           cityData | Aevum,0,47.01002192786718,47.01002192786718, Chongqing,0,34.33062663216696,34.33062663216696, Ishima,0,35.114365202309074,35.114365202309074, New Tokyo,0,34.58380426191991,34.58380426191991, Sector-12,0,34.08221751614316,34.08221751614316, Volhaven,0,34.380313335907545,34.380313335907545
-developmentProgress | 100.1351346264278
-  */
   let data = [];
   for (let pName of products) {
     let p = ns.corporation.getProduct(div, pName);
@@ -266,6 +257,7 @@ async function setSale(ns, name, mat, qty = "MAX", price = "MP", cities) {
  */
 async function createDiv(ns, type) {
   let divs = {
+    "Agriculture": { name: "Totally Food Inc", autosale:["Plants", "Food"]},
     "Tobacco": { name: "Totally Safe Inc", product: "Total Lungs", autosale: [] },
     "Software": { name: "Totally Works Inc", product: "Total Vaporware", autosale: ["AI Cores"] },
     "Food": { name: "Totally Organic Inc", product: "Total Food Product", autosale: [] },
@@ -274,8 +266,31 @@ async function createDiv(ns, type) {
     await out("Type is required, one of: %s", Object.keys(divs));
     return;
   }
+  let apiFunds = 0;
+  if (!ns.corporation.hasUnlockUpgrade("Office API")) {
+    apiFunds += 50e9;
+  }
+  if (!ns.corporation.hasUnlockUpgrade("Warehouse API")) {
+    apiFunds += 50e9;
+  }
+  if (apiFunds > 0 && ns.corporation.getCorporation().funds < 150e9 + apiFunds) {
+    await out("Not enough money in the corp to start new div, need %s, got %s.",
+        fmt.money(150e9+apiFunds), fmt.money(ns.corporation.getCorporation().funds));
+    return;
+  } 
+  if (apiFunds > 0) {
+    if (!await ns.prompt(`Will spend ${fmt.money(apiFunds)} on APIs. Proceed?`)) {
+      await out("Aborting.");
+      return;
+    }
+  }
   ns.tail();
   type = type[0].toUpperCase() + type.substr(1);
+
+  if (ns.corporation.getCorporation().divisions.length == 0 && type != "Agriculture") {
+    await out("First division must be Agriculture");
+    return;
+  }
 
   let name = divs[type].name;
   if (!name) {
@@ -292,6 +307,14 @@ async function createDiv(ns, type) {
   if (!div) {
     await out("Failed to create division!");
     return;
+  }
+  
+  await unlockUpgrade(ns, "Office API");
+  await unlockUpgrade(ns, "Warehouse API");
+
+  if (type == "Agriculture") {
+    await out("Going through Agriculture startup process...");
+    return await startAgri(ns);
   }
 
   for (let c of cities) {
@@ -345,7 +368,159 @@ async function createDiv(ns, type) {
 
   // Start working on the first product
   await log("Starting work on pilot product %s", divs[type].product);
-  ns.corporation.makeProduct(name, "Aevum", divs[type].product, 1e9, 1e9);
+  ns.corporation.makeProduct(name, rName, divs[type].product, 1e9, 1e9);
+}
+
+/**
+ * @param {NS} ns
+ */
+async function startAgri(ns) {
+  let name = "Totally Food Inc";
+  let div = ns.corporation.getDivision(name);
+
+  // Unlock upgrades
+  await unlockUpgrade(ns, "Smart Supply");
+
+  // Get offices everywhere, 3 people each
+  for (let c of cities) {
+    if (div.cities.includes(c)) {
+      await log("Found office in %s", c);
+      continue;
+    }
+    await log("Expanding to %s", c);
+    ns.corporation.expandCity(name, c);
+  }
+
+  let staff = {
+    "Engineer": 1,
+    "Operations": 1,
+    "Business": 1,
+  }
+  for (let c of cities) {
+    await expandOffice(ns, name, c, staff);
+    if (!ns.corporation.hasWarehouse(name, c)) {
+      await log("Buying warehouse in %s", c)
+      ns.corporation.purchaseWarehouse(name, c);
+    }
+    while (ns.corporation.getWarehouse(name, c).size < 300) {
+      await log("Upgrading warehouse in %s", c);
+      ns.corporation.upgradeWarehouse(name, c);
+    }
+    ns.corporation.setSmartSupply(name, c, true);
+    ns.corporation.sellMaterial(name, c, "Plants", "MAX", "MP");
+    ns.corporation.sellMaterial(name, c, "Food", "MAX", "MP");
+  }
+
+  // Get one(1) AdVert
+  if (ns.corporation.getHireAdVertCount(name) == 0) {
+    await out("Hiring AdVert...");
+    ns.corporation.hireAdVert(name);
+  }
+
+  // Upgrades
+  for (let u of [
+    "FocusWires",
+    "Neural Accelerators",
+    "Speech Processor Implants",
+    "Nuoptimal Nootropic Injector Implants",
+    "Smart Factories",
+  ]) {
+    await levelUpgrade(ns, u, 2);
+  }
+
+  // Buy hardware
+  await buyHardware(ns, name, cities, {
+    "Hardware": 125,
+    "AI Cores": 75,
+    "Real Estate": 27000,
+  });
+
+  // Get investment round for $210b+
+  await out("Waiting for profits of $1.4m+...");
+  while (true) {
+    let corp = ns.corporation.getCorporation();
+    if (corp.revenue - corp.expenses > 1.5e6) {
+      break;
+    }
+    await out("Current profits: %s", fmt.money(corp.revenue-corp.expenses, 2));
+    await ns.sleep(5000);
+  }
+
+  if (!await getInvestment(ns, 210e9, 1)) {
+    await out("Couldn't get investment for $210b");
+    return;
+  }
+
+  // Expand offices
+  staff = {
+    "Engineer": 2,
+    "Operations": 2,
+    "Business": 1,
+    "Management": 2,
+    "Research & Development": 2,
+  }
+  for (let c of cities) {
+    await expandOffice(ns, name, c, staff);
+  }
+
+  // Verify expected funds are at $160b+
+  let funds = ns.corporation.getCorporation().funds;
+  await log("Current corp funds: %s", fmt.money(funds));
+  if (funds < 160e9 && !await ns.prompt(`Corp funds ${fmt.money(funds)} lower than the expected \$160b, proceed?`)) {
+    return;
+  }
+
+  // Get more upgrades
+  await levelUpgrade(ns, "Smart Factories", 10);
+  await levelUpgrade(ns, "Smart Storage", 10);
+
+  // Upgrade warehouse
+  for (let c of cities) {
+    while (ns.corporation.getWarehouse(name, c).size < 2000) {
+      await log("Upgrading warehouse in %s", c);
+      ns.corporation.upgradeWarehouse(name, c);
+    }
+  }
+
+  // Verify expected funds are at $45b+
+  funds = ns.corporation.getCorporation().funds;
+  await log("Current corp funds: %s", fmt.money(funds));
+  if (funds < 45e9 && !await ns.prompt(`Corp funds ${fmt.money(funds)} lower than the expected \$45b, proceed?`)) {
+    await out("Corp funds lower than the expected $45b");
+    return;
+  }
+
+  // Buy hardware
+  await buyHardware(ns, name, cities, {
+    "Hardware": 2800,
+    "Robots": 96,
+    "AI Cores": 2520,
+    "Real Estate": 146400,
+  });
+
+  // Get investment of $5t
+  if (!await getInvestment(ns, 5e12, 2)) {
+    await out("Couldn't get investment for $5t");
+    return;
+  }
+
+  // Upgrade warehouse
+  for (let c of cities) {
+    while (ns.corporation.getWarehouse(name, c).size <= 3800) {
+      await log("Upgrading warehouse in %s", c);
+      ns.corporation.upgradeWarehouse(name, c);
+    }
+  }
+
+  // Buy hardware
+  await buyHardware(ns, name, cities, {
+    "Hardware": 9300,
+    "Robots": 726,
+    "AI Cores": 6270,
+    "Real Estate": 230400,
+  });
+
+  await out("Agri division done!");
 }
 
 /**
