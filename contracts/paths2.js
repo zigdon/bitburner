@@ -1,9 +1,9 @@
 /** @param {NS} ns **/
 export async function main(ns) {
     var data = [
-        [0,0,1],
-        [0,0,0],
-        [0,1,0],
+        [0,0,0,0,0,1,1,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
     ];
 
     ns.tprintf("paths: %d", blockedPaths(ns, data));
