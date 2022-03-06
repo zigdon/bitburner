@@ -2,14 +2,15 @@ import * as fmt from "/lib/fmt.js";
 import { toast } from "/lib/log.js";
 import { getPorts } from "/lib/ports.js";
 import { getCrimes } from "/lib/constants.js";
+import { settings } from "/lib/state.js";
 
-var nextTick = 0;
-var ports = getPorts();
+let nextTick = 0;
+let ports = getPorts();
 // money | respect | wanted | auto
-var focus = "auto";
-var repGoal;
-var buyingEq = 0;
-var showDetails = true;
+let focus = "auto";
+let repGoal;
+let showDetails = true;
+let st;
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -17,9 +18,10 @@ export async function main(ns) {
         ns.tprintf("Not in a gang.");
         return;
     }
+    st = settings(ns, "gangmgr");
     ns.disableLog("sleep");
     ns.tail();
-    var ports = getPorts();
+    let ports = getPorts();
     ns.clearPort(ports.GANGMGR);
     loadSettings(ns);
 
@@ -31,19 +33,18 @@ export async function main(ns) {
         await checkRecruits(ns);
         await assignTasks(ns);
         await checkCtl(ns);
-        await checkState(ns);
         await checkAsc(ns);
-        if (buyingEq > 0) {
+        if (st.get("limit") > 0) {
             await buyEq(ns);
         }
         printStatus(ns);
         if (Date.now() - lastUI > 5000) {
-            let profit = ns.gang.getGangInformation().moneyGainRate*5;
+            let profit = ns.gang.getGangInformation().moneyGainRate * 5;
             let territory = ns.gang.getGangInformation().territory;
             let members = ns.gang.getMemberNames().length;
             if (profit > 0 || Date.now() - lastUI > 10000) {
                 lastUI = Date.now();
-                await ns.writePort(ports.UI, `update gang ${members}, ${fmt.pct(territory, {digits:0})}\n${fmt.money(profit)}/s`)
+                await ns.writePort(ports.UI, `update gang ${members}, ${fmt.pct(territory, { digits: 0 })}\n${fmt.money(profit)}/s`)
             }
         }
         await ns.sleep(250);
@@ -53,18 +54,8 @@ export async function main(ns) {
 /**
  * @param {NS} ns
  */
-async function checkState(ns) {
-    if (buyingEq > 0 && ns.gang.getGangInformation().territory == 1) {
-        toast(ns, "Territory at 100%, disabling buying eq", { timeout: 30000 });
-        buyingEq = 0;
-    }
-}
-
-/**
- * @param {NS} ns
- */
 async function saveSettings(ns) {
-    await ns.write("/conf/gangSettings.txt", JSON.stringify([focus, repGoal, buyingEq, showDetails]), "w")
+    await ns.write("/conf/gangSettings.txt", JSON.stringify([focus, repGoal, showDetails]), "w")
 }
 
 /**
@@ -72,19 +63,19 @@ async function saveSettings(ns) {
  */
 function loadSettings(ns) {
     if (!ns.fileExists("/conf/gangSettings.txt")) { return }
-    [focus, repGoal, buyingEq, showDetails] = JSON.parse(ns.read("/conf/gangSettings.txt"));
+    [focus, repGoal, showDetails] = JSON.parse(ns.read("/conf/gangSettings.txt"));
 }
 
 /**
  * @param {NS} ns
  */
 async function buyEq(ns) {
-    var bill = 0;
-    for (var n of equipmentByCombatValue(ns)) {
+    let bill = 0;
+    for (let n of equipmentByCombatValue(ns)) {
         if (!n) { continue }
-        var cost = ns.gang.getEquipmentCost(n);
-        if (cost > buyingEq) { continue }
-        for (var m of ns.gang.getMemberNames().map(m => [m, ns.gang.getMemberInformation(m)])) {
+        let cost = ns.gang.getEquipmentCost(n);
+        if (cost > st.get("limit")) { continue }
+        for (let m of ns.gang.getMemberNames().map(m => [m, ns.gang.getMemberInformation(m)])) {
             if (m[1].augmentations.indexOf(n) == -1 && m[1].upgrades.indexOf(n) == -1 && ns.getServerMoneyAvailable("home") > cost) {
                 if (ns.gang.purchaseEquipment(m[0], n)) {
                     bill += cost;
@@ -120,8 +111,8 @@ function equipmentByCombatValue(ns) {
  * @param {NS} ns
  */
 async function checkAsc(ns) {
-    for (var m of ns.gang.getMemberNames()) {
-        var res = ns.gang.getAscensionResult(m);
+    for (let m of ns.gang.getMemberNames()) {
+        let res = ns.gang.getAscensionResult(m);
         if (!res) {
             continue;
         }
@@ -137,11 +128,11 @@ async function checkAsc(ns) {
  * @param {NS} ns
  */
 async function checkCtl(ns) {
-    var cmd = ns.readPort(ports.GANGMGR);
+    let cmd = ns.readPort(ports.GANGMGR);
     if (cmd.startsWith("NULL")) {
         return;
     }
-    var words = cmd.split(" ");
+    let words = cmd.split(" ");
     switch (words[0]) {
         case "restart":
             await toast(ns, "Gang manager restarting...");
@@ -157,10 +148,6 @@ async function checkCtl(ns) {
             await toast(ns, "Rep goal set to %s", fmt.large(repGoal));
             await saveSettings(ns);
             break;
-        case "limit":
-            buyingEq = fmt.parseNum(words[1]);
-            await saveSettings(ns);
-            break;
         case "details":
             showDetails = !showDetails;
             break;
@@ -173,11 +160,11 @@ async function checkCtl(ns) {
  * @param {NS} ns
  */
 async function findTick(ns) {
-    var start = Date.now();
-    var last = 0;
+    let start = Date.now();
+    let last = 0;
     while (true) {
-        var info = ns.gang.getOtherGangInformation();
-        var pow = Object.values(info).map(v => v.power).reduce((t, p) => t + p, 0);
+        let info = ns.gang.getOtherGangInformation();
+        let pow = Object.values(info).map(v => v.power).reduce((t, p) => t + p, 0);
         if (last == 0) {
             last = pow;
         } else if (last != pow) {
@@ -192,8 +179,8 @@ async function findTick(ns) {
     }
 }
 
-var lastPower = 0;
-var noChange = 0;
+let lastPower = 0;
+let noChange = 0;
 
 /**
  * @param {NS} ns
@@ -203,39 +190,41 @@ async function assignTasks(ns) {
     // weakest, assign training
     // wanted penalty > 10% -> vigilante
     // If near a warfare tick, everyone to territory!
-    var members = ns.gang.getMemberNames().map(m => ns.gang.getMemberInformation(m));
-    var gangInfo = ns.gang.getGangInformation();
-    var otherGangs = Object.keys(ns.gang.getOtherGangInformation());
+    let members = ns.gang.getMemberNames().map(m => ns.gang.getMemberInformation(m));
+    let gangInfo = ns.gang.getGangInformation();
+    let otherGangs = Object.keys(ns.gang.getOtherGangInformation());
 
-    var stats = [];
-    var now = Date.now();
+    let stats = [];
+    let now = Date.now();
     if (nextTick - now < 0) {
         nextTick += 20000;
     }
-    if (nextTick - now < 1000) {
-        lastPower = gangInfo.power;
-        if (gangInfo.territory < 1 && otherGangs.map(g => ns.gang.getChanceToWinClash(g)).every(c => c >= 0.5)) {
-            ns.gang.setTerritoryWarfare(true);
-        }
-        if (gangInfo.territory < 1) {
-            members.forEach(m => ns.gang.setMemberTask(m.name, "Territory Warfare"));
-        }
-        return;
-    }
-    if (nextTick - now > 19700) {
-        if (lastPower == gangInfo.power) {
-            if (noChange++ > 10) {
-                await toast(ns, "No power change, recalibrating tick")
-                noChange = 0;
-                await findTick(ns);
+    if (gangInfo.territory < 1) {
+        if (nextTick - now < 1000) {
+            lastPower = gangInfo.power;
+            if (otherGangs.map(g => ns.gang.getChanceToWinClash(g)).every(c => c >= 0.5)) {
+                ns.gang.setTerritoryWarfare(true);
             }
-        } else {
-            noChange = 0;
+            members.forEach(m => ns.gang.setMemberTask(m.name, "Territory Warfare"));
+            return;
         }
+        if (nextTick - now > 19700) {
+            if (lastPower == gangInfo.power) {
+                if (noChange++ > 10) {
+                    await toast(ns, "No power change, recalibrating tick")
+                    noChange = 0;
+                    await findTick(ns);
+                }
+            } else {
+                noChange = 0;
+            }
+        }
+    } else {
+        noChange = 0;
     }
     ns.gang.setTerritoryWarfare(false);
 
-    var pickTraining = (m) => {
+    let pickTraining = (m) => {
         if (m.hack < m.cha) {
             return "Train Hacking";
         } else if (m.cha < m.str) {
@@ -245,9 +234,9 @@ async function assignTasks(ns) {
         }
     }
 
-    for (var m of members) {
-        var plan = m.task;
-        var power = [m.str, m.def, m.dex, m.agi].reduce((p, v) => p + v, 0);
+    for (let m of members) {
+        let plan = m.task;
+        let power = [m.str, m.def, m.dex, m.agi].reduce((p, v) => p + v, 0);
 
         plan = bestCrime(ns, gangInfo, m)
 
@@ -260,12 +249,12 @@ async function assignTasks(ns) {
     stats = stats.sort((a, b) => a.power - b.power);
     stats[0].plan = pickTraining(members.find(m => m.name == stats[0].name))
     if (gangInfo.wantedLevel > 5) {
-        var vigis = (0.90 - gangInfo.wantedPenalty) / 0.05;
+        let vigis = (0.90 - gangInfo.wantedPenalty) / 0.05;
         if (vigis > 0) {
             if (vigis >= stats.length) {
                 vigis = stats.length;
             }
-            for (var i = 1; i <= vigis; i++) {
+            for (let i = 1; i <= vigis; i++) {
                 stats[stats.length - i].plan = "Vigilante Justice";
             }
         }
@@ -279,10 +268,10 @@ async function assignTasks(ns) {
  * @param {GangMemberInfo} m
  */
 function bestCrime(ns, g, m) {
-    var crimes = getCrimes();
-    var best = "Train Combat";
-    var fStat = 0;
-    var focusFunc;
+    let crimes = getCrimes();
+    let best = "Train Combat";
+    let fStat = 0;
+    let focusFunc;
     switch (focus) {
         case "respect":
             focusFunc = ns.formulas.gang.respectGain;
@@ -299,12 +288,12 @@ function bestCrime(ns, g, m) {
                 focusFunc = ns.formulas.gang.moneyGain;
             }
     }
-    for (var c of crimes) {
+    for (let c of crimes) {
         if (c.name.startsWith("Vigilante")) {
             continue;
         }
-        var t = ns.gang.getTaskStats(c.name);
-        var val = focusFunc(g, m, t);
+        let t = ns.gang.getTaskStats(c.name);
+        let val = focusFunc(g, m, t);
         if (focus == "wanted") {
             val *= -1;
         }
@@ -321,17 +310,17 @@ function bestCrime(ns, g, m) {
  * @param {NS} ns
  */
 async function getName(ns) {
-    var colors = ["red", "green", "white", "gray", "blue", "yellow", "orange", "purple", "black", "pink"];
-    var animals = ["mouse", "rat", "snake", "elephant", "cat", "tiger", "crow", "fish", "hawk"];
-    var members = ns.gang.getMemberNames();
-    var start = Date.now();
-    var suffix = 0;
+    let colors = ["red", "green", "white", "gray", "blue", "yellow", "orange", "purple", "black", "pink"];
+    let animals = ["mouse", "rat", "snake", "elephant", "cat", "tiger", "crow", "fish", "hawk"];
+    let members = ns.gang.getMemberNames();
+    let start = Date.now();
+    let suffix = 0;
     while (true) {
         if (Date.now() - start > 10000) {
             suffix++;
             start = Date.now();
         }
-        var name = colors[Math.floor(Math.random() * colors.length)] + " " + animals[Math.floor(Math.random() * animals.length)]
+        let name = colors[Math.floor(Math.random() * colors.length)] + " " + animals[Math.floor(Math.random() * animals.length)]
         if (suffix > 0) { name += " " + suffix }
         if (members.indexOf(name) == -1) {
             return name;
@@ -347,38 +336,38 @@ async function checkRecruits(ns) {
     if (!ns.gang.canRecruitMember()) {
         return;
     }
-    var name = await getName(ns);
+    let name = await getName(ns);
     if (ns.gang.recruitMember(name)) {
         await toast(ns, "New recruit %s", name);
         ns.gang.setMemberTask(name, "Train Combat");
         if (ns.gang.getMemberNames().length == 12 && focus == "respect") {
             focus = "money";
-            await toast(ns, "Gang full, switching focus to money", {level: "success"})
+            await toast(ns, "Gang full, switching focus to money", { level: "success" })
         }
     } else {
         await toast(ns, "Couldn't recruit %s", name, { level: "error" });
     }
 }
 
-var lastRep = [];
+let lastRep = [];
 /**
  * @param {NS} ns
  */
 function printStatus(ns) {
-    var stats = ns.gang.getGangInformation();
-    var curRep = ns.getFactionRep(stats.faction);
+    let stats = ns.gang.getGangInformation();
+    let curRep = ns.getFactionRep(stats.faction);
     lastRep.push([curRep, Date.now()]);
     while (lastRep.length > 300) {
         lastRep.shift();
     }
-    var oldRep = lastRep.reduce((p, c) => { return (!p || c[1] < p[1]) ? c : p });
-    var repRate = oldRep ? (curRep - oldRep[0]) * 1000 / (Date.now() - oldRep[1]) : lastRep.length;
+    let oldRep = lastRep.reduce((p, c) => { return (!p || c[1] < p[1]) ? c : p });
+    let repRate = oldRep ? (curRep - oldRep[0]) * 1000 / (Date.now() - oldRep[1]) : lastRep.length;
 
-    var chances = Object.keys(ns.gang.getOtherGangInformation())
+    let chances = Object.keys(ns.gang.getOtherGangInformation())
         .filter(g => g != stats.faction)
         .map(g => sprintf("%s: %s", fmt.initial(g),
-            ns.gang.getChanceToWinClash(g) > 0.5 ? "✓" : fmt.pct(ns.gang.getChanceToWinClash(g), 2)));
-    var gangData = [
+            ns.gang.getChanceToWinClash(g) > 0.5 ? "✓" : fmt.pct(ns.gang.getChanceToWinClash(g), { digits: 2 })));
+    let gangData = [
         [
             "Power", fmt.large(stats.power) + (noChange > 0 ? "*" : ""),
             "$ rate", fmt.money(5 * stats.moneyGainRate) + "/s",
@@ -388,14 +377,14 @@ function printStatus(ns) {
         ],
         [
             "Respect", fmt.large(stats.respect),
-            "Gear", buyingEq > 0 ? fmt.money(buyingEq) : "-",
+            "Gear", st.get("limit") > 0 ? fmt.money(st.get("limit")) : "-",
             "Wanted rate", (5 * stats.wantedLevelGainRate).toFixed(2) + "/s",
             "Next tick", fmt.time(nextTick - Date.now()),
             "Rep rate", fmt.large(repRate) + "/s",
         ],
         [
-            "Respect rate", fmt.large(5 * stats.respectGainRate, {digits:0}) + "/s",
-            "Teritory", fmt.pct(stats.territory, 2),
+            "Respect rate", fmt.large(5 * stats.respectGainRate, { digits: 0 }) + "/s",
+            "Teritory", fmt.pct(stats.territory, { digits: 2 }),
             "Penalty", fmt.int(100 - stats.wantedPenalty * 100),
             "Clash chance", fmt.int(stats.territoryClashChance * 100),
             "Rep goal", repGoal ? fmt.large(repGoal) : "",
@@ -407,16 +396,16 @@ function printStatus(ns) {
         ],
     ];
     if (showDetails) {
-        var memberData = [];
-        for (var m of ns.gang.getMemberNames()) {
-            var i = ns.gang.getMemberInformation(m);
+        let memberData = [];
+        for (let m of ns.gang.getMemberNames()) {
+            let i = ns.gang.getMemberInformation(m);
             memberData.push([
                 m, i.task, i.str, i.def, i.dex, i.agi, i.cha, i.hack, i.earnedRespect,
                 5 * i.moneyGain, (5 * i.respectGain).toFixed(3), (5 * i.wantedLevelGain).toFixed(3),
             ])
         }
     }
-    
+
     ns.clearLog();
     ns.print(fmt.table(gangData), "\n");
     ns.print(showDetails ? fmt.table(
