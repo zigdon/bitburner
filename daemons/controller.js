@@ -1,5 +1,5 @@
 import * as fmt from "/lib/fmt.js";
-import {getPorts} from "/lib/ports.js";
+import {ports} from "/lib/ports.js";
 import {log, loglvl, console, netLog} from "/lib/log.js";
 import {readAssignments} from "/lib/assignments.js";
 import {hosts} from "/lib/hosts.js";
@@ -7,7 +7,6 @@ import {hosts} from "/lib/hosts.js";
 var workers = new Map();
 var targets = new Map();
 var helping = {};
-var ports = getPorts();
 var script = "/daemons/worker.js";
 var reqVersion = 11;
 var autoTarget = false;
