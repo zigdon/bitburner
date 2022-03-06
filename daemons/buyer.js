@@ -14,6 +14,11 @@ export async function main(ns) {
 	ns.disableLog("getServerMaxRam");
 	ns.disableLog("sleep");
 
+	if (ns.getPurchasedServerLimit() == 0) {
+		await toast(ns, "Can't purchase servers on this node, disabling buyer.", {level: "warning", timeout: 30000});
+		ns.exit();
+	}
+
 	if (ns.fileExists("/conf/buyerReserve.txt", "home")) {
 		reserve = Math.floor(ns.read("/conf/buyerReserve.txt"));
 	}
