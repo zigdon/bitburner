@@ -128,6 +128,7 @@ async function checkUpgrades(ns) {
       "Drones - Assembly",
       "uPgrade: Fulcrum",
       "uPgrade: Capacity.I",
+      "Self-Correcting Assemblers",
       "uPgrade: Capacity.II",
     ];
 
@@ -141,6 +142,7 @@ async function checkUpgrades(ns) {
       } else {
         break;
       }
+      div = ns.corporation.getDivision(div.name);
     }
 
     let sizes = div.cities.map(c => ({ name: c, size: ns.corporation.getOffice(div.name, c).size })).filter(c => c.name != researchCity).sort((a, b) => a.size - b.size);
@@ -179,7 +181,7 @@ async function printSummary(ns, progress) {
   ns.clearLog();
   let corp = ns.corporation.getCorporation();
   ns.print(corp.name.toUpperCase() +
-    `   Profits: ${fmt.money(corp.revenue - corp.expenses)}/s  Funds: ${fmt.money(corp.funds)}`);
+    `   Profits: ${fmt.money(corp.revenue - corp.expenses, {digits:2})}/s  Funds: ${fmt.money(corp.funds)}`);
   let offer = ns.corporation.getInvestmentOffer();
   if (offer.funds > 0) {
     ns.print(`Available invenstment offer: ${fmt.money(offer.funds)} for ${fmt.large(offer.shares)} shares`);
