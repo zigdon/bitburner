@@ -1,8 +1,9 @@
 import * as fmt from "/lib/fmt.js";
 import {getPorts} from "/lib/ports";
 import {toast, netLog} from "/lib/log.js";
-import {longEmp, getLocations, manualCrimeStats, getManualCrimeEV} from "/lib/constants.js";
+import {longEmp, longFact, getLocations, manualCrimeStats, getManualCrimeEV} from "/lib/constants.js";
 import {newUI} from "/lib/ui.js";
+import { settings } from "/lib/state.js";
 
 const ports = getPorts();
 const crimes = manualCrimeStats();
@@ -11,13 +12,14 @@ let h;
 let tasks = [];
 let goals;
 let shopping;
-let buyLimit = 1e8;
 let ui;
+let st;
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("ALL");
     ns.tail();
+    st = settings(ns, "sleevemgr");
     ui = await newUI(ns, "sleeve", "Sleeves");
     
     // actions: f(id, ...args)
@@ -26,6 +28,7 @@ export async function main(ns) {
         shockRecovery: (id) => [ns.sleeve.setToShockRecovery(id), "Recover"],
         money: (id) => makeProfit(ns, id),
         work: async (id, c) => await work(ns, id, c),
+        faction: async (id, f) => await faction(ns, id, f),
         sync: (id) => [ns.sleeve.setToSynchronize(id), "Sync"],
         improve: (id) => {
             let stats = ns.sleeve.getSleeveStats(id);
@@ -73,6 +76,7 @@ export async function main(ns) {
         "combat": ["abilities"],
         "profit": ["crime", "abilities"],
         "work": ["work", "abilities"],
+        "faction": ["faction", "abilities"],
     };
 
     goals = {
@@ -95,6 +99,9 @@ export async function main(ns) {
             end: (id) => h.getStat(id, "shock") == 0 || Math.random() > 0.5},
             {name: "train", action: a.train, end: (id, stat, val) => h.hasStat(id, stat, val)}
         ],
+        "faction": [
+            {name: "faction", action: a.faction},
+        ],
         "work": [
             {name: "work", action: a.work},
         ],
@@ -114,6 +121,10 @@ export async function main(ns) {
             {name: "def", action: a.train, args: ["defense"], end: (id, stat, val) => h.pHasStat(id, stat, val)},
             {name: "dex", action: a.train, args: ["dexterity"], end: (id, stat, val) => h.pHasStat(id, stat, val)},
             {name: "agi", action: a.train, args: ["agility"], end: (id, stat, val) => h.pHasStat(id, stat, val)},
+        ],
+        "recover": [
+            {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100)},
+            {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") == 0},
         ],
         "idle": [
             {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100)},
@@ -168,12 +179,13 @@ async function shop(ns, id) {
         "abilities": ["hacking", "strength", "defense", "dexterity", "agility", "charisma"].map(a => [a+"_exp_mult", a+"_mult"]),
         "crime": ["crime_money_mult", "crime_success_mult"],
         "work": ["work_money_mult", "company_rep_mult"],
+        "faction": ["faction_rep_mult"],
     }
     let attrs = focus.map(f => allAttrs[f]).flat(2);
 
     let augs = ns.sleeve.getSleevePurchasableAugs(id)
         .map(a => [a.name, a.cost, ns.getAugmentationStats(a.name)])
-        .filter(a => a[1] <= buyLimit)
+        .filter(a => a[1] <= st.get("limit"))
         .filter(a => !attrs.every(t => !a[2][t]))
         .sort((a,b) => a[1]-b[1])
     let total = 0;
@@ -246,7 +258,7 @@ async function doTasks(ns, id) {
  * @param {NS} ns
  */
 async function saveTasks(ns) {
-    await ns.write("/conf/sleeves.txt", JSON.stringify([tasks, buyLimit]), "w");
+    await ns.write("/conf/sleeves.txt", JSON.stringify([tasks]), "w");
 }
 
 /**
@@ -254,7 +266,7 @@ async function saveTasks(ns) {
  */
 function loadTasks(ns) {
     if (ns.fileExists("/conf/sleeves.txt")) {
-        [tasks, buyLimit] = JSON.parse(ns.read("/conf/sleeves.txt"));
+        [tasks] = JSON.parse(ns.read("/conf/sleeves.txt"));
     }
     while (tasks.length < ns.sleeve.getNumSleeves()) {
         tasks.push({id: tasks.length, goal: "idle", args: [], current: []});
@@ -295,10 +307,6 @@ async function checkCtl(ns) {
                 }
                 ns.tprintf("Setting sleeve #%d to %s (%s)", id, words[2], words.slice(3));
             }
-            break;
-        case "limit":
-            buyLimit = fmt.parseNum(words[1]);
-            ns.tprintf("Setting shopping limit to %s", fmt.money(buyLimit));
             break;
         case "restart":
             await toast(ns, "Restarting sleevemgr...");
@@ -367,6 +375,16 @@ function makeProfit(ns, id) {
     const stats = ns.sleeve.getSleeveStats(id);
     const evs = crimes.map(c => ({name: c.name, ev: getManualCrimeEV(c.name, stats)})).sort((a,b) => b.ev-a.ev);
     return [ns.sleeve.setToCommitCrime(id, evs[0].name), evs[0].name];
+}
+
+/**
+ * @param {NS} ns
+ * @param {number} id
+ * @param {string} faction
+ */
+async function faction(ns, id, fact) {
+    fact = longFact(fact);
+    return [ns.sleeve.setToFactionWork(id, fact, "hacking"), fact];
 }
 
 /**
