@@ -33,7 +33,7 @@ export async function main(ns) {
                     console(ns, "Bad contract type %s@%s: want %s, got %s", words[3], words[2], want, got);
                     continue;
                 }
-                await post(ns, words[1], JSON.stringify(ns.codingcontract.getData(words[3], words[2])));
+                await post(ns, words[1], ns.codingcontract.getData(words[3], words[2]));
             break;
             case "answer":
                 await post(ns, words[1], ns.codingcontract.attempt(JSON.parse(words[5]), words[3], words[2], { returnReward: true }));
@@ -44,7 +44,7 @@ export async function main(ns) {
                 for (var f of files) {
                     res.push([f, ns.codingcontract.getContractType(f, words[2])]);
                 }
-                await post(ns, words[1], JSON.stringify(res));
+                await post(ns, words[1], res);
             break;
             default:
                 await toast(ns, "Unknown command to contractProxy: %s", words[4], {level: "error", timeout: 0});
@@ -62,7 +62,7 @@ async function post(ns, pid, data) {
     var now = Date.now();
     var ports = getPorts();
     // > timestamp pid data
-    var msg = ns.sprintf("> %d %d %s", now, pid, data);
+    var msg = ns.sprintf("> %d %d %s", now, pid, JSON.stringify(data));
     await netLog(ns, msg);
     await ns.writePort(ports.CPROXY, msg);
 }
