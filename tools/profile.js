@@ -24,5 +24,5 @@ export async function main(ns) {
     ns.tprintf("Security: %.2f/%.2f", curSec, baseSec);
     ns.tprintf("Value: $%s/$%s", fmt.int(curVal), fmt.int(maxVal));
     ns.tprintf("Growth rate: %d", growthRate);
-    ns.tprintf("Times: hack: %s; grow: %s; weaken: %s", fmt.time(hackTime), fmt.time(growTime), fmt.time(weakenTime));
+    ns.tprintf("Times: hack: %s; grow: %s; weaken: %s", fmt.time(hackTime, {digits:2}), fmt.time(growTime,{digits:2}), fmt.time(weakenTime, {digits:2}));
 }

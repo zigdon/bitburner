@@ -31,7 +31,9 @@ export async function main(ns) {
     targets.sort((a, b) => { return b.max - a.max })
     var data = targets.map(h => [h.host, fmt.large(h.max)]);
     await out(ns, "Found %d targets:\n%s", targets.length, fmt.table(data));
-    var servers = ns.getPurchasedServers()
+    var workers = ns.getPurchasedServers();
+    // workers.push(...ns.scan("home").filter(h => h.startsWith("hacknet-node-")))
+    var servers = workers
         .map(s => {return {
             host: s,
             mem: ns.getServerMaxRam(s),

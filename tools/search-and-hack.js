@@ -16,7 +16,7 @@ var msg = console;
 
 let shouldBackdoor = (h) => 
     h.host.includes("fitness") ||
-    h.max == 0 && !h.host.startsWith("pserv") && h.host != "home" && h.host != "darkweb";
+    h.max == 0 && !h.host.startsWith("pserv") && h.host != "home" && h.host != "darkweb" && !h.host.startsWith("hacknet-node-");
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -131,9 +131,9 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     if (!ns.scriptRunning(workerScript, host) &&
       !ns.scriptRunning(batchScript, host) &&
       !ns.scriptRunning(sharerScript, host) &&
-      host.startsWith("pserv-")) {
+      (host.startsWith("pserv-") || host.startsWith("hacknet-node-"))) {
       log(ns, "%s: can be hacking", host);
-    } else if ( host != "home" && !host.startsWith("pserv-")) {
+    } else if ( host != "home" && !host.startsWith("pserv-") && !host.startsWith("hacknet-node-")) {
       if (droneMode == "weaken" && !ns.scriptRunning(weakenScript, host)) {
         await log(ns, "Starting weakener on %s", host);
         await installWeaken(ns, host);
@@ -161,7 +161,11 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     }
   }
   if (!h.backdoor && h.hack <= myHack && shouldBackdoor(h)) {
-    await doBackdoor(ns, host);
+    if (host != "w0r1d_d43m0n") {
+      await doBackdoor(ns, host);
+    } else {
+      await toast(ns, "w0r1d_d43m0n is availble", {level: "success", timeout: 0});
+    }
   }
 
   var hosts = ns.scan(host);

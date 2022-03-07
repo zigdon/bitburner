@@ -37,12 +37,16 @@ export async function main(ns) {
         ns.exec("/daemons/joiner.js", "home");
         ns.exec("/daemons/monitor.js", "home");
         ns.exec("/daemons/buyprogs.js", "home");
+        ns.exec("/daemons/logsweeper.js", "home");
+        ns.exec("/daemons/hackmgr.js", "home");
+        ns.exec("/daemons/homeUpgrader.js", "home");
+        ns.exec("/daemons/sleevemgr.js", "home");
+        ns.exec("/daemons/gangmgr.js", "home");
+        ns.exec("/daemons/helper.js", "home");
     }
     if (mem >= 512) {
         ns.tprint("Launching large daemons");
-        ns.exec("/daemons/helper.js", "home");
-        ns.exec("/daemons/gangmgr.js", "home");
-        ns.exec("/daemons/sleevemgr.js", "home");
+        ns.exec("/daemons/corpmon.js", "home");
     }
     pid = ns.exec("/tools/search-and-hack.js", "home");
     while (ns.isRunning(pid, "home")) {

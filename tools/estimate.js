@@ -1,45 +1,42 @@
 import * as fmt from "/lib/fmt.js";
-import * as zui from "/lib/ui.js";
+import {newUI} from "/lib/ui.js";
+import {toast} from "/lib/log.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
-    var skill = ns.args[0].toLowerCase();
-    var target = fmt.parseNum(ns.args[1]);
+    let skill = ns.args[0].toLowerCase();
+    let target = fmt.parseNum(ns.args[1]);
 
-    var p = ns.getPlayer();
-    var getCur;
-    var mult;
+    let p = ns.getPlayer();
+    let getCur;
+    let mult;
+    let needed;
+    let ffmt = n => fmt.large(n, {digits:0});
     switch (skill) {
         case "hack":
             getCur = () => p.hacking_exp;
             mult = p.hacking_mult;
+            needed = ns.formulas.skills.calculateExp(target, mult)*mult;
+            break;
+        case "money":
+            getCur = () => p.money;
+            needed = target;
+            ffmt = fmt.money;
             break;
         default:
             ns.tprintf("Dunno how to look up %s", skill);
+            return;
     }
-    var id = "est-" + skill;
-    zui.customOverview(id, "Hack " + fmt.large(target, {digits: 0}));
-    ns.atExit(() => zui.rmCustomOverview(id));
+    let id = "est-" + skill;
+    let ui = await newUI(ns, id, `${skill[0].toUpperCase()+skill.substr(1)} ${ffmt(target)}`);
 
-    var xpNeeded = ns.formulas.skills.calculateExp(target, mult)*mult;
-    ns.tprintf("XP for %s@%s: %s/%s with %s multiplier.", skill, fmt.int(target), fmt.large(getCur()), fmt.large(xpNeeded), fmt.int(mult));
-    var cur = getCur();
-    var last = [cur];
-    while (cur < xpNeeded) {
-        /*
-        ns.tprintf("%s/%s (%.2f%%), +%s (%d), ETA: %s",
-          fmt.large(cur), 
-          fmt.large(xpNeeded), 
-          cur/xpNeeded*100, 
-          fmt.large(rate(cur,last)), 
-          last.length,
-          fmt.time((xpNeeded-cur)/rate(cur,last)*1000));
-          */
-        zui.setCustomOverview(
-            id,
-            sprintf("+%s\n%s",
-            fmt.large(rate(cur, last), {digits: 3}),
-            fmt.time((xpNeeded - cur) / rate(cur, last) * 1000)));
+    if (skill != "money") {
+        ns.tprintf("XP for %s@%s: %s/%s with %s multiplier.", skill, fmt.int(target), fmt.large(getCur()), fmt.large(needed), fmt.int(mult));
+    }
+    let cur = getCur();
+    let last = [cur];
+    while (cur < needed) {
+        await ui.update(`${ffmt(rate(cur, last))}/${fmt.time((needed - cur) / rate(cur, last) * 1000)}`);
         await ns.sleep(1000);
         p = ns.getPlayer();
         last.unshift(cur);
@@ -48,6 +45,8 @@ export async function main(ns) {
         }
         cur = getCur();
     }
+    await ui.remove();
+    await toast(ns, "%s got to %s", skill, ffmt(target), {level: "success", timeout: 30000});
 }
 
 /**

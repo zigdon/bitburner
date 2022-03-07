@@ -114,7 +114,7 @@ export async function handleContract(ns, file, host) {
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Find All Valid Math Expressions":
-            answer = await allSums(String(cData[0]), cData[1]);
+            answer = await allSums(ns, String(cData[0]), cData[1]);
             res = ns.codingcontract.attempt(answer, file, host, { returnReward: true })
             break;
         case "Minimum Path Sum in a Triangle":

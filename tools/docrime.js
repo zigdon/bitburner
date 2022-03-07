@@ -45,7 +45,8 @@ async function checkStats(ns) {
     for (var name of [ "strength",  "defense",  "dexterity",  "agility"]) {
         var p = ns.getPlayer();
         while (p[name] < 50) {
-            ns.gymWorkout(gym, name, true);
+            ns.tail();
+            ns.gymWorkout(gym, name, ns.isFocused());
             await ns.sleep(100);
             p = ns.getPlayer();
         }

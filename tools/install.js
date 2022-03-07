@@ -27,7 +27,7 @@ export async function main(ns) {
         .map(f => ns.fileExists(f, "home")).length;
 
     if (!target || target == "all") {
-        var hs = hosts(ns).filter((h) => { return !h.host.startsWith("pserv-") });
+        var hs = hosts(ns).filter((h) => { return !h.host.startsWith("pserv-") && !h.host.startsWith("hacknet-node-") });
         var wReq = ns.getScriptRam("/daemons/weakener.js");
         var sReq = ns.getScriptRam("/daemons/sharer.js");
         for (var i in hs) {

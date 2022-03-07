@@ -25,7 +25,7 @@ export async function main(ns) {
 
 	ns.print("req: " + req);
 
-	var ram = 32;
+	var ram = 64;
 	if (ns.serverExists("pserv-0")) {
 		ram = ns.getServerMaxRam("pserv-0");
 	}

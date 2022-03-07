@@ -16,7 +16,13 @@ export async function main(ns) {
         case "task":
             var id = ns.args.shift();
             var task = ns.args.shift();
-            assign(ns, id, task);
+            if (id == "ALL") {
+                for (let i = 0; i < ns.sleeve.getNumSleeves(); i++) {
+                    assign(ns, i, task);
+                }
+            } else {
+                assign(ns, id, task);
+            }
             break;
         default:
             ns.tprintf("Dunno what to do with %s", cmd);
