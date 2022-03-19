@@ -1,6 +1,7 @@
 import * as fmt from "/lib/fmt.js";
 import {settings} from "/lib/state.js";
 import {hosts, sorter} from "/lib/hosts.js";
+import {resizeWindow} from "/lib/ui.js";
 
 let st;
 
@@ -14,10 +15,13 @@ export async function main(ns) {
     let out = ns.tprintf;
     if (flags.top) {
         out = ns.printf;
+        ns.tail();
+        resizeWindow("lsservers");
     }
     while (true) {
         if (flags.top) {
             ns.tail();
+            resizeWindow("lsservers", {h:null});
             ns.clearLog();
         }
         let srvs = [];
