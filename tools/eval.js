@@ -6,4 +6,5 @@ export async function main(ns) {
     ns.getPurchasedServerCost(2);
     ns.growthAnalyze("home", 1);
     ns.isRunning("asdf", "home", "");
+    ns.ls("home");
 }

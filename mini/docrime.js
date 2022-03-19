@@ -7,6 +7,6 @@ export async function main(ns) {
         while (ns.isBusy()) {
             await ns.sleep(100);
         }
-        ns.print(ns.getPlayer().numPeopleKilled, " kills");
+        ns.print(`${ns.heart.break()} karma, ${ns.getPlayer().numPeopleKilled} kills`);
     }
 }

@@ -1,58 +1,65 @@
 import * as fmt from "/lib/fmt.js";
-import {log, console, toast} from "/lib/log.js";
-import {installWeaken, installWorker, installSharer} from "/tools/install.js";
-import {go} from "/lib/hosts.js";
+import { log, console, toast } from "/lib/log.js";
+import { installWeaken, installWorker, installSharer } from "/tools/install.js";
+import { go } from "/lib/hosts.js";
+import { settings } from "/lib/state";
 
-var nextHack = [];
-var myHack = 0;
-var workerScript = "/daemon/worker.js";
-var batchScript = "/daemons/batch.js";
-var weakenScript = "/daemons/weakener.js";
-var sharerScript = "/daemons/sharer.js";
-var controllerScript = "/daemons/controller.js";
-var scanScript = "/tools/scan.js";
-var droneMode = "worker";
-var msg = console;
+let nextHack = [];
+let myHack = 0;
+let workerScript = "/daemon/worker.js";
+let batchScript = "/daemons/batch.js";
+let weakenScript = "/daemons/weakener.js";
+let sharerScript = "/daemons/sharer.js";
+let controllerScript = "/daemons/controller.js";
+let scanScript = "/tools/scan.js";
+let droneMode = "bee";
+let msg = console;
+let st;
 
-let shouldBackdoor = (h) => 
-    h.host.includes("fitness") ||
-    h.max == 0 && !h.host.startsWith("pserv") && h.host != "home" && h.host != "darkweb" && !h.host.startsWith("hacknet-node-");
+let shouldBackdoor = (h) =>
+  h.host.includes("fitness") ||
+  h.host.includes("uni") ||
+  h.max == 0 && !h.host.startsWith("pserv") && h.host != "home" && h.host != "darkweb" && !h.host.startsWith("hacknet-node-");
 
 /** @param {NS} ns **/
 export async function main(ns) {
-    var flags = ns.flags([
-        ["quiet", false],
-    ])
-    if (flags.quiet) {
-        log(ns, "Applying --quiet flag");
-        msg = log;
-    }
-    
+  st = settings(ns, "search");
+  let flags = ns.flags([
+    ["quiet", false],
+  ])
+  if (flags.quiet) {
+    log(ns, "Applying --quiet flag");
+    msg = log;
+  }
+
   if (ns.args[0]) {
     droneMode = ns.args[0];
+    await msg(ns, "mode manually set to %s", droneMode);
   } else {
-    if (ns.ps("home").filter((s) => {return s.filename == "/daemons/share.js"}).length > 0) {
+    if (ns.ps("home").filter((s) => { return s.filename == "/daemons/share.js" }).length > 0) {
       droneMode = "sharer";
-    } else if (ns.ps("home").filter((s) => {return s.filename == "/daemons/controller.js"}).length > 0) {
+      await msg(ns, "mode set to %s via /daemons/share.js", droneMode);
+    } else if (st.read("hiveBatching")) {
+      droneMode = "bee";
+      await msg(ns, "mode set to %s via hiveBatching setting", droneMode);
+    } else if (ns.ps("home").filter((s) => { return s.filename == "/daemons/controller.js" }).length > 0) {
       droneMode = "worker";
+      await msg(ns, "mode set to %s via /daemons/controller.js setting", droneMode);
     } else if (ns.getPurchasedServers().length > 3) {
       droneMode = "weaken";
+      await msg(ns, "mode set to %s as fallback", droneMode);
     }
   }
   await msg(ns, "Drone mode: %s", droneMode);
-  var found = new Map();
-  var openers = [];
+  let found = {};
+  let openers = [];
   nextHack = [0, 0, 0, 0, 0, 0];
 
-  if (found.length > 0) {
-    await msg(ns, "previous instance not reset");
-    ns.exit();
-  }
   ns.disableLog("ALL");
   myHack = ns.getHackingLevel();
   log(ns, "hack level: " + myHack);
 
-  var progs = [
+  let progs = [
     { file: "BruteSSH.exe", func: ns.brutessh },
     { file: "FTPCrack.exe", func: ns.ftpcrack },
     { file: "HTTPWorm.exe", func: ns.httpworm },
@@ -66,12 +73,12 @@ export async function main(ns) {
   });
   log(ns, "Found " + openers.length + " openers.");
 
-  var hacked = await scanFrom(ns, "home", "", 0, found, openers);
+  let hacked = await scanFrom(ns, "home", "", 0, found, openers);
 
   if (hacked.length > 0) {
     await msg(ns, "hacked %d hosts:", hacked.length);
-    for (var h in hacked) {
-      var host = hacked[h];
+    for (let h in hacked) {
+      let host = hacked[h];
       await msg(ns, "%s: %d $%s", host.host, host.hack, fmt.int(host.max));
     };
     ns.exec(scanScript, "home");
@@ -81,34 +88,38 @@ export async function main(ns) {
   if (!nextHack.every(p => p == 0)) {
     done = false;
     await msg(ns, "*** Next hacking levels:",);
-    var out = [];
-    nextHack.forEach(function(l, i) {
+    let out = [];
+    nextHack.forEach(function (l, i) {
       if (l.lvl) { out.push(["  %d: %d (%s)", i, l.lvl, l.host]) };
     })
-    for (var o in out) {
-      var line = out[o];
+    for (let o in out) {
+      let line = out[o];
       await msg(ns, ...line)
     }
   }
-  
+
   if (done) {
-    await toast(ns, "*** Nothing left to hack. Disabling job.", {level: "success", timeout: 0});
+    await toast(ns, "*** Nothing left to hack. Disabling job.", { level: "success", timeout: 0 });
     ns.exec("/tools/send.js", "home", 1, "cron", "pause", "search");
   }
 }
 
 /**
+ *  @typedef opener
+ *  @property {string} file
+ *  @property {function} func
+ *
  *  @param {NS} ns
  * 	@param {string} host
  *  @param {string} parent
  *  @param {int} depth
- *  @param {Map} found
- *  @param {Array} openers
+ *  @param {Object} found
+ *  @param {opener[]} openers
  *  **/
 async function scanFrom(ns, host, parent, depth, found, openers) {
-  var server = ns.getServer(host);
-  var hacked = [];
-  var h = {
+  let server = ns.getServer(host);
+  let hacked = [];
+  let h = {
     depth: depth,
     host: host,
     root: server.hasAdminRights,
@@ -122,25 +133,20 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
     children: [],
     parent: parent,
   };
-  found.set(host, h);
+  found[host] = h;
 
-  if (found.has(parent)) {
-    found.get(parent).children.unshift(host);
+  if (found[parent]) {
+    found[parent].children.unshift(host);
   }
   if (h.root) {
-    if (!ns.scriptRunning(workerScript, host) &&
-      !ns.scriptRunning(batchScript, host) &&
-      !ns.scriptRunning(sharerScript, host) &&
-      (host.startsWith("pserv-") || host.startsWith("hacknet-node-"))) {
-      log(ns, "%s: can be hacking", host);
-    } else if ( host != "home" && !host.startsWith("pserv-") && !host.startsWith("hacknet-node-")) {
+    if (host != "home" && !host.startsWith("pserv-") && !host.startsWith("hacknet-node-")) {
       if (droneMode == "weaken" && !ns.scriptRunning(weakenScript, host)) {
         await log(ns, "Starting weakener on %s", host);
         await installWeaken(ns, host);
       } else if (droneMode == "sharer" && !ns.scriptRunning(sharerScript, host)) {
         await log(ns, "Starting sharer on %s", host);
         await installSharer(ns, host);
-      } else if ( droneMode = "worker" &&
+      } else if (droneMode == "worker" &&
         !ns.scriptRunning(workerScript, host) &&
         !ns.scriptRunning(controllerScript, host)) {
         await log(ns, "Starting worker on %s", host);
@@ -157,24 +163,24 @@ async function scanFrom(ns, host, parent, depth, found, openers) {
       hacked.push(h);
     } else if (!nextHack[h.ports] || nextHack[h.ports].lvl > h.hack) {
       await log(ns, "Can't hack %s, need %d ports", host, h.ports);
-      nextHack[h.ports] = {lvl: h.hack, host: host};
+      nextHack[h.ports] = { lvl: h.hack, host: host };
     }
   }
   if (!h.backdoor && h.hack <= myHack && shouldBackdoor(h)) {
     if (host != "w0r1d_d43m0n") {
       await doBackdoor(ns, host);
     } else {
-      await toast(ns, "w0r1d_d43m0n is availble", {level: "success", timeout: 0});
+      await toast(ns, "w0r1d_d43m0n is availble", { level: "success", timeout: 0 });
     }
   }
 
-  var hosts = ns.scan(host);
-  for (var i = 0; i < hosts.length; i++) {
+  let hosts = ns.scan(host);
+  for (let i = 0; i < hosts.length; i++) {
     if (hosts[i] == parent) {
       continue;
     }
-    var hs = await scanFrom(ns, hosts[i], host, depth + 1, found, openers);
-    hs.forEach((h) => {hacked.push(h)});
+    let hs = await scanFrom(ns, hosts[i], host, depth + 1, found, openers);
+    hs.forEach((h) => { hacked.push(h) });
   }
 
   return hacked;
@@ -206,8 +212,8 @@ async function doBackdoor(ns, host) {
  * @param {Array} openers
  */
 async function doPorts(ns, host, openers) {
-  var ports = ns.getServerNumPortsRequired(host);
-  log(ns, "Trying " + openers.legnth + " openers on " + host);
+  let ports = ns.getServerNumPortsRequired(host);
+  log(ns, "Trying " + openers.length + " openers on " + host);
   openers.forEach(function (f) {
     if (f(host) <= 0) {
       msg(ns, "can't run %s on %s", f, host);

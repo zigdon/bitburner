@@ -1,7 +1,7 @@
 import * as fmt from "/lib/fmt.js";
 import {getPorts} from "/lib/ports";
 import {toast, netLog} from "/lib/log.js";
-import {longEmp, longFact, getLocations, manualCrimeStats, getManualCrimeEV} from "/lib/constants.js";
+import {longEmp, longFact, locations, manualCrimeStats, getManualCrimeEV} from "/lib/constants.js";
 import {newUI} from "/lib/ui.js";
 import { settings } from "/lib/state.js";
 
@@ -40,6 +40,7 @@ export async function main(ns) {
         },
         train: (id, stat) => {
             ns.sleeve.travel(id, "Sector-12");
+            if (!stat) { return a.improve(id) }
             switch(stat.substr(0, 3)) {
                 case "hac":
                     return [ns.sleeve.setToUniversityCourse(id, "rothman university", "algorithms"), "Hacking"];
@@ -67,7 +68,6 @@ export async function main(ns) {
         getStat: (id, stat) => ns.sleeve.getSleeveStats(id)[stat],
         hasStat: (id, stat, thresh) => ns.sleeve.getSleeveStats(id)[stat] >= thresh,
         pHasStat: (id, stat, thresh) => {
-            ns.tprintf("Player %s %s >? %s", stat, ns.getPlayer()[stat], thresh)
             return ns.getPlayer()[stat] >= thresh},
     }
     shopping = {
@@ -82,21 +82,20 @@ export async function main(ns) {
     goals = {
         "karma": [
             {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 50)},
-            {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") < 75},
-            {name: "de-shock", action: a.shockRecovery,
-            end: (id) => h.getStat(id, "shock") == 0 || Math.random() > 0.5},
+            {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") < 95},
+            {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") == 0, chance: 50},
             {name: "str", action: a.train, args: ["strength"], end: (id, stat) => h.hasStat(id, stat, 50)},
             {name: "def", action: a.train, args: ["defense"], end: (id, stat) => h.hasStat(id, stat, 50)},
             {name: "dex", action: a.train, args: ["dexterity"], end: (id, stat) => h.hasStat(id, stat, 50)},
             {name: "agi", action: a.train, args: ["agility"], end: (id, stat) => h.hasStat(id, stat, 50)},
-            {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100) || Math.random() > 0.05},
+            {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100), chance: 95},
             {name: "murder", action: a.crime, args: ["homicide"], end: () => ns.gang.inGang()},
         ],
         "train": [
             {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 50)},
             {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") < 75},
             {name: "de-shock", action: a.shockRecovery,
-            end: (id) => h.getStat(id, "shock") == 0 || Math.random() > 0.5},
+            end: (id) => h.getStat(id, "shock") == 0, chance: 50},
             {name: "train", action: a.train, end: (id, stat, val) => h.hasStat(id, stat, val)}
         ],
         "faction": [
@@ -107,7 +106,7 @@ export async function main(ns) {
         ],
         "profit": [
             {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100)},
-            {name: "improve", action: a.improve, end: () => Math.random() > 0.2 },
+            {name: "improve", action: a.improve, chance: 80 },
             {name: "crime", action: a.money},
         ],
         "combat": [
@@ -129,7 +128,12 @@ export async function main(ns) {
         "idle": [
             {name: "sync", action: a.sync, end: (id) => h.hasStat(id, "sync", 100)},
             {name: "de-shock", action: a.shockRecovery, end: (id) => h.getStat(id, "shock") == 0},
-            {name: "crime", action: a.crime, args: ["Mug"], end: () => false},
+            {name: "hacking", action: a.train, args: ["hacking"], end: (id, stat) => h.pHasStat(id, stat, 20)},
+            {name: "faction", action: a.faction},
+            {name: "work", action: a.work},
+            {name: "hacking", action: a.train, args: ["hacking"], end: (id, stat) => h.pHasStat(id, stat, 100)},
+            {name: "improve", action: a.improve, end: () => ns.getPlayer().money < 1e9, chance: 20},
+            {name: "crime", action: a.money, end: () => false},
         ],
     };
 
@@ -147,7 +151,7 @@ export async function main(ns) {
                 || (ns.sleeve.getTask(s).task == "Crime" ?
                         info.timeWorked < 1000 :
                         now-last[s] > 10000)) {
-                if (ns.sleeve.getSleeveStats(s).shock == 0) {
+                if (st.get("buyAugsWithShock") || ns.sleeve.getSleeveStats(s).shock == 0) {
                     eq += await shop(ns, s);
                 }
                 await doTasks(ns, s);
@@ -189,7 +193,7 @@ async function shop(ns, id) {
         .filter(a => !attrs.every(t => !a[2][t]))
         .sort((a,b) => a[1]-b[1])
     let total = 0;
-    while (augs[0] && augs[0][1] < ns.getServerMoneyAvailable("home")) {
+    while (augs[0] && augs[0][1] < ns.getServerMoneyAvailable("home") - st.get("reserve")) {
         let a = augs.shift();
         if (ns.sleeve.purchaseSleeveAug(id, a[0])) {
             await netLog(ns, "bought %s for #%d for %s", a[0], id, fmt.money(a[1]));
@@ -229,6 +233,9 @@ async function doTasks(ns, id) {
         if (g.end && g.end(id, ...args)) {
             continue;
         }
+        if (g.chance !== undefined && Math.random() > g.chance/100) {
+            continue;
+        }
         if (!g.action) {
             task.current = ["sync"];
             ns.sleeve.setToSynchronize(id);
@@ -244,8 +251,7 @@ async function doTasks(ns, id) {
             task.current = [g.name, label];
             return true;
         } else {
-            ns.tprintf("Sleeve #%d couldn't perform %s, idling", id, g.name)
-            task.goal = "idle";
+            continue;
         }
     }
 
@@ -326,6 +332,10 @@ let hist = [];
 async function printInfo(ns) {
     let data = [];
     let cur = {profits: 0, timestamp: Date.now()};
+    let brief = Array(ns.sleeve.getNumSleeves())
+        .fill(0)
+        .map((_, i) => ns.sleeve.getSleeveStats(i))
+        .every(s => s.shock == 0 && s.sync == 100);
 
     for (let s=0; s<ns.sleeve.getNumSleeves(); s++) {
         const stats = ns.sleeve.getSleeveStats(s);
@@ -348,6 +358,10 @@ async function printInfo(ns) {
                 details = tasks[s].current[1];
                 break;
         }
+        if (brief) {
+            delete stats.sync;
+            delete stats.shock;
+        }
         data.push([
             s, tasks[s].goal, task.task, details, info.timeWorked, ...Object.values(stats), augs,
         ])
@@ -361,10 +375,11 @@ async function printInfo(ns) {
     await ui.update(`${fmt.money(rate)}/s`);
 
     ns.clearLog();
-    ns.print(fmt.table(
-        data,
-        ["#", "GOAL", "TASK", "DETAILS", ["BUSY", fmt.time], ["SHOCK", fmt.large], ["SYNC", fmt.large], "HACK", "STR", "DEF", "DEX", "AGI", "CHA", "AUGS"],
-    ))
+    let headers =  ["#", "GOAL", "TASK", "DETAILS", ["BUSY", fmt.time], ["SHOCK", fmt.large], ["SYNC", fmt.large], "HACK", "STR", "DEF", "DEX", "AGI", "CHA", "AUGS"];
+    if (brief) {
+        headers =  ["#", "GOAL", "TASK", "DETAILS", ["BUSY", fmt.time], "HACK", "STR", "DEF", "DEX", "AGI", "CHA", "AUGS"];
+    }
+    ns.print(fmt.table(data, headers));
 }
 
 /**
@@ -379,12 +394,55 @@ function makeProfit(ns, id) {
 
 /**
  * @param {NS} ns
+ */
+function getAllTasks(ns) {
+    let res = [];
+    for (let i=0; i < ns.sleeve.getNumSleeves(); i++) {
+        res.push(ns.sleeve.getTask(i))
+    }
+
+    return res;
+}
+
+/**
+ * @param {NS} ns
  * @param {number} id
  * @param {string} faction
  */
 async function faction(ns, id, fact) {
-    fact = longFact(fact);
-    return [ns.sleeve.setToFactionWork(id, fact, "hacking"), fact];
+    if (fact) {
+        fact = longFact(fact);
+        return [ns.sleeve.setToFactionWork(id, fact, "hacking"), fact];
+    }
+    let fs = ns.getPlayer().factions.sort((a,b) => ns.getFactionFavor(a)-ns.getFactionFavor(b));
+
+    // If no faction was specified, pick one that no one else is working on
+    for (let f of fs) {
+        if (f == "Slum Snakes") {
+            // Can't work for our gang
+            continue;
+        }
+        // See if there are any augs we still need from this faction
+        if (ns.getAugmentationsFromFaction(f).map(a => ns.getOwnedAugmentations(true).includes(a)).every(a => a)) {
+            continue;
+        }
+        // Check no other sleeve is already there, it would be awkward
+        if (!getAllTasks(ns).filter((_, i) => i != id).every(t => t.task != "Faction" || t.location != f)) {
+            continue;
+        }
+
+        if (ns.sleeve.setToFactionWork(id, f, "hacking")) {
+            return [true, f];
+        }
+        if (ns.sleeve.setToFactionWork(id, f, "security")) {
+            return [true, f];
+        }
+        if (ns.sleeve.setToFactionWork(id, f, "field")) {
+            return [true, f];
+        }
+    }
+
+    return [false, ""];
 }
 
 /**
@@ -393,8 +451,18 @@ async function faction(ns, id, fact) {
  * @param {string} company
  */
 async function work(ns, id, company) {
-    const emp = longEmp(company);
-    for (let [loc, places] of Object.entries(getLocations())) {
+    let emp = longEmp(company);
+    if (!emp) { // If no company is specified, pick one
+        let cs = Object.keys(ns.getPlayer().jobs);
+        for (let c of cs) {
+            if (!getAllTasks(ns).filter((_, i) => i != id).every(t => t.task != "Company" || t.location != c)) {
+                continue;
+            }
+            emp = c;
+            break;
+        }
+    }
+    for (let [loc, places] of Object.entries(locations)) {
         if (places.indexOf(emp) > -1) {
             if (ns.sleeve.getInformation(id).city != loc) {
                 await toast(ns, "Sleeve #%d travelling to %s", id, loc);

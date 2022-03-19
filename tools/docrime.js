@@ -94,6 +94,7 @@ export async function main(ns) {
         ns.tail();
         ns.print(`Expected rate: ${fmt.large(ev(crimes[0])*1000)} ${priority}/s`);
         if (priority == "karma") {
+            ns.print(`Karma: ${fmt.large(ns.heart.break())}`);
             ns.print(`Kills: ${fmt.large(ns.getPlayer().numPeopleKilled)}`);
         }
         ns.commitCrime(crimes[0]);

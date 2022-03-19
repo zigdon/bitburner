@@ -1,43 +1,94 @@
 import * as fmt from "/lib/fmt.js";
+import {settings} from "/lib/state.js";
+import {hosts, sorter} from "/lib/hosts.js";
+
+let st;
 
 /** @param {NS} ns **/
 export async function main(ns) {
-    let srvs = ns.getPurchasedServers();
-    for (let n=0; n < ns.hacknet.numNodes(); n++) {
-        srvs.push(`hacknet-node-${n}`);
+    ns.disableLog("ALL");
+    st = settings(ns, "lsservers");
+    let flags = ns.flags([
+        ["top", false],
+    ])
+    let out = ns.tprintf;
+    if (flags.top) {
+        out = ns.printf;
     }
-    srvs.sort();
-    let data = [];
-    for (let s of srvs.map(s => [s, s.substr(s.lastIndexOf("-")+1)]).sort((a,b) => a[1]-b[1]).map(s => s[0])) {
-        let maxRam = ns.getServerMaxRam(s);
-        let usedRam = ns.getServerUsedRam(s);
-        let current = !ns.fileExists("/obsolete.txt", s);
-        let procs = ns.ps(s)
-        data.push([
-            s, usedRam, maxRam, usedRam/maxRam, current, summarise(procs),
-        ]);
+    while (true) {
+        if (flags.top) {
+            ns.tail();
+            ns.clearLog();
+        }
+        let srvs = [];
+        if (st.read("useHomeBee") > 0) {
+            srvs.push("home");
+        }
+        srvs.push(...ns.getPurchasedServers());
+        if (st.read("useHacknetBees")) {
+            for (let n=0; n < ns.hacknet.numNodes(); n++) {
+                srvs.push(`hacknet-node-${n}`);
+            }
+        }
+        if (st.read("useWildBees")) {
+            srvs.push(...hosts(ns).filter(
+                h => !h.purchased && h.root && h.host != "home" && !h.host.startsWith("hacknet-node-")
+            ).map(h => h.host));
+        }
+
+        srvs.sort(sorter);
+        let data = [];
+        let wild = {};
+        for (let f of ["used", "max", "grow", "hack", "weaken", "other"]) {
+            wild[f] = 0;
+        }
+        for (let s of srvs) {
+            let maxRam = ns.getServerMaxRam(s);
+            let usedRam = ns.getServerUsedRam(s);
+            let current = !ns.fileExists("/obsolete.txt", s);
+            let procs = ns.ps(s)
+            if (s.startsWith("pserv-") || s.startsWith("hacknet-node-") || s == "home") {
+                data.push([
+                    s, usedRam, maxRam, usedRam/maxRam, current, ...summarise(procs),
+                ]);
+            } else {
+                let summary = summarise(procs);
+                wild["used"] += usedRam;
+                wild["max"] += maxRam;
+                wild["grow"] += summary[0];
+                wild["hack"] += summary[1];
+                wild["weaken"] += summary[2];
+                wild["other"] += summary[3];
+            }
+        }
+        if (wild) {
+            data.push([
+                "wild servers", wild["used"], wild["max"], wild["used"]/wild["max"], "N/A",
+                wild["grow"], wild["hack"], wild["weaken"], wild["other"],
+            ]);
+        }
+        out("%s", fmt.table(
+            data,
+            ["HOST", ["USED", fmt.memory], ["TOTAL", fmt.memory], ["% MEM", fmt.pct],
+            ["CURRENT", fmt.bool], "Grow", "Hack", "Weaken", "other"],
+        ));
+        if (!flags.top) {
+            break;
+        }
+        await ns.sleep(500);
     }
-    let pct = (n) => fmt.pct(n, 0, true);
-    ns.tprintf(fmt.table(
-        data,
-        ["HOST", ["USED", fmt.memory], ["TOTAL", fmt.memory], ["%% MEM", pct], ["CURRENT", fmt.bool], "PROCS"],
-    ))
 }
 
 function summarise(procs) {
-    let c = new Map();
+    let c = {"grow": 0, "hack": 0, "weaken": 0, "other": 0};
     for (let p of procs) {
-        let f = p.filename.substring(p.filename.indexOf("/", 1) + 1);
-        // await ns.sleep(5);
-        if (!c.has(f)) {
-            c.set(f, 0);
+        let f = p.filename.replace(/.bin\//, "").split(".")[0];
+        if (c[f] !== undefined) {
+            c[f]+=p.threads;
+        } else {
+            c["other"] += p.threads;
         }
-        c.set(f, c.get(f) + p.threads);
     }
 
-    let res = []
-    for (let k of c) {
-        res.push(k[0] + ": " + k[1]);
-    }
-    return res.join(", ");
+    return [c["grow"], c["hack"], c["weaken"], c["other"]];
 }

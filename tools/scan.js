@@ -50,7 +50,7 @@ export async function main(ns) {
       break;
     case "hacked":
       eachFunc = function(v) {
-        if (v.root && !v.host.startsWith('pserv')) {
+        if (v.root && !v.host.startsWith('pserv') && !v.host.startsWith('hacknet-node-')) {
           printHost(ns, v);
         }
       }
@@ -65,7 +65,7 @@ export async function main(ns) {
     case "values":
       var list = [];
       eachFunc = function(v) {
-        if (!v.host.startsWith("pserv-")) {
+        if (!v.host.startsWith("pserv-") && !v.host.startsWith('hacknet-node-')) {
           list.push(v);
         }
       }
@@ -115,7 +115,7 @@ export async function main(ns) {
       break;
     case "mkaliases":
       eachFunc = function(v) {
-        if (v.host == "home" || v.host.startsWith("pserv-")) {
+        if (v.host == "home" || v.host.startsWith("pserv-") || v.host.startsWith('hacknet-node-')) {
           return;
         }
         ns.tprintf(trailTo(ns, found, v) + ";");
@@ -123,7 +123,7 @@ export async function main(ns) {
       break;
     case "unalias":
       eachFunc = function(v) {
-        if (v.host == "home" || v.host.startsWith("pserv-")) {
+        if (v.host == "home" || v.host.startsWith("pserv-") || v.host.startsWith('hacknet-node-')) {
           return;
         }
         ns.tprintf("unalias go-%s;", v.host);
@@ -281,16 +281,8 @@ async function scanFrom(ns, host, parent, depth, found) {
 async function saveDB(ns, found) {
   var data = [];
   var pServers = ns.getPurchasedServers();
-  var contains = function(item, a) {
-    var found = false;
-    a.forEach((i) => {
-      if (i == item) {
-        found = true;
-      }})
-    return found;
-  }
   found.forEach((h) => {
-    data.push([h.host, h["hack"], h.max, h.ports, h.root, contains(h.host, pServers), h.path].join("\t"));
+    data.push([h.host, h["hack"], h.max, h.ports, h.root, pServers.includes(h.host) || h.host.startsWith("hacknet-node-"), h.path].join("\t"));
   })
   await ns.write("/conf/hosts.txt", data.join("\n"), "w");
 }

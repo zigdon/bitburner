@@ -20,7 +20,7 @@ export async function main(ns) {
             factions.push(f);
         }
         for (var a of ns.getAugmentationsFromFaction(f)) {
-            await ns.sleep(5);
+            await ns.sleep(1);
             var rep = ns.getAugmentationRepReq(a);
             augs.push({
                 faction: f,

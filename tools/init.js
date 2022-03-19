@@ -23,7 +23,7 @@ export async function main(ns) {
     ns.exec("/tools/rmlogs.js", "home");
     let pid = ns.exec("/daemons/logger.js", "home");
     ns.tail(pid, "home");
-    ns.exec("/daemons/controller.js", "home");
+    // ns.exec("/daemons/controller.js", "home");
 
     let mem = ns.getServerMaxRam("home");
     if (mem >= 64) {
@@ -34,7 +34,6 @@ export async function main(ns) {
         ns.tprint("Launching medium daemons");
         ns.exec("/daemons/buyer.js", "home");
         ns.exec("/daemons/ui.js", "home");
-        ns.exec("/daemons/joiner.js", "home");
         ns.exec("/daemons/monitor.js", "home");
         ns.exec("/daemons/buyprogs.js", "home");
         ns.exec("/daemons/logsweeper.js", "home");
@@ -43,10 +42,14 @@ export async function main(ns) {
         ns.exec("/daemons/sleevemgr.js", "home");
         ns.exec("/daemons/gangmgr.js", "home");
         ns.exec("/daemons/helper.js", "home");
+        ns.exec("/daemons/queen.js", "home");
+        ns.exec("/daemons/batch-director.js", "home");
     }
     if (mem >= 512) {
         ns.tprint("Launching large daemons");
+        ns.exec("/daemons/joiner.js", "home");
         ns.exec("/daemons/corpmon.js", "home");
+        ns.exec("/daemons/bladeburner.js", "home");
     }
     pid = ns.exec("/tools/search-and-hack.js", "home");
     while (ns.isRunning(pid, "home")) {

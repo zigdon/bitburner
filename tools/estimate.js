@@ -4,6 +4,7 @@ import {toast} from "/lib/log.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    ns.disableLog("sleep");
     let skill = ns.args[0].toLowerCase();
     let target = fmt.parseNum(ns.args[1]);
 
@@ -23,6 +24,10 @@ export async function main(ns) {
             needed = target;
             ffmt = fmt.money;
             break;
+        case "karma":
+            getCur = () => ns.heart.break();
+            needed = 0-target;
+            break;
         default:
             ns.tprintf("Dunno how to look up %s", skill);
             return;
@@ -30,16 +35,17 @@ export async function main(ns) {
     let id = "est-" + skill;
     let ui = await newUI(ns, id, `${skill[0].toUpperCase()+skill.substr(1)} ${ffmt(target)}`);
 
-    if (skill != "money") {
+    if (skill == "hack") {
         ns.tprintf("XP for %s@%s: %s/%s with %s multiplier.", skill, fmt.int(target), fmt.large(getCur()), fmt.large(needed), fmt.int(mult));
     }
     let cur = getCur();
     let last = [cur];
-    while (cur < needed) {
+    while (Math.abs(cur) < Math.abs(needed)) {
         await ui.update(`${ffmt(rate(cur, last))}/${fmt.time((needed - cur) / rate(cur, last) * 1000)}`);
         await ns.sleep(1000);
         p = ns.getPlayer();
         last.unshift(cur);
+        ns.print(cur);
         while (last.length > 300) {
             last.pop();
         }

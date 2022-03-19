@@ -1,40 +1,34 @@
 import * as fmt from "/lib/fmt.js";
 import { console, netLog, toast } from "/lib/log.js";
-import { getPorts } from "/lib/ports.js";
+import { ports } from "/lib/ports.js";
+import { settings } from "/lib/state.js";
+import { newUI } from "/lib/ui.js";
 
-var installer = "/tools/install.js";
-var assigner = "/tools/assigntargets.js";
-var reserve = 0;
-var mode = "none";
-var ports = getPorts();
+let installer = "/tools/install.js";
+let assigner = "/tools/assigntargets.js";
+let st;
+let ui;
 
 /** @param {NS} ns **/
 export async function main(ns) {
 	ns.disableLog("getServerMoneyAvailable");
 	ns.disableLog("getServerMaxRam");
 	ns.disableLog("sleep");
+	st = settings(ns, "buyer");
+	ui = await newUI(ns, "buyer", "Buyer");
 
 	if (ns.getPurchasedServerLimit() == 0) {
 		await toast(ns, "Can't purchase servers on this node, disabling buyer.", {level: "warning", timeout: 30000});
 		ns.exit();
 	}
 
-	if (ns.fileExists("/conf/buyerReserve.txt", "home")) {
-		reserve = Math.floor(ns.read("/conf/buyerReserve.txt"));
-	}
-	if (ns.fileExists("/conf/buyerMode.txt", "home")) {
-		mode = ns.read("/conf/buyerMode.txt");
-	}
-
 	// start from whereever we stopped
-	var ram = 16;
+	let ram = 16;
 	if (ns.getPurchasedServers().length > 0) {
-		ram = ns.getPurchasedServers()
-			.map(s => ns.getServerMaxRam(s))
-			.reduce((m, c) => c < m ? c : m, ns.getPurchasedServerMaxRam());
+		ram = Math.min(...ns.getPurchasedServers().map(s => ns.getServerMaxRam(s)), ns.getPurchasedServerMaxRam());
 	}
 
-	var batchRam = Math.max(ns.getScriptRam("/daemons/batch.js"), 64);
+	let batchRam = Math.max(ns.getScriptRam("/daemons/batch.js"), 64);
 	while (ram < batchRam
 	    || ns.getPurchasedServerCost(ram) * 10 < ns.getServerMoneyAvailable("home")) {
 		ram *= 2;
@@ -42,45 +36,86 @@ export async function main(ns) {
 	if (ram > ns.getPurchasedServerMaxRam()) {
 		ram = ns.getPurchasedServerMaxRam();
 	}
-	await console(ns, "Buying servers with %s GB RAM for %s", fmt.int(ram), fmt.money(ns.getPurchasedServerCost(ram)));
-	await ns.writePort(ports.UI, "create buyer Buyer");
-	await ns.writePort(ports.UI, "update buyer waiting...");
-	var updateUI = async function (m = "") {
-		var obs = 0;
-		var cur = 0;
-		ns.getPurchasedServers().forEach(srv => ns.getServer(srv).maxRam == ram ? cur++ : obs++);
-		var t = ns.sprintf("%s\n(%s)\n%d/%d%s",
+	await toast(ns, "Buying servers with %s for %s", fmt.memory(ram), fmt.money(ns.getPurchasedServerCost(ram)));
+	await ui.update("waiting...");
+	let updateUI = async function (m = "") {
+		let obs = 0;
+		let cur = 0;
+		ns.getPurchasedServers().forEach(srv => ns.getServer(srv).maxRam >= ram ? cur++ : obs++);
+		let t = ns.sprintf("%s (%s)\n%d/%d%s",
 			fmt.money(ns.getPurchasedServerCost(ram)),
 			fmt.memory(ram),
 			obs, cur, m);
-		await ns.writePort(ports.UI, `update buyer ${t}`);
+		await ui.update(t);
 	}
 	await updateUI();
 
-	await console(ns, "Waiting 1 minute before starting...");
-	var start = Date.now();
-	var max = ns.getPurchasedServerMaxRam();
+	await toast(ns, "Waiting 1 minute before starting...");
+	let start = Date.now();
+	let max = ns.getPurchasedServerMaxRam();
 
-	var idle = [];
+	let idle = [];
 	while (ram <= max) {
-		var need = ns.getPurchasedServerCost(ram);
+		let need = ns.getPurchasedServerCost(ram);
 
 		await checkControl(ns, need);
+		// Wait our startup timer
 		if (Date.now() - start < 60000) {
 			await ns.sleep(1000);
 			continue;
 		}
-		var next = await getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
-		if (next == "<waiting>") {
-			await ns.sleep(1000);
+
+		// Figure out if we have servers to upgrade, as them to shut down if we're ready
+		let qty = (ns.getServerMoneyAvailable("home")+st.read("reserve")) / need;
+		let next = await getNextServer(ns, ram, qty);
+		if (next == "<waiting>" || !qty) {
+			await ns.sleep(10000);
 			continue;
 		}
+
+		// wait until we have enough money
+		await netLog(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(st.read("reserve")));
+		while (ns.getServerMoneyAvailable("home") < need + st.read("reserve")) {
+			if (st.read("buyerMode") != "idle") {
+				while (idle.length > 0) {
+					let h = idle.shift();
+					switch (st.read("buyerMode")) {
+						case "worker":
+							ns.exec(installer, "home", 1, h, "worker");
+							break;
+						case "sharer":
+							ns.exec(installer, "home", 1, h, "sharer");
+							break;
+						default:
+							if (idle.length > 0) {
+								let pid = ns.exec(assigner, "home", 1, "--quiet");
+								while (ns.isRunning(pid, "home")) {
+									await ns.sleep(500);
+								}
+							}
+							ns.exec(installer, "home", 1, h, "batch");
+							break;
+					}
+				}
+			}
+			await checkControl(ns, need);
+			await ns.sleep(10000);
+		}
+
+		next = await getNextServer(ns, ram, (ns.getServerMoneyAvailable("home")-st.read("reserve")) / need);
+		if (next == "<waiting>") {
+			await ns.sleep(10000);
+			continue;
+		}
+
+
+		// When we're out of servers to upgrade, aim higher
 		if (next == "") {
 			if (ram == max) {
 				break;
 			}
-			var oldRam = ram;
-			var rate = Math.log2(ram);
+			let oldRam = ram;
+			let rate = Math.log2(ram);
 			if (rate < 10) {
 				ram *= 2;
 			} else if (rate < 20) {
@@ -100,41 +135,6 @@ export async function main(ns) {
 			continue;
 		}
 
-		// wait until we have enough money
-		await netLog(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
-		while (Math.floor(ns.getServerMoneyAvailable("home")) < need + reserve) {
-			while (idle.length > 0) {
-				var h = idle.shift();
-				switch (mode) {
-					case "batch":
-						if (idle.length > 0) {
-							var pid = ns.exec(assigner, "home", 1, "--quiet");
-							while (ns.isRunning(pid, "home")) {
-								await ns.sleep(500);
-							}
-						}
-						ns.exec(installer, "home", 1, h, "batch");
-						break;
-					case "worker":
-						ns.exec(installer, "home", 1, h, "worker");
-						break;
-					case "sharer":
-						ns.exec(installer, "home", 1, h, "sharer");
-						break;
-					default:
-						await console(ns, "bought new server %s with %s GB RAM, leaving idle", h, fmt.int(ram));
-				}
-			}
-			await checkControl(ns, need);
-			await ns.sleep(10000);
-		}
-
-		next = await getNextServer(ns, ram, ns.getServerMoneyAvailable("home") / need);
-		if (next == "<waiting>") {
-			await ns.sleep(1000);
-			continue;
-		}
-
 		// if the server exists, delete it
 		if (ns.serverExists(next)) {
 			await netLog(ns, "deleting obsolete server %s", next);
@@ -144,14 +144,14 @@ export async function main(ns) {
 
 		await updateUI(".");
 		next = ns.purchaseServer(next, ram);
-		await netLog(ns, "bought new server %s with %s GB RAM", next, fmt.int(ram));
+		await netLog(ns, "bought new server %s with %s", next, fmt.memory(ram));
 		idle.push(next);
 		await ns.sleep(1000);
 		await updateUI();
 	}
 
 	await toast(ns, "Bought max servers with max memory, done", { level: "success", timeout: 0 });
-	await ns.writePort(ports.UI, "delete buyer");
+	await ui.remove();
 }
 
 /**
@@ -162,9 +162,9 @@ export async function main(ns) {
 async function getNextServer(ns, ram, qty = 1) {
 	// Find the next server to buy:
 	// - missing
-	var maxServers = ns.getPurchasedServerLimit();
-	for (var i = 0; i < maxServers; i++) {
-		var name = "pserv-" + i;
+	let maxServers = ns.getPurchasedServerLimit();
+	for (let i = 0; i < maxServers; i++) {
+		let name = "pserv-" + i;
 		if (!ns.serverExists(name)) {
 			return name;
 		}
@@ -172,58 +172,47 @@ async function getNextServer(ns, ram, qty = 1) {
 
 	// - too small, and idle
 	qty = Math.floor(qty);
-	var found = 0;
-	var turndown = [];
-	var servers = ns.getPurchasedServers()
+	await netLog(ns, "Turning down up to %d servers with less than %s", qty, fmt.memory(ram));
+	let turndown = [];
+	let servers = ns.getPurchasedServers()
 		.map(s => [s, ns.getServerMaxRam(s)])
 		.sort((a, b) => a[1] - b[1])
 		.map(s => s[0]);
-	for (var name of servers) {
-		if (ns.getServerMaxRam(name) < ram) {
-			if (ns.ps(name).filter((p) => { return p.filename.startsWith("/bin") }).length == 0) {
-				await netLog(ns, "%s is idle, upgrading.", name);
-				return name;
-			} else if (!ns.fileExists("/conf/assignments.txt", name)) {
-				await netLog(ns, "%s is shutting down.", name);
-				found++;
-				turndown.push(name);
-			} else if (found < qty) {
-				await netLog(ns, "%s is obsolete, turning down.", name);
-				ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
-				ns.scriptKill("/daemons/batch.js", name);
-				turndown.push(name);
-				found++;
-			}
+	for (let name of servers) {
+		if (ns.getServerMaxRam(name) >= ram) {
+			continue;
+		}
+
+		if (ns.ps(name).filter((p) => { return p.filename.startsWith("/bin") }).length == 0) {
+			await netLog(ns, "%s is idle, upgrading.", name);
+			return name;
+		} 
+		if (turndown.length >= qty) {
+			break;
+		} 
+
+		turndown.push(name);
+		if (ns.fileExists("obsolete.txt", name)) {
+			await netLog(ns, "%s is already shutting down.", name);
+			continue;
+		}
+		if (ns.fileExists("/conf/assignments.txt", name)) {
+			await netLog(ns, "%s is obsolete, turning down.", name);
+			ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
+			ns.scriptKill("/daemons/batch.js", name);
+		} else {
+			await netLog(ns, "marking bee %s obsolete.", name);
+			await ns.scp("/conf/assignments.txt", name);
+			ns.mv(name, "/conf/assignments.txt", "obsolete.txt");
 		}
 	}
 
-	if (!found) {
-		await netLog(ns, "Turning down up to %d servers with less than %s", qty, fmt.memory(ram));
-		await netLog(ns, "No available servers, servers spinning down: ", turndown);
+	if (turndown.length > 0) {
+		await netLog(ns, "No available servers, servers spinning down: %s", turndown.join(", "));
+	} else {
+		await netLog(ns, "No upgradable servers found.");
 	}
-	return found ? "<waiting>" : "";
-}
-
-/**
- * @param {string} s
- */
-function parseMoney(s) {
-	if (1 * s == s) {
-		return 1 * s;
-	}
-	var unit = s.substr(-1);
-	var val = s.substr(0, s.length - 1);
-	switch (unit) {
-		case "t":
-			val *= 1000
-		case "b":
-			val *= 1000
-		case "m":
-			val *= 1000
-		case "k":
-			val *= 1000
-	}
-	return Math.floor(val);
+	return turndown.length ? "<waiting>" : "";
 }
 
 /**
@@ -232,33 +221,24 @@ function parseMoney(s) {
  * @param {number} reserve
  **/
 async function checkControl(ns, need) {
-	var words = ns.readPort(ports.BUYER_CTL).split(" ");
+	let words = ns.readPort(ports.BUYER_CTL).split(" ");
 	switch (words[0]) {
 		case "NULL":
 			return
 			break;
-		case "reserve":
-			reserve = parseMoney(words[1]);
-			await console(ns, "Setting reserve to %s", fmt.money(reserve));
-			await ns.write("/conf/buyerReserve.txt", reserve, "w");
-			break;
-		case "mode":
-			mode = words[1];
-			await console(ns, "Setting mode to %s", mode);
-			await ns.write("/conf/buyerMode.txt", mode, "w");
-			break;
 		case "report":
-			await console(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need), fmt.money(reserve));
+			await console(ns, "Waiting for %s, leaving %s in reserve", fmt.money(need, {digits:2 }), fmt.money(st.read("reserve")));
 			break;
 		case "quit":
-			await console(ns, "quitting");
-			await ns.writePort(ports.UI, "delete buyer");
+			await toast(ns, "Buyer quitting...");
+			await ui.remove();
 			ns.exit();
 		case "restart":
-			await console(ns, "restarting...");
+			await toast(ns, "Buyer restarting...");
+			await ui.remove();
 			ns.spawn(ns.getScriptName());
 		default:
 			ns.tprintf("Unknown control command: " + words.join(" "));
-			ns.tprintf("cmds: reserve, quit, report");
+			ns.tprintf("cmds: quit, restart, report");
 	}
 }

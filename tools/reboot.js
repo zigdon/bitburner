@@ -5,7 +5,7 @@ import {keep, toast} from "/lib/log.js";
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
-    var flags = ns.flags([
+    let flags = ns.flags([
         ["time", null],
         ["money", null],
         ["hack", null],
@@ -17,11 +17,11 @@ export async function main(ns) {
         ["noaugs", false],
     ])
 
-    var [waitDesc, waitFuncs] = parseFlags(ns, flags);
+    let [waitDesc, waitFuncs] = parseFlags(ns, flags);
 
-    var msg = "";
+    let msg = "";
     if (waitDesc.length > 0) {
-        var any = waitDesc.length == 1 ? "" : flags.any ? "(any) " : "(all) "
+        let any = waitDesc.length == 1 ? "" : flags.any ? "(any) " : "(all) "
         msg = "Waiting for " + any + waitDesc.join(", ") + " then install augs and reboot?";
     } else {
         msg = "Install augs and reboot?";
@@ -31,9 +31,9 @@ export async function main(ns) {
     }
 
     if (waitFuncs.length > 0) {
-        var startWait = Date.now();
+        let startWait = Date.now();
         ns.toast(`Waiting for ${flags.any ? "(any) " : ""}${waitDesc.join(", ")}...`, "warning", null);
-        var check = flags.any ? (t, f) => t || f() : (t, f) => t && f();
+        let check = flags.any ? (t, f) => t || f() : (t, f) => t && f();
         while (!waitFuncs.reduce(check, !flags.any)) {
             ns.print(`Still waiting for ${(flags.any ? "any of: " : "all of: ")}${waitDesc.join(", ")}`);
             await ns.sleep(5000);
@@ -46,14 +46,14 @@ export async function main(ns) {
         ns.kill("/daemons/buyer.js", "home");
     }
 
-    var pid = ns.run("/tools/lsaugs.js", 1, "buy", "hack", "--quiet");
+    let pid = ns.run("/tools/lsaugs.js", 1, "buy", "hack", "--quiet");
     while (ns.isRunning(pid, "home")) {
         await ns.sleep(100);
     }
-    var installedAugs = ns.getOwnedAugmentations(false);
-    var allAugs = ns.getOwnedAugmentations(true);
-    var newAugs = [];
-    for (var a of allAugs) {
+    let installedAugs = ns.getOwnedAugmentations(false);
+    let allAugs = ns.getOwnedAugmentations(true);
+    let newAugs = [];
+    for (let a of allAugs) {
         if (installedAugs.indexOf(a) == -1) {
             newAugs.push(a);
         }
@@ -67,7 +67,7 @@ export async function main(ns) {
     }
 
     // Buy any server upgrades
-    var c = 0;
+    let c = 0;
     while (ns.getServerMoneyAvailable("home") > ns.getUpgradeHomeCoresCost()) {
         if (!ns.upgradeHomeCores()) {
             break;
@@ -96,7 +96,7 @@ export async function main(ns) {
         await ns.sleep(30000);
         ns.toast("Reboot in 30 seconds!", "warning", 20000);
         await ns.sleep(20000);
-        for (var i=10; i>0; i--) {
+        for (let i=10; i>0; i--) {
             ns.toast(`Reboot in ${i} seconds!`, "warning", 1000);
             await ns.sleep(1000);
         }
@@ -107,7 +107,7 @@ export async function main(ns) {
     // Buy any possible NeuroFlux Governor
     // Find the faction with the most rep
     c = 0;
-    for(var fact of getFactions().map(f => [f, ns.getFactionRep(f)]).sort((a,b) => b[1]-a[1])) {
+    for(let fact of getFactions().map(f => [f, ns.getFactionRep(f)]).sort((a,b) => b[1]-a[1])) {
         while (ns.purchaseAugmentation(fact[0], "NeuroFlux Governor")) {
             c++;
         }
@@ -119,13 +119,13 @@ export async function main(ns) {
     }
 
     // Save progress
-    var player = ns.getPlayer();
+    let player = ns.getPlayer();
     await keep(ns, "Rebooting BN%d, %s since last reboot", player.bitNodeN, fmt.time(player.playtimeSinceLastAug));
     if (player.numPeopleKilled) {
         await keep(ns, "Current player kills: %s", player.numPeopleKilled);
     }
     if (flags.money) {
-        await ns.write("/conf/rebootState.txt", Math.floor(1.2 * Number(fmt.parseNum(flags.money))), "w");
+        await ns.write("/conf/rebootState.txt", Math.floor(1.5 * Number(fmt.parseNum(flags.money))), "w");
     } else {
         ns.rm("/conf/rebootState.txt");
     }
@@ -139,33 +139,33 @@ export async function main(ns) {
  * @param {Object} flags
  */
 function parseFlags(ns, flags) {
-    var waitDesc = [];
-    var waitFuncs = [];
+    let waitDesc = [];
+    let waitFuncs = [];
     if (flags.time) {
-        var waitTime = fmt.parseTime(flags.time);
+        let waitTime = fmt.parseTime(flags.time);
         waitDesc.push(fmt.time(waitTime));
-        var start = Date.now();
+        let start = Date.now();
         waitFuncs.push(function() {
             return Date.now() - start > waitTime;
         });
     }
     if (flags.money) {
-        var waitMoney = fmt.parseNum(flags.money);
+        let waitMoney = fmt.parseNum(flags.money);
         waitDesc.push(fmt.money(waitMoney));
         waitFuncs.push(function() {
             return ns.getServerMoneyAvailable("home") > waitMoney;
         });
     }
     if (flags.hack) {
-        var waitHack = fmt.parseNum(flags.hack);
+        let waitHack = fmt.parseNum(flags.hack);
         waitDesc.push("hack @" + fmt.int(waitHack));
         waitFuncs.push(function() {
             return ns.getPlayer().hacking > waitHack;
         })
     }
     if (flags.rep) {
-        var [factName, rep] = flags.rep.split("=");
-        var fact = longFact(factName);
+        let [factName, rep] = flags.rep.split("=");
+        let fact = longFact(factName);
         if (!fact) {
             ns.tprintf("Unknown faction %s!", factName);
             return;
@@ -176,15 +176,15 @@ function parseFlags(ns, flags) {
         })
     }
     if (flags.donate) {
-        var fact = longFact(flags.donate);
+        let fact = longFact(flags.donate);
         if (!fact) {
             ns.tprintf("Unknown faction %s!", flags.donate);
             return;
         }
         waitDesc.push(`can donate to ${fact}`);
         waitFuncs.push(function() {
-            var pending = ns.getPlayer().currentWorkFactionName == fact ? ns.getPlayer().workRepGained : 0;
-            var extra = Math.log(pending / 25000 + 1) / Math.log(1.02)
+            let pending = ns.getPlayer().currentWorkFactionName == fact ? ns.getPlayer().workRepGained : 0;
+            let extra = Math.log(pending / (25000 + 1)) / Math.log(1.02)
             return ns.getFactionFavorGain(fact) + ns.getFactionFavor(fact) + extra > ns.getFavorToDonate();
         })
     }

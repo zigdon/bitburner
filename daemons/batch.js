@@ -1,20 +1,20 @@
 import * as fmt from "/lib/fmt.js";
 import { batchReport, log, netLog } from "/lib/log.js";
 
-var wScript = "/bin/weaken.js";
-var gScript = "/bin/grow.js";
-var hScript = "/bin/hack.js";
-var minGap = 250;
+let wScript = "/bin/weaken.js";
+let gScript = "/bin/grow.js";
+let hScript = "/bin/hack.js";
+let minGap = 250;
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
     ns.disableLog("getServerUsedRam");
-    var flags = ns.flags([
+    let flags = ns.flags([
         ["single", false],
     ])
-    var target = ns.args[0];
-    var reserve = ns.args[1];
+    let target = ns.args[0];
+    let reserve = ns.args[1];
     reserve = parseMemory(reserve);
     if (reserve) {
         await log(ns, "Reserving %s GB", fmt.int(reserve));
@@ -29,7 +29,7 @@ export async function main(ns) {
     }
 
     // Wait a random pause at startup, to avoid thundering on reboot
-    var pause = 1000 + Math.random() * 9000;
+    let pause = 1000 + Math.random() * 9000;
     await netLog(ns, "[%s] Starting up batcher, sleeping for %.2fs", target, pause / 1000);
     await batchReport(ns, target, "batch", 0);
     await ns.sleep(pause);
@@ -40,16 +40,16 @@ export async function main(ns) {
     // 4. Start a grow to end after the weaken (#3)
     // 5. Start a hack to end after the weaken (#2)
 
-    var hostname = ns.getHostname();
-    var hRam = ns.getScriptRam(hScript);
-    var gRam = ns.getScriptRam(gScript);
-    var wRam = ns.getScriptRam(wScript);
-    var scriptRam = ns.getScriptRam(ns.getScriptName());
-    var maxRam = ns.getServerMaxRam(hostname);
-    var availRam = maxRam - scriptRam - reserve;
-    var maxW = Math.floor((maxRam - scriptRam) / wRam);
-    var maxG = Math.floor((maxRam - scriptRam) / gRam);
-    var hackTime = ns.getHackTime(target);
+    let hostname = ns.getHostname();
+    let hRam = ns.getScriptRam(hScript);
+    let gRam = ns.getScriptRam(gScript);
+    let wRam = ns.getScriptRam(wScript);
+    let scriptRam = ns.getScriptRam(ns.getScriptName());
+    let maxRam = ns.getServerMaxRam(hostname);
+    let availRam = maxRam - scriptRam - reserve;
+    let maxW = Math.floor((maxRam - scriptRam) / wRam);
+    let maxG = Math.floor((maxRam - scriptRam) / gRam);
+    let hackTime = ns.getHackTime(target);
 
     // If something else is running on the machine, wait for it to end.
     await netLog(ns, "[%s] Script needs %s GB, reserve %s GB, total ram: %s GB.",
@@ -66,23 +66,23 @@ export async function main(ns) {
         }
     }
 
-    var atSec = false;
-    var atVal = false;
+    let atSec = false;
+    let atVal = false;
     while (!atSec || !atVal) {
         atSec = await getToMinSec(ns, target, maxW);
         atVal = await getToMaxVal(ns, target, maxG);
     }
 
-    var threads;
-    var batches;
+    let threads;
+    let batches;
     while (true) {
         // Update to make sure we have the latest memory numbers (things change!)
-        var maxRam = ns.getServerMaxRam(hostname);
-        var availRam = maxRam - scriptRam - reserve;
-        var maxW = Math.floor((maxRam - scriptRam) / wRam);
-        var maxG = Math.floor((maxRam - scriptRam) / gRam);
+        let maxRam = ns.getServerMaxRam(hostname);
+        let availRam = maxRam - scriptRam - reserve;
+        let maxW = Math.floor((maxRam - scriptRam) / wRam);
+        let maxG = Math.floor((maxRam - scriptRam) / gRam);
         
-        var schedule;
+        let schedule;
         [schedule, batches, threads] = await designBatch(ns, target, availRam, hRam, gRam, wRam, batches, threads);
         if (!schedule) {
             ns.tprintf("Can't figure out batches on %s for %s", hostname, target);
@@ -116,16 +116,16 @@ export async function main(ns) {
  * @param {Object[]} schedule
  */
 async function runBatch(ns, start, target, schedule) {
-    var hostname = ns.getHostname();
-    for (var i = 0; i < schedule.length; i++) {
+    let hostname = ns.getHostname();
+    for (let i = 0; i < schedule.length; i++) {
         await ns.sleep(10);
-        var s = schedule[i];
+        let s = schedule[i];
         if (Date.now() < start + s.time) {
             await ns.sleep(start + s.time - Date.now());
         }
         log(ns, "Launching %s for batch #%d (%dms off)", s.proc, s.batch, Date.now() - (start + s.time));
-        var t = s.threads;
-        while (t > 0 && !ns.exec(s.proc, hostname, t, target, start + s.end, s.time)) {
+        let t = s.threads;
+        while (t > 0 && !ns.exec(s.proc, hostname, t, target, "--eta", start + s.end, "--delta", s.time)) {
             t--;
         }
     }
@@ -140,20 +140,21 @@ async function runBatch(ns, start, target, schedule) {
  * @param {number} wRam
  */
 async function getThreads(ns, target, availRam, hRam, gRam, wRam) {
-    var targetHack = 90;
-    var growThreads;
-    var hackThreads;
-    var weakHackThreads;
-    var weakGrowThreads;
-    var maxVal = ns.getServerMaxMoney(target);
+    let targetHack = 90;
+    let growThreads;
+    let hackThreads;
+    let weakHackThreads;
+    let weakGrowThreads;
+    let reqRam;
+    let maxVal = ns.getServerMaxMoney(target);
     while (targetHack > 0) {
         growThreads = await threadsForGrow(ns, target, 100 / (100 - targetHack));
         hackThreads = Math.ceil(ns.hackAnalyzeThreads(target, maxVal * targetHack / 100));
-        var secHackDmg = ns.hackAnalyzeSecurity(hackThreads);
+        let secHackDmg = ns.hackAnalyzeSecurity(hackThreads);
         weakHackThreads = Math.ceil(getWeakThreads(ns, secHackDmg));
-        var secGrowDmg = ns.growthAnalyzeSecurity(growThreads);
+        let secGrowDmg = ns.growthAnalyzeSecurity(growThreads);
         weakGrowThreads = Math.ceil(getWeakThreads(ns, secGrowDmg));
-        var reqRam = growThreads * gRam + hackThreads * hRam + (weakHackThreads + weakGrowThreads) * wRam;
+        reqRam = growThreads * gRam + hackThreads * hRam + (weakHackThreads + weakGrowThreads) * wRam;
 
         if (reqRam < availRam && growThreads * hackThreads * weakHackThreads * weakGrowThreads > 0) {
             break;
@@ -179,8 +180,8 @@ async function getThreads(ns, target, availRam, hRam, gRam, wRam) {
  * @param {number} dmg
  */
 function getWeakThreads(ns, dmg) {
-    var i = 0;
-    var got = 0;
+    let i = 0;
+    let got = 0;
     while (got < dmg) {
         i++;
         got = ns.weakenAnalyze(i);
@@ -195,11 +196,11 @@ function getWeakThreads(ns, dmg) {
  * @param {number} threads
  */
 async function getToMaxVal(ns, target, threads) {
-    var maxVal = ns.getServerMaxMoney(target);
-    var curVal = ns.getServerMoneyAvailable(target);
-    var hostname = ns.getHostname();
+    let maxVal = ns.getServerMaxMoney(target);
+    let curVal = ns.getServerMoneyAvailable(target);
+    let hostname = ns.getHostname();
     log(ns, "getting %s val: %s -> %s", target, fmt.int(curVal), fmt.int(maxVal));
-    var ratio = 1000;
+    let ratio = 1000;
     if (curVal > 0) {
         ratio = maxVal / curVal;
     }
@@ -209,15 +210,15 @@ async function getToMaxVal(ns, target, threads) {
         return true;
     }
 
-    var gn = await threadsForGrow(ns, target, ratio);
+    let gn = await threadsForGrow(ns, target, ratio);
     if (gn > threads) {
         await netLog(ns, "[%s] Too many threads, want %s, can only run %s", target, fmt.int(gn), fmt.int(threads));
         gn = threads;
     }
-    var wait = ns.getGrowTime(target);
+    let wait = ns.getGrowTime(target);
     await netLog(ns, "[%s] grow will take %s. Running %s threads on %s.", target,
         fmt.time(wait), fmt.int(gn), hostname);
-    var pid = 0;
+    let pid = 0;
     while (pid == 0 && gn > 0) {
         pid = ns.exec(gScript, hostname, gn, target);
         gn--;
@@ -240,20 +241,20 @@ async function getToMaxVal(ns, target, threads) {
  * @param {number} threads
  */
 async function getToMinSec(ns, target, threads) {
-    var minSec = ns.getServerMinSecurityLevel(target);
-    var curSec = ns.getServerSecurityLevel(target);
-    var hostname = ns.getHostname();
+    let minSec = ns.getServerMinSecurityLevel(target);
+    let curSec = ns.getServerSecurityLevel(target);
+    let hostname = ns.getHostname();
     log(ns, "getting %s sec: %.3f -> %.3f", target, curSec, minSec);
-    var need = curSec - minSec;
+    let need = curSec - minSec;
     if (need <= 1) {
         log(ns, "Got to min security %d", minSec);
         return true;
     }
 
-    var wn = await threadsForWeaken(ns, need, threads);
-    var wait = ns.getWeakenTime(target);
+    let wn = await threadsForWeaken(ns, need, threads);
+    let wait = ns.getWeakenTime(target);
     await netLog(ns, "[%s] weaken will take %s", target, fmt.time(wait));
-    var pid = 0;
+    let pid = 0;
     while (pid == 0 && wn > 0) {
         pid = ns.exec(wScript, hostname, wn, target);
         wn--;
@@ -276,7 +277,7 @@ async function getToMinSec(ns, target, threads) {
  * @param {number} max
  */
 async function threadsForGrow(ns, target, need) {
-    var got = Math.ceil(ns.growthAnalyze(target, need));
+    let got = Math.ceil(ns.growthAnalyze(target, need));
     // await netLog(ns, "growing with %d threads to gain %.2f", got, need);
     return got;
 }
@@ -287,9 +288,9 @@ async function threadsForGrow(ns, target, need) {
  * @param {number} max
  */
 async function threadsForWeaken(ns, target, max) {
-    var n = 1;
+    let n = 1;
     while (n < max) {
-        var got = ns.weakenAnalyze(n);
+        let got = ns.weakenAnalyze(n);
         if (got > target) {
             await netLog(ns, "weakening with %d threads: %.2f", n, got);
             return n;
@@ -308,7 +309,7 @@ function parseMemory(n) {
     if (!n) {
         return 0;
     }
-    var unit = n.substring(n.length - 2);
+    let unit = n.substring(n.length - 2);
     n = n.substring(0, n.length - 2);
     switch (unit) {
         case "pb":
@@ -333,10 +334,10 @@ function parseMemory(n) {
  * @param {object} threads
  */
 async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, threads) {
-    var weakTime = ns.getWeakenTime(target);
-    var hackTime = ns.getHackTime(target);
-    var growTime = ns.getGrowTime(target);
-    var maxVal = ns.getServerMaxMoney(target);
+    let weakTime = ns.getWeakenTime(target);
+    let hackTime = ns.getHackTime(target);
+    let growTime = ns.getGrowTime(target);
+    let maxVal = ns.getServerMaxMoney(target);
 
     batches ||= 0;
     if (!threads) {
@@ -347,7 +348,7 @@ async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, thre
             if (threads && (threads.gt * gRam + (threads.wgt + threads.wht) * wRam + threads.ht * hRam) < availRam / (batches+1)) {
                 continue;
             }
-            var solution = await getThreads(ns, target, Math.floor(availRam / batches+1), hRam, gRam, wRam);
+            let solution = await getThreads(ns, target, Math.floor(availRam / batches+1), hRam, gRam, wRam);
             if (solution) {
                 threads = solution;
                 continue;
@@ -363,17 +364,17 @@ async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, thre
     await netLog(ns, "[%s] using %d weaken threads to recover from grow security damage", target, threads.wgt);
     await netLog(ns, "[%s] each hack yields $%s", target, fmt.int(ns.hackAnalyze(target) * threads.ht * maxVal));
 
-    var gap = hackTime / batches / 5;
+    let gap = hackTime / batches / 5;
     if (gap < minGap) {
         gap = minGap;
     }
     await netLog(ns, "[%s] Running %d batches of %s each (1 hack = %s, gap = %.2fs) with %s GB", target,
         batches, fmt.time(gap * 6), fmt.time(hackTime), gap / 1000, fmt.int(availRam));
 
-    var schedule = [];
-    var addBatch = function (i) {
-        var base = weakTime + gap * 3;
-        var t = (i - 1) * gap * 6;
+    let schedule = [];
+    let addBatch = function (i) {
+        let base = weakTime + gap * 3;
+        let t = (i - 1) * gap * 6;
         schedule.push({ time: base + t - hackTime, proc: hScript, threads: threads.ht, batch: i, end: base + t });
         t += gap;
         schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wht, batch: i, end: base + t });
@@ -383,7 +384,7 @@ async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, thre
         schedule.push({ time: base + t - weakTime, proc: wScript, threads: threads.wgt, batch: i, end: base + t });
     }
 
-    for (var i = 1; i <= batches; i++) {
+    for (let i = 1; i <= batches; i++) {
         await ns.sleep(100);
         addBatch(i)
     }
@@ -392,7 +393,7 @@ async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, thre
     })
 
     // Count threads
-    var totals = new Map();
+    let totals = new Map();
     schedule.forEach((step) => {
         if (!totals.has(step.proc)) {
             totals.set(step.proc, 0);
@@ -400,11 +401,11 @@ async function designBatch(ns, target, availRam, hRam, gRam, wRam, batches, thre
         totals.set(step.proc, totals.get(step.proc) + step.threads);
     })
 
-    var sched = [];
+    let sched = [];
     schedule.forEach((s) => {
         sched.push(ns.sprintf("%3.2fs: (%2d) run %s with %s threads", s.time, s.batch, s.proc, fmt.int(s.threads)));
     })
-    for (var m in sched) {
+    for (let m in sched) {
         await log(ns, "[%s] %s", target, sched[m]);
         await ns.sleep(100);
     }

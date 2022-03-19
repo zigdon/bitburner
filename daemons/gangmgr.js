@@ -3,6 +3,7 @@ import { toast } from "/lib/log.js";
 import { getPorts } from "/lib/ports.js";
 import { getCrimes } from "/lib/constants.js";
 import { settings } from "/lib/state.js";
+import { newUI } from "/lib/ui.js";
 
 let nextTick = 0;
 let ports = getPorts();
@@ -11,9 +12,11 @@ let focus = "auto";
 let repGoal;
 let showDetails = true;
 let st;
+let ui;
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    ui = await newUI(ns, "gang", "Gang");
     if (!ns.gang.inGang()) {
         ns.tprintf("Not in a gang.");
         return;
@@ -27,26 +30,24 @@ export async function main(ns) {
 
     await findTick(ns);
 
-    let lastUI = 0;
-    await ns.writePort(ports.UI, "create gang Gang");
     while (true) {
         await checkRecruits(ns);
         await assignTasks(ns);
-        await checkCtl(ns);
+        await checkCtl(ns, ui);
         await checkAsc(ns);
         if (st.get("limit") > 0) {
             await buyEq(ns);
         }
         printStatus(ns);
-        if (Date.now() - lastUI > 5000) {
-            let profit = ns.gang.getGangInformation().moneyGainRate * 5;
-            let territory = ns.gang.getGangInformation().territory;
-            let members = ns.gang.getMemberNames().length;
-            if (profit > 0 || Date.now() - lastUI > 10000) {
-                lastUI = Date.now();
-                await ns.writePort(ports.UI, `update gang ${members}, ${fmt.pct(territory, { digits: 0 })}\n${fmt.money(profit)}/s`)
-            }
+        let profit = ns.gang.getGangInformation().moneyGainRate * 5;
+        let territory = ns.gang.getGangInformation().territory;
+        let members = ns.gang.getMemberNames().length;
+        let updates = [];
+        if (territory < 0.9999) {
+            updates.push(`${members}, ${fmt.pct(territory, { digits: 0 })}`);
         }
+        updates.push(`${fmt.money(profit, {digits: 2})}/s`);
+        await ui.update(updates.join("\n"));
         await ns.sleep(250);
     }
 }
@@ -75,6 +76,7 @@ async function buyEq(ns) {
         if (!n) { continue }
         let cost = ns.gang.getEquipmentCost(n);
         if (cost > st.get("limit")) { continue }
+        if (ns.getPlayer().money + cost < st.get("reserve")) { continue }
         for (let m of ns.gang.getMemberNames().map(m => [m, ns.gang.getMemberInformation(m)])) {
             if (m[1].augmentations.indexOf(n) == -1 && m[1].upgrades.indexOf(n) == -1 && ns.getServerMoneyAvailable("home") > cost) {
                 if (ns.gang.purchaseEquipment(m[0], n)) {
@@ -127,7 +129,7 @@ async function checkAsc(ns) {
 /**
  * @param {NS} ns
  */
-async function checkCtl(ns) {
+async function checkCtl(ns, ui) {
     let cmd = ns.readPort(ports.GANGMGR);
     if (cmd.startsWith("NULL")) {
         return;
@@ -136,6 +138,7 @@ async function checkCtl(ns) {
     switch (words[0]) {
         case "restart":
             await toast(ns, "Gang manager restarting...");
+            await ui.remove();
             ns.spawn(ns.getScriptName());
             break;
         case "focus":
@@ -199,7 +202,7 @@ async function assignTasks(ns) {
     if (nextTick - now < 0) {
         nextTick += 20000;
     }
-    if (gangInfo.territory < 1) {
+    if (gangInfo.territory < 0.9999) {
         if (nextTick - now < 1000) {
             lastPower = gangInfo.power;
             if (otherGangs.map(g => ns.gang.getChanceToWinClash(g)).every(c => c >= 0.5)) {
@@ -372,46 +375,47 @@ function printStatus(ns) {
             "Power", fmt.large(stats.power) + (noChange > 0 ? "*" : ""),
             "$ rate", fmt.money(5 * stats.moneyGainRate) + "/s",
             "Wanted level", fmt.large(stats.wantedLevel),
-            "Warfare", stats.territory < 1 ? stats.territoryWarfareEngaged : "Done",
-            "Faction rep", fmt.large(curRep),
         ],
         [
             "Respect", fmt.large(stats.respect),
             "Gear", st.get("limit") > 0 ? fmt.money(st.get("limit")) : "-",
             "Wanted rate", (5 * stats.wantedLevelGainRate).toFixed(2) + "/s",
-            "Next tick", fmt.time(nextTick - Date.now()),
-            "Rep rate", fmt.large(repRate) + "/s",
         ],
         [
             "Respect rate", fmt.large(5 * stats.respectGainRate, { digits: 0 }) + "/s",
             "Teritory", fmt.pct(stats.territory, { digits: 2 }),
             "Penalty", fmt.int(100 - stats.wantedPenalty * 100),
-            "Clash chance", fmt.int(stats.territoryClashChance * 100),
-            "Rep goal", repGoal ? fmt.large(repGoal) : "",
         ],
         [
-            "Win chance", ...chances,
-            "Focus: " + focus,
+            "Focus", focus,
+            "Rep goal", repGoal ? fmt.large(repGoal) : "",
             "Rep ETA", repGoal ? fmt.time((repGoal - curRep) / repRate * 1000) : "",
         ],
     ];
+    if (stats.territory < 0.9999) {
+        gangData.push(
+            [
+                "Warfare", stats.territory < 1 ? stats.territoryWarfareEngaged : "Done",
+                "Next tick", fmt.time(nextTick - Date.now(), {digits:2}),
+                "Clash chance", fmt.int(stats.territoryClashChance * 100),
+            ],
+            ["Win chance", ...chances],
+        )
+    }
+    ns.clearLog();
+    ns.print(fmt.table(gangData), "\n");
     if (showDetails) {
         let memberData = [];
         for (let m of ns.gang.getMemberNames()) {
             let i = ns.gang.getMemberInformation(m);
             memberData.push([
-                m, i.task, i.str, i.def, i.dex, i.agi, i.cha, i.hack, i.earnedRespect,
-                5 * i.moneyGain, (5 * i.respectGain).toFixed(3), (5 * i.wantedLevelGain).toFixed(3),
+                m, i.task, i.str, i.def, i.dex, i.agi, i.cha, i.hack
             ])
         }
+        ns.print(showDetails ? fmt.table(
+            memberData,
+            ["NAME", "TASK", "STR", "DEF", "DEX", "AGI", "CHA", "HACK"],
+        ) : "");
     }
-
-    ns.clearLog();
-    ns.print(fmt.table(gangData), "\n");
-    ns.print(showDetails ? fmt.table(
-        memberData,
-        ["NAME", "TASK", "STR", "DEF", "DEX", "AGI", "CHA", "HACK",
-            ["EARNED RSPT", fmt.int], ["$ GAIN", fmt.money], "REPT GAIN", "WANTED GAIN"],
-    ) : "");
 
 }

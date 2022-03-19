@@ -51,6 +51,7 @@ async function maths(ns, digits, cache) {
         return cache.get(digits);
     }
     for (var i = 1; i <= digits.length; i++) {
+        await ns.sleep(1);
         var n = digits.substr(0, i);
 
         if (i == digits.length) {

@@ -1,19 +1,39 @@
 import {netLog} from "/lib/log.js";
 import * as fmt from "/lib/fmt.js";
+import {settings} from "/lib/state.js";
+
+let st;
 
 /** @param {NS} ns **/
 export async function main(ns) {
-	var version = 11;
+	let version = 13;
+	st = settings(ns, "worker");
+	let hostname = ns.getHostname();
+	if (hostname.startsWith("pserv-")) {
+		if (st.read("usePurchasedBees")) {
+			ns.print("Leaving purchased bee alone")
+			return;
+		}
+	} else if (hostname.startsWith("hacknet-node-")) {
+	    if (st.read("useHacknetBees")) {
+			ns.print("Leaving hacknet bee alone")
+			return;
+		}
+	} else if (st.read("useWildBees")) {
+		ns.print("Leaving wild bee alone")
+		return;
+	}
 	ns.disableLog("sleep");
-	var target = "";
-	var cont = true;
+
+	let cont = true;
 	await netLog(ns, "agent starting");
 	await send(ns, "version %d", version);
 	while (cont) {
-		var words = await wait(ns);
-		var target = words[1];
-		var threads = words[2];
-		var opts = {};
+		let words = await wait(ns);
+		let target = words[1];
+		let threads = words[2];
+		let opts = {};
+		let got;
 		if (threads) {
 			opts = { threads: threads };
 		}
@@ -23,17 +43,17 @@ export async function main(ns) {
 				await ns.sleep(10000);
 				break;
 			case "weaken":
-				var got = await ns.weaken(target, opts);
+				got = await ns.weaken(target, opts);
 				await send(ns, "done weaken %s", target);
 				await netLog(ns, "Weakened %s by %.2f", target, got);
 				break;
 			case "grow":
-				var got = await ns.grow(target, opts);
+				got = await ns.grow(target, opts);
 				await send(ns, "done grow %s", target);
 				await netLog(ns, "Grew %s by %.2f%%", target, (got-1)*100);
 				break;
 			case "hack":
-				var got = await ns.hack(target, opts);
+				got = await ns.hack(target, opts);
 				await send(ns, "done hack %s", target);
 				await netLog(ns, "Hacked %s for $%s", target, fmt.int(got));
 				break;
@@ -53,25 +73,25 @@ export async function main(ns) {
  */
 async function wait(ns) {
     log(ns, "waiting...");
-	var hostname = ns.getHostname();
-	var port = ns.getPortHandle(2);
-	var start = Date.now();
+	let hostname = ns.getHostname();
+	let port = ns.getPortHandle(2);
+	let start = Date.now();
 	while (true) {
-		var head = port.peek();
+		let head = port.peek();
 		if (head == "ping") {
 			return ["ping"];
 		}
 		if (head.startsWith(hostname + ":")) {
 			head = await port.read();
 			log(ns, "read: '%s'", head);
-			var words = head.split(" ");
+			let words = head.split(" ");
 			if (Date.now() - words[1] > 20000) {
 				log(ns, "ignoring obsolete message, %ds old", (Date.now() - words[1])/1000);
 				continue;
 			}
 			return words.slice(2);
 		}
-		var idle = (Date.now() - start) / 1000;
+		let idle = (Date.now() - start) / 1000;
 		if (idle > 10) {
 			log(ns, "idle for %d seconds", idle);
 			await send(ns, "idle %d", idle);
@@ -87,10 +107,10 @@ async function wait(ns) {
  * @param {string[]} ..args
  */
 async function send(ns, tmpl, ...args) {
-	var hostname = ns.getHostname();
-	var cmd = ns.sprintf(tmpl, ...args);
+	let hostname = ns.getHostname();
+	let cmd = ns.sprintf(tmpl, ...args);
 	log(ns, "sending %s", cmd);
-	var msg = ns.sprintf("%s: %s", hostname, cmd);
+	let msg = ns.sprintf("%s: %s", hostname, cmd);
 	while (!await ns.tryWritePort(1, msg)) {
 		log(ns, "waiting to write to port!")
 		await ns.sleep(100);
@@ -103,7 +123,7 @@ async function send(ns, tmpl, ...args) {
  * @param {string[]} ..args
  */
 function log(ns, tmpl, ...args) {
-    var now = new Date();
+    let now = new Date();
     tmpl = ns.sprintf("%s - %s", now.toLocaleTimeString("en-US", { timeZone: "PST" }), tmpl);
 	ns.print(ns.sprintf(tmpl, ...args));
 }

@@ -3,30 +3,33 @@ import {ports} from "/lib/ports.js";
 import {log, loglvl, console, netLog} from "/lib/log.js";
 import {readAssignments} from "/lib/assignments.js";
 import {hosts} from "/lib/hosts.js";
+import {settings} from "/lib/state.js";
 
-var workers = new Map();
-var targets = new Map();
-var helping = {};
-var script = "/daemons/worker.js";
-var reqVersion = 11;
-var autoTarget = false;
+let workers = new Map();
+let targets = new Map();
+let helping = {};
+let script = "/daemons/worker.js";
+let reqVersion = 11;
+let autoTarget = false;
+let st;
 
-var lastReport = Date.now();
-var lastNetReport = Date.now() - 280000;
-var lastIdle = 0;
-var debug = 0;
+let lastReport = Date.now();
+let lastNetReport = Date.now() - 280000;
+let lastIdle = 0;
+let debug = 0;
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("ALL");
-    var lastTargetSelected = 0;
+    let lastTargetSelected = 0;
+    st = settings(ns, "controller");
     await init(ns);
     while (true) {
         if (autoTarget && Date.now() - lastTargetSelected > 30000) {
             await selectTargets(ns);
             lastTargetSelected = Date.now();
         }
-        var msg = await wait(ns);
+        let msg = await wait(ns);
         await process(ns, msg);
         await ns.sleep(100);
     }
@@ -36,20 +39,26 @@ export async function main(ns) {
  * @param {NS} ns
  */
 async function selectTargets(ns) {
-    var assignments = [];
+    let assignments = [];
     readAssignments(ns).forEach(a => assignments.push(...a.targets));
-    var unassigned = hosts(ns)
+    let blocked = st.get("workerBlock") || "";
+    let unassigned = hosts(ns)
         .filter(h => h.max > 0 && h.root)
         .filter(h => assignments.every(a => a != h.host))
+        .filter(h => !blocked.includes(h.host))
         .map(h => h.host);
-    for (var [v,_] of targets) {
+    for (let [v,_] of targets) {
         if (unassigned.indexOf(v) == -1) {
             await log(ns, "Removing %s as it has been assigned.", v);
             targets.delete(v);
         }
+        if (blocked.includes(v)) {
+            await log(ns, "Removing %s as it is blocked.", v);
+            targets.delete(v);
+        }
     }
     await log(ns, unassigned);
-    for (var h of unassigned) {
+    for (let h of unassigned) {
         if (!targets.has(h)) {
             await addTargets(ns, [h]);
         }
@@ -62,7 +71,7 @@ async function selectTargets(ns) {
  */
 async function report(ns, f) {
     await f(ns, "====================== (%d targets)", targets.size);
-    var lines = [];
+    let lines = [];
     targets.forEach((t) => {
         lines.push(ns.sprintf("%s: %d weaken (%d->%d), %d grow (%s->%s), %d hack",
             t.host, t.weakenCount, t.curSec, t.minSec,
@@ -70,7 +79,7 @@ async function report(ns, f) {
         ));
     })
     lines.push(ns.sprintf("Helping: %d weaken, %d grow", helping["weaken"] || 0, helping["grow"] || 0))
-    for (var l in lines) {
+    for (let l in lines) {
         await f(ns, lines[l]);
     }
 }
@@ -99,7 +108,7 @@ async function addTargets(ns, ts) {
  *  @param {string} path
  **/
 async function saveTargets(ns, path) {
-    var data = [];
+    let data = [];
     targets.forEach((t) => { data.push(t.host) });
     await ns.write(path, data.join(" "), "w");
     await netLog(ns, "Saved targets: %s", data);
@@ -109,7 +118,7 @@ async function saveTargets(ns, path) {
  *  @param {NS} ns 
  **/
 async function init(ns) {
-    var ts = [];
+    let ts = [];
     if (ns.fileExists("/conf/targets.txt")) {
         ns.read("/conf/targets.txt").split(" ").forEach(function (target) {
             ts.push(target);
@@ -136,8 +145,8 @@ async function init(ns) {
  *  @param {string} msg.text
  **/
 async function process(ns, msg) {
-    var h;
-    var words = msg.text.split(" ");
+    let h;
+    let words = msg.text.split(" ");
     if (workers.has(msg.host)) {
         loglvl(ns, 2, "found existing entry for %s", msg.host);
         h = workers.get(msg.host);
@@ -159,7 +168,7 @@ async function process(ns, msg) {
         }
     }
 
-    var threads = h.mem / ns.getScriptRam(script, msg.host);
+    let threads = h.mem / ns.getScriptRam(script, msg.host);
     if (words[0] == "version") {
         if (words[1] != reqVersion) {
             await netLog(ns, "%s is running wrong version %d, restarting.", msg.host, reqVersion);
@@ -191,7 +200,7 @@ async function process(ns, msg) {
 
     workers.set(msg.host, h);
 
-    var inst = selectTarget(ns, threads);
+    let inst = selectTarget(ns, threads);
     if (!inst) {
         inst = selectHelp(ns);
         if (inst) {
@@ -221,9 +230,9 @@ async function process(ns, msg) {
  * @param {NS} ns
  */
 function selectHelp(ns) {
-    var hs = {};
+    let hs = {};
     readAssignments(ns) .forEach(a => a.targets .forEach(t => hs[t] = { host: t }));
-    for (var h of Object.keys(hs)) {
+    for (let h of Object.keys(hs)) {
         hs[h].curSec = ns.getServerSecurityLevel(h);
         hs[h].minSec = ns.getServerMinSecurityLevel(h);
         hs[h].sec = hs[h].curSec - hs[h].minSec;
@@ -231,13 +240,13 @@ function selectHelp(ns) {
         hs[h].maxVal = ns.getServerMaxMoney(h);
         hs[h].val = hs[h].curVal/hs[h].maxVal;
     }
-    var weakens = Object.values(hs)
+    let weakens = Object.values(hs)
         .filter(h => h.sec > 5)
         .sort((a,b) => b.sec - a.sec);
 
     // Select entries earlier in the list more than later
     if (weakens.length > 0) {
-        for (var h of weakens) {
+        for (let h of weakens) {
             if (Math.random()> 0.5) {
                 return {cmd: "weaken", host: h.host};
             }
@@ -245,13 +254,13 @@ function selectHelp(ns) {
         return {cmd: "weaken", host: weakens[0].host};
     }
     
-    var grows = Object.values(hs)
+    let grows = Object.values(hs)
         .filter(h => h.val < 0.9)
         .sort((a,b) => a.sec - b.sec);
 
     // Select entries earlier in the list more than later
     if (grows.length > 0) {
-        for (var h of grows) {
+        for (let h of grows) {
             if (Math.random()> 0.5) {
                 return {cmd: "grow", host: h.host};
             }
@@ -268,15 +277,15 @@ function selectHelp(ns) {
  **/
 async function unclogFor(ns, host) {
     loglvl(ns, 2, "starting unclog");
-    var first = ns.peek(2);
+    let first = ns.peek(2);
     while (true) {
-        var head = ns.peek(2);
+        let head = ns.peek(2);
         if (head == "NULL PORT DATA") {
             return false;
         } else if (head.startsWith(host)) {
             return true;
         }
-        var msg = ns.readPort(ports.CONTROLLER);
+        let msg = ns.readPort(ports.CONTROLLER);
         if (msg == first) {
             return false;
         } else {
@@ -289,10 +298,10 @@ function updateTarget(target) {
     if (!targets.has(target)) {
         return;
     }
-    var t = targets.get(target);
-    var w = 0;
-    var g = 0;
-    var h = 0;
+    let t = targets.get(target);
+    let w = 0;
+    let g = 0;
+    let h = 0;
     workers.forEach((v) => {
         if (v.target == target) {
             switch (v.cmd) {
@@ -335,8 +344,8 @@ async function send(ns, host, msg) {
     while (!await ns.tryWritePort(ports.CONTROLLER, msg)) {
         loglvl(ns, 1, "outgoing queue full, retrying...");
         // check the head of the queue for obsolete messages
-        var head = ns.peek(2);
-        var words = head.split(" ");
+        let head = ns.peek(2);
+        let words = head.split(" ");
         if (Date.now() - words[1] > 20000) {
             loglvl(ns, 1, "removing obsolete message '%s'", head);
             ns.readPort(ports.CONTROLLER);
@@ -350,11 +359,11 @@ async function send(ns, host, msg) {
  */
 async function checkControl(ns) {
     while (true) {
-        var msg = await ns.readPort(ports.CONTROLLER_CTL);
+        let msg = await ns.readPort(ports.CONTROLLER_CTL);
         if (msg == "NULL PORT DATA") {
             return;
         }
-        var words = msg.split(" ");
+        let words = msg.split(" ");
         switch (words[0]) {
             case "target":
                 if (words[1] == "add") {
@@ -396,9 +405,9 @@ async function checkControl(ns) {
  */
 async function wait(ns) {
     loglvl(ns, 2, "waiting...");
-    var lastActivity = Date.now();
+    let lastActivity = Date.now();
     while (true) {
-        var now = Date.now();
+        let now = Date.now();
         await checkControl(ns);
         if (now - lastReport > 10000) {
             lastReport = now;
@@ -411,14 +420,14 @@ async function wait(ns) {
             lastNetReport = now;
             await report(ns, netLog);
         }
-        var msg = await ns.readPort(ports.WORKERS);
+        let msg = await ns.readPort(ports.WORKERS);
         if (msg == "NULL PORT DATA") {
             await ns.sleep(100);
             continue;
         }
         lastActivity = now;
         loglvl(ns, 2, "read: '%s'", msg);
-        var data = msg.split(": ", 2);
+        let data = msg.split(": ", 2);
         return { host: data[0], text: data[1] };
     }
 }
@@ -431,9 +440,9 @@ function selectTarget(ns, threads) {
     if (targets.size == 0) {
         return;
     }
-    var fewest = 0;
-    var target = "";
-    var cmd = "hack";
+    let fewest = 0;
+    let target = "";
+    let cmd = "hack";
 
     targets.forEach(function (t) {
         t.curSec = ns.getServerSecurityLevel(t.host);
@@ -446,8 +455,8 @@ function selectTarget(ns, threads) {
         // - each weaken reduces sec by 0.05 - if we have enough already
         // running, don't bother adding more.
         // - pretend that every grow call increases the value by 0.7%
-        var ratio = t.curVal / t.maxVal;
-        var secGap = t.curSec - t.minSec;
+        let ratio = t.curVal / t.maxVal;
+        let secGap = t.curSec - t.minSec;
         loglvl(ns, 2, "%s ratio: %.2f, count: %d", t.host, ratio, t.growCount);
         loglvl(ns, 2, "%s secGap: %d, count: %d", t.host, secGap, t.weakenCount);
         if (secGap > 50 && (secGap - 50) / 0.05 > t.weakenCount) {
@@ -479,7 +488,7 @@ function selectTarget(ns, threads) {
         }
     })
 
-    var t = targets.get(target);
+    let t = targets.get(target);
     switch (cmd) {
         case "weaken":
             t.weakenCount += threads;

@@ -8,6 +8,7 @@ var libs = [
     "/lib/ports.js",
     "/lib/ui.js",
     "/lib/hack.js",
+    "/lib/state.js",
     "/lib/assignments.js",
 ];
 
@@ -38,7 +39,7 @@ export async function main(ns) {
             if (ns.isRunning("/daemons/controller.js")) {
                 installs["worker"].push(h.host);
                 await installWorker(ns, h.host);
-            } else if (ns.isRunning("/daemons/share.js")) {
+            } else if (!ns.ps().every(p => p.filename != "/daemons/share.js")) {
                 if (ns.getServerMaxRam(h.host) > sReq) {
                     installs["sharer"].push(h.host);
                     await installSharer(ns, h.host);

@@ -1,10 +1,13 @@
 import * as fmt from "/lib/fmt.js";
 import { cities, materials } from "/lib/constants.js";
-import { console, netLog } from "/lib/log.js";
-import { getInvestment, buyHardware, levelUpgrade, unlockUpgrade, expandOffice, researchHardware } from "/lib/corp.js";
+import { toast, console, netLog } from "/lib/log.js";
+import { getInvestment, buyHardware, levelUpgrade, unlockUpgrade, expandOffice } from "/lib/corp.js";
+import { newUI } from "/lib/ui.js";
+import { ports } from "/lib/ports.js";
 
 let out;
 let log;
+let ui;
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -15,12 +18,8 @@ export async function main(ns) {
 
   let div;
   switch (cmd) {
-    case "hardware":
-      div = await getDiv(ns, ns.args.shift());
-      ns.print("Running research cycle");
-      await researchHardware(ns, div)
-      ns.print("Running buy cycle");
-      await researchHardware(ns, div)
+    case "save":
+      await saveForCorp(ns);
       break;
     case "fraud":
       await investmentFraud(ns);
@@ -66,10 +65,69 @@ export async function main(ns) {
       }
       await setSale(ns, div.name, mat, qty, price, div.cities);
       break;
+    case "stockup":
+      for (let div of ns.corporation.getCorporation().divisions) {
+        for (let city of div.cities) {
+          for (let m of Object.keys(materials)) {
+            ns.corporation.sellMaterial(div.name, city, m, "0", "MP");
+          }
+          for (let p of div.products) {
+            ns.corporation.sellProduct(div.name, city, p, "0", "MP");
+          }
+        }
+      }
+      break;
+    case "spend":
+      let spendPrice = ns.args.shift() || "MP*10";
+      for (let div of ns.corporation.getCorporation().divisions) {
+        for (let city of div.cities) {
+          for (let m of Object.keys(materials)) {
+            ns.corporation.sellMaterial(div.name, city, m, "MAX", spendPrice);
+          }
+          for (let p of div.products) {
+            ns.corporation.sellProduct(div.name, city, p, "MAX", spendPrice);
+          }
+        }
+      }
+      break;
     default:
       await out("Unknown command: %s", cmd);
       return;
   }
+}
+
+/**
+ * @param {NS} ns
+ **/
+async function saveForCorp(ns) {
+  if (ns.getPlayer().hasCorporation && ns.corporation.getCorporation().divisions.length > 0) {
+    ns.tprintf("Corp already exists.")
+    return;
+  }
+
+  if (!ns.getPlayer().hasCorporation) {
+    await toast(ns, "Waiting for corp startup funds...", { level: "warning", timeout: 0 });
+    while (ns.getPlayer().money < 150e9) {
+      await netLog(ns, "Still waiting... %s/%s", fmt.money(ns.getPlayer().money), fmt.money(150e9));
+      await ns.sleep(10000);
+    }
+    await netLog(ns, "Funds got! %s", fmt.money(ns.getPlayer().money));
+    await toast(ns, "Have funds for creating corp, will spend $150b in 60s!",
+      { level: "warning", timeout: 60 });
+    ns.corporation.createCorporation("Totally Human Inc", true);
+    await toast(ns, "Corp created!", { level: "success", timeout: 0 });
+  }
+
+  if (ns.corporation.getCorporation().funds < 250e9) {
+    await toast(ns, "Instructing hacknet to build up more corp funds...", { level: "warning", timeout: 0 });
+    await ns.writePort(ports.HACKMGR, "mode corp");
+    while (ns.corporation.getCorporation().funds < 250e9) {
+      await netLog(ns, "Still waiting... %s/%s",
+        fmt.money(ns.corporation.getCorporation().funds), fmt.money(250e9));
+      await ns.sleep(10000);
+    }
+  }
+  await toast(ns, "Corp funds at $250b, run createDiv!", { level: "success", timeout: 0 });
 }
 
 /**
@@ -130,7 +188,7 @@ async function printProducts(ns, div) {
   await out(fmt.table(data,
     ["name", ["demand", fmt.large], ["competition", fmt.large],
       ["prod$", fmt.money], "sale$", "inventory",
-      ["dev %%", (n) => fmt.pct(n, 0, true)]]
+      ["dev %%", (n) => fmt.pct(n, { fmtstring: true })]]
   ));
 }
 
@@ -150,7 +208,7 @@ async function listOffices(ns, div) {
   }
   await out(fmt.table(data,
     ["Location", "Employees",
-      ["Warehouse util", (n) => fmt.pct(n, 0, true)], ["Warehouse size", fmt.large]],
+      ["Warehouse util", (n) => fmt.pct(n, { fmtstring: true })], ["Warehouse size", fmt.large]],
   ));
 }
 
@@ -257,15 +315,17 @@ async function setSale(ns, name, mat, qty = "MAX", price = "MP", cities) {
  */
 async function createDiv(ns, type) {
   let divs = {
-    "Agriculture": { name: "Totally Food Inc", autosale:["Plants", "Food"]},
+    "Agriculture": { name: "Totally Food Inc", autosale: ["Plants", "Food"] },
     "Tobacco": { name: "Totally Safe Inc", product: "Total Lungs", autosale: [] },
     "Software": { name: "Totally Works Inc", product: "Total Vaporware", autosale: ["AI Cores"] },
     "Food": { name: "Totally Organic Inc", product: "Total Food Product", autosale: [] },
+    "RealEstate": { name: "Totally Real Inc", product: "Total Land", autosale: ["Real Estate"] },
   }
   if (!type) {
     await out("Type is required, one of: %s", Object.keys(divs));
     return;
   }
+  ui = await newUI(ns, "corp", "CorpBoot");
   let apiFunds = 0;
   if (!ns.corporation.hasUnlockUpgrade("Office API")) {
     apiFunds += 50e9;
@@ -273,17 +333,15 @@ async function createDiv(ns, type) {
   if (!ns.corporation.hasUnlockUpgrade("Warehouse API")) {
     apiFunds += 50e9;
   }
-  if (apiFunds > 0 && ns.corporation.getCorporation().funds < 150e9 + apiFunds) {
-    await out("Not enough money in the corp to start new div, need %s, got %s.",
-        fmt.money(150e9+apiFunds), fmt.money(ns.corporation.getCorporation().funds));
-    return;
-  } 
   if (apiFunds > 0) {
-    if (!await ns.prompt(`Will spend ${fmt.money(apiFunds)} on APIs. Proceed?`)) {
-      await out("Aborting.");
-      return;
+    await ui.update("%s/%s", fmt.money(ns.corporation.getCorporation().funds), fmt.money(150e9 + apiFunds));
+    await out("Waiting or %s in corp funds before proceeding...", fmt.money(150e9 + apiFunds));
+    while (ns.corporation.getCorporation().funds < 150e9 + apiFunds) {
+      ns.print(`Current funds: ${fmt.money(ns.corporation.getCorporation().funds)}...`);
+      await ns.sleep(1000);
     }
   }
+  await ui.update("-");
   ns.tail();
   type = type[0].toUpperCase() + type.substr(1);
 
@@ -292,11 +350,11 @@ async function createDiv(ns, type) {
     return;
   }
 
-  let name = divs[type].name;
-  if (!name) {
+  if (!divs[type]) {
     await out("Unknown type: %s", type);
     return;
   }
+  let name = divs[type].name;
 
   if (!ns.corporation.getCorporation().divisions.find(d => d.type == type)) {
     await log("Creating new division %s: %s", type, name);
@@ -308,7 +366,7 @@ async function createDiv(ns, type) {
     await out("Failed to create division!");
     return;
   }
-  
+
   await unlockUpgrade(ns, "Office API");
   await unlockUpgrade(ns, "Warehouse API");
 
@@ -329,6 +387,7 @@ async function createDiv(ns, type) {
   // Reserch office in Aevum, sales elsewhere
   let rName = "Aevum";
   for (let c of cities) {
+    await ui.update("Staff I");
     if (c == rName) {
       await expandOffice(ns, name, c, {
         "Operations": 6,
@@ -356,6 +415,7 @@ async function createDiv(ns, type) {
       await log("Enabling smart supply at %s", c);
       ns.corporation.setSmartSupply(name, c, true);
     }
+    await ui.update("Warehouse I");
     while (ns.corporation.getWarehouse(name, c).size < 1000) {
       await log("Expanding warehouse at %s", c);
       ns.corporation.upgradeWarehouse(name, c);
@@ -369,6 +429,7 @@ async function createDiv(ns, type) {
   // Start working on the first product
   await log("Starting work on pilot product %s", divs[type].product);
   ns.corporation.makeProduct(name, rName, divs[type].product, 1e9, 1e9);
+  await ui.remove();
 }
 
 /**
@@ -391,12 +452,14 @@ async function startAgri(ns) {
     ns.corporation.expandCity(name, c);
   }
 
+  await ui.update("Staff I");
   let staff = {
     "Engineer": 1,
     "Operations": 1,
     "Business": 1,
   }
   for (let c of cities) {
+    await ui.update(c);
     await expandOffice(ns, name, c, staff);
     if (!ns.corporation.hasWarehouse(name, c)) {
       await log("Buying warehouse in %s", c)
@@ -418,6 +481,7 @@ async function startAgri(ns) {
   }
 
   // Upgrades
+  await ui.update("Upgrades");
   for (let u of [
     "FocusWires",
     "Neural Accelerators",
@@ -429,6 +493,7 @@ async function startAgri(ns) {
   }
 
   // Buy hardware
+  await ui.update("Hardware I");
   await buyHardware(ns, name, cities, {
     "Hardware": 125,
     "AI Cores": 75,
@@ -436,22 +501,23 @@ async function startAgri(ns) {
   });
 
   // Get investment round for $210b+
-  await out("Waiting for profits of $1.4m+...");
-  while (true) {
-    let corp = ns.corporation.getCorporation();
-    if (corp.revenue - corp.expenses > 1.5e6) {
-      break;
-    }
-    await out("Current profits: %s", fmt.money(corp.revenue-corp.expenses, 2));
-    await ns.sleep(5000);
-  }
-
-  if (!await getInvestment(ns, 210e9, 1)) {
+  await ui.update("Loan $210b");
+  if (ns.corporation.getCorporation().funds < 210e9 && !await getInvestment(ns, 210e9, 1, ui)) {
     await out("Couldn't get investment for $210b");
     return;
   }
 
+  // Re-buy hardware
+  await ui.update("Hardware I (redo)");
+  await buyHardware(ns, name, cities, {
+    "Hardware": 125,
+    "AI Cores": 75,
+    "Real Estate": 27000,
+  });
+
+
   // Expand offices
+  await ui.update("Staff II");
   staff = {
     "Engineer": 2,
     "Operations": 2,
@@ -475,6 +541,7 @@ async function startAgri(ns) {
   await levelUpgrade(ns, "Smart Storage", 10);
 
   // Upgrade warehouse
+  await ui.update("Warehouse II");
   for (let c of cities) {
     while (ns.corporation.getWarehouse(name, c).size < 2000) {
       await log("Upgrading warehouse in %s", c);
@@ -491,6 +558,7 @@ async function startAgri(ns) {
   }
 
   // Buy hardware
+  await ui.update("Hardware II");
   await buyHardware(ns, name, cities, {
     "Hardware": 2800,
     "Robots": 96,
@@ -499,12 +567,13 @@ async function startAgri(ns) {
   });
 
   // Get investment of $5t
-  if (!await getInvestment(ns, 5e12, 2)) {
+  if (ns.corporation.getCorporation().funds < 5e12 && !await getInvestment(ns, 5e12, 2, ui)) {
     await out("Couldn't get investment for $5t");
     return;
   }
 
   // Upgrade warehouse
+  await ui.update("Warehouse III");
   for (let c of cities) {
     while (ns.corporation.getWarehouse(name, c).size <= 3800) {
       await log("Upgrading warehouse in %s", c);
@@ -513,6 +582,7 @@ async function startAgri(ns) {
   }
 
   // Buy hardware
+  await ui.update("Hardware III");
   await buyHardware(ns, name, cities, {
     "Hardware": 9300,
     "Robots": 726,
@@ -521,13 +591,14 @@ async function startAgri(ns) {
   });
 
   await out("Agri division done!");
+  await ui.remove();
 }
 
 /**
  * @param {NS} ns
  */
 async function investmentFraud(ns) {
-  let mp = (p, m) => `MP*${p.split("*")[1]*m}`
+  let mp = (p, m) => `MP*${p.split("*")[1] * m}`
   // record curren prices for everything
   let pre = [];
   for (let d of ns.corporation.getCorporation().divisions) {
@@ -554,11 +625,11 @@ async function investmentFraud(ns) {
       ))) {
         let k = `${w.div}/${w.city}`;
         if (!last[k] || last[k].used < w.used) {
-          last[k] = {used: w.used, ts: now, ready: false};
+          last[k] = { used: w.used, ts: now, ready: false };
         } else if (now - last[k].ts > 20000) {
           last[k].ready = true;
         }
-        data.push([w.div, w.city, last[k].used, now-last[k].ts, last[k].ready, w.used/w.size*100]);
+        data.push([w.div, w.city, last[k].used, now - last[k].ts, last[k].ready, w.used / w.size * 100]);
       }
     }
     ns.tprintf(fmt.table(data, ['div', 'city', ['used', fmt.large], ['age', fmt.time], 'ready', 'pct']))

@@ -1,34 +1,31 @@
-import * as zui from "/lib/ui.js";
+import {newUI} from "/lib/ui.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("sleep");
-    var reserve = parseMemory(ns.args[0]);
+    let reserve = parseMemory(ns.args[0]);
     ns.print("Reserving ", reserve, " GB");
-    var hostname = ns.getHostname();
-    var thread = ns.getScriptRam("/bin/share.js");
-    if (hostname == "home") {
-        zui.customOverview("sharePower", "Sharing");
-    }
+    let hostname = ns.getHostname();
+    let thread = ns.getScriptRam("/bin/share.js");
+    let ui = await newUI(ns, "share", "Sharing");
     ns.print("Each thread needs ", thread, " GB");
-    ns.atExit(function() {zui.rmCustomOverview("sharePower")});
     while(true) {
-        await ns.sleep(Math.random()*10000+1000);
-        var avail = ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname);
+        await ns.sleep(1);
+        let avail = ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname);
         avail -= reserve;
-        var n = avail/thread;
+        let n = avail/thread;
         if (n < 1) {
             continue;
         }
-        var pid = ns.run("/bin/share.js", n);
-        var sp = 1;
+        let pid = ns.run("/bin/share.js", n);
+        let sp = 1;
         while (ns.isRunning(pid, hostname)) {
-            var newSP = ns.getSharePower();
+            let newSP = ns.getSharePower();
             if (sp != newSP && hostname == "home") {
-                zui.setCustomOverview("sharePower", ns.sprintf("+%.2f%%", (ns.getSharePower()-1)*100));
+                await ui.update(`+${((ns.getSharePower()-1)*100).toFixed(2)}`);
                 sp = newSP;
             }
-            await ns.sleep(500);
+            await ns.sleep(100);
         }
     }
 }
@@ -40,7 +37,7 @@ function parseMemory(n) {
     if (!n) {
         return 0;
     }
-    var unit = n.substring(n.length-2);
+    let unit = n.substring(n.length-2);
     n = n.substring(0, n.length-2);
     switch (unit) {
         case "pb":

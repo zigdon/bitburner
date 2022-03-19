@@ -1,15 +1,20 @@
 import * as fmt from "/lib/fmt.js";
 import { netLog, toast } from "/lib/log.js";
-import { ports } from "/lib/ports.js";
-import { expandOffice } from "/lib/corp.js";
+import { materialStock, unlockUpgrade, expandOffice } from "/lib/corp.js";
+import { settings } from "/lib/state.js";
+import { newUI } from "/lib/ui.js";
 
 const researchCity = "Aevum";
 let util = {};
+let st;
+let ui;
 
 /** @param {NS} ns **/
 export async function main(ns) {
   ns.disableLog("ALL");
   ns.tail();
+  st = settings(ns, "corp");
+  ui = await newUI(ns, "corp", "Corp");
 
   if (ns.corporation.getCorporation().divisions.length == 0) {
     ns.tprintf("No divisions exist, exiting corpmon.");
@@ -19,7 +24,6 @@ export async function main(ns) {
   let lastUpgrades = 0;
   let lastTick = 0;
   let utilReset = 0;
-  await ns.writePort(ports.UI, "create corp Corp");
   while (true) {
     let now = Date.now();
     // check product development
@@ -45,6 +49,8 @@ export async function main(ns) {
       lastTick = ns.corporation.getCorporation().funds;
       // check product pricing
       await checkPrices(ns);
+      // make sure materials are handled as expected
+      await checkMats(ns);
     }
     await printSummary(ns, progress);
     // check commands
@@ -94,9 +100,9 @@ async function checkUpgrades(ns) {
 
   cur.sort((a, b) => a.cost - b.cost);
   let next = cur[0];
-  if (cur.length > 0 && next.cost < ns.corporation.getCorporation().funds / cur.lvl < 20 ? 5 : 100) {
-    await netLog(ns, "Upgrading %s to level %d for %s",
-      next.name, next.lvl + 1, fmt.money(next.cost));
+  if (cur.length > 0 && next.cost < ns.corporation.getCorporation().funds / (cur.lvl < 20 ? 5 : 100)) {
+    await netLog(ns, "Upgrading %s to level %d for %s (corp funds: %s)",
+      next.name, next.lvl + 1, fmt.money(next.cost), fmt.money(ns.corporation.getCorporation().funds));
     ns.corporation.levelUpgrade(next.name);
   }
 
@@ -106,6 +112,10 @@ async function checkUpgrades(ns) {
   }
 
   for (let div of ns.corporation.getCorporation().divisions) {
+    if (div.cities.length < 6) {
+      await netLog(ns, "Skipping %s, not fully expanded", div.name);
+      continue;
+    }
     for (let c of div.cities) {
       if (util[div.name][c] > 0.8 && ns.corporation.getUpgradeWarehouseCost(div.name, c) < (div.lastCycleRevenue - div.lastCycleExpenses) * 60) {
         await toast(ns, "Upgrading warehouse for %s in %s", div.name, c);
@@ -170,6 +180,13 @@ async function checkUpgrades(ns) {
       await netLog(ns, "Hiring AdVert for %s", div.name);
       ns.corporation.hireAdVert(div.name);
     }
+
+    if (ns.corporation.getCorporation().funds > fmt.parseNum('500t')) {
+      await unlockUpgrade(ns, "Shady Accounting");
+    }
+    if (ns.corporation.getCorporation().funds > fmt.parseNum('2q')) {
+      await unlockUpgrade(ns, "Government Partnership");
+    }
   }
 }
 
@@ -194,14 +211,41 @@ async function printSummary(ns, progress) {
       div.type,
       div.lastCycleRevenue - div.lastCycleExpenses,
       div.prodMult,
-      progress[div.name] ? fmt.pct(progress[div.name]) : "N/A",
+      Object.keys(progress).includes(div.name) ? fmt.pct(progress[div.name]) : "N/A",
     ])
   }
   ns.print(fmt.table(data, [
     "division name", "type", ["profits", fmt.money],
     ["production", fmt.large], "Product Dev",
   ]))
-  await ns.writePort(ports.UI, `update corp ${fmt.money(corp.revenue - corp.expenses)}/s`);
+  await ui.update(`${fmt.money(corp.revenue - corp.expenses, {digits: 2})}/s`);
+}
+
+/** @param {NS} ns **/
+async function checkMats(ns) {
+  for (let div of ns.corporation.getCorporation().divisions) {
+    if (!materialStock[div.type]) { continue }
+    for (let city of div.cities) {
+      for (let [m, data] of Object.entries(materialStock[div.type])) {
+        if (data.goal && ns.corporation.getMaterial(div.name, city, m).qty != data.goal) {
+          let delta = ns.corporation.getMaterial(div.name, city, m).qty - data.goal;
+          if (delta > 0) {
+            ns.corporation.buyMaterial(div.name, city, m, "0", "MP");
+            ns.corporation.sellMaterial(div.name, city, m, delta/10, "MP*0.1");
+          } else {
+            ns.corporation.buyMaterial(div.name, city, m, -delta/10, "MP*10");
+            ns.corporation.sellMaterial(div.name, city, m, "0", "MP");
+          }
+        } else if (data.autosale) {
+          ns.corporation.buyMaterial(div.name, city, m, "0", "MP");
+          ns.corporation.sellMaterial(div.name, city, m, "MAX", "MP");
+        } else {
+          ns.corporation.buyMaterial(div.name, city, m, "0", "MP");
+          ns.corporation.sellMaterial(div.name, city, m, "0", "MP");
+        }
+      }
+    }
+  }
 }
 
 /** @param {NS} ns **/
@@ -219,9 +263,9 @@ async function checkPrices(ns) {
       }
       // If we have a good AI, we're all good
       if (ns.corporation.hasResearched(div.name, "Market-TA.II")) {
-        ns.corporation.setProductMarketTA1(div.name, name, false);
-        ns.corporation.setProductMarketTA2(div.name, name, false);
-        // continue;
+        ns.corporation.setProductMarketTA1(div.name, name, st.get("useMarketTA"));
+        ns.corporation.setProductMarketTA2(div.name, name, st.get("useMarketTA"));
+        if (st.get("useMarketTA")) {continue;}
       }
       if (p.sCost == 0) {
         // Set a default
@@ -244,7 +288,7 @@ async function checkPrices(ns) {
         await netLog(ns, "Increasing price of %s to MP*%.2f", name, m);
         changed = true;
       }
-      if (m == 0) {
+      if (m == 0 || isNaN(m)) {
         m = 10;
         changed = true;
       }
@@ -273,6 +317,12 @@ async function devProducts(ns) {
       name: "Totally Organic Inc",
       products: ["Total Food Product", "Total Drink Product", "Total Nutrition"],
       gens: ["", "II", "Delux", "Organic", "Zero", "Free", "Diet"],
+    },
+    "RealEstate": {
+      name: "Totally Real Inc",
+      products: ["Total Land", "Total Bridge", "Total Lakefront", "Total Beach", "Total Estate"],
+      gens: ["", "Private", "Exclusive", "Club"],
+
     },
   }
   let progress = {};

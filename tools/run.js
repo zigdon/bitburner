@@ -1,10 +1,10 @@
 /** @param {NS} ns **/
 export async function main(ns) {
-    var path = ["", "/tools", "/daemons"];
-    var file = ns.args[0];
-    var all = ns.ls("home", file).filter(f => f.endsWith(".js"));
-    var opts = [];
-    var full = "";
+    let path = ["", "/tools", "/daemons"];
+    let file = ns.args[0];
+    let all = ns.ls("home", file).filter(f => f.endsWith(".js"));
+    let opts = [];
+    let full = "";
     while (path.length > 0) {
         if (path[0] == "") {
             opts.push(...all.filter((f) => { return !f.includes("/") }))
@@ -33,7 +33,7 @@ export async function main(ns) {
  * @param {String} path
  */
 async function run(ns, path) {
-    var pid;
+    let pid;
     if (ns.args.length > 1) {
         pid = ns.run(path, 1, ...ns.args.splice(1));
     } else {
