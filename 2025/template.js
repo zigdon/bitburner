@@ -1,0 +1,4 @@
+export async function main(ns) {
+  ns.tprint("Hello World!");
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInRlbXBsYXRlLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IE5TIH0gZnJvbSAnQG5zJztcblxuZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIG1haW4obnM6IE5TKSB7XG4gIG5zLnRwcmludCgnSGVsbG8gV29ybGQhJyk7XG59XG4iXSwibWFwcGluZ3MiOiJBQUVBLHNCQUFzQixLQUFLLElBQVE7QUFDakMsS0FBRyxPQUFPLGNBQWM7QUFDMUI7IiwibmFtZXMiOltdfQ==

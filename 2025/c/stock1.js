@@ -1,0 +1,184 @@
+import {err} from "../contracts.js"
+/** @param {NS} ns */
+export async function main(ns) {
+  /*
+    Algorithmic Stock Trader I
+    You are given the following array of stock prices (which are numbers) where
+    the i-th element represents the stock price on day i:
+
+    11,163,173,25,98,117,25,82,114,176,23,104,18,4,27,151,129,124,111,120,112
+
+    Determine the maximum possible profit you can earn using at most one transaction
+    (i.e. you can only buy and sell the stock once). If no profit can be made then
+    the answer should be 0. Note that you have to buy the stock before you can sell it.
+
+    Algorithmic Stock Trader III
+    
+    Determine the maximum possible profit you can earn using at most two transactions.
+    A transaction is defined as buying and then selling one share of the stock.
+    Note that you cannot engage in multiple transactions at once. In other words,
+    you must sell the stock before you buy it again.
+    
+    If no profit can be made, then the answer should be 0.
+
+    Algorithmic Stock Trader IV
+    You are given the following array with two elements:
+
+    [7, [63,95,185,82,92,52,195,2,163,99,168,8,103,100,78,9,88,33]]
+
+    The first element is an integer k. The second element is an array of stock
+    prices (which are numbers) where the i-th element represents the stock price
+    on day i.
+
+    Determine the maximum possible profit you can earn using at most k transactions.
+    A transaction is defined as buying and then selling one share of the stock. Note
+    that you cannot engage in multiple transactions at once. In other words, you
+    must sell the stock before you can buy it again.
+  */
+
+  var host = ns.args[0]
+  var file = ns.args[1]
+
+  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
+  var type = [
+    "Algorithmic Stock Trader I",   // 0
+    "Algorithmic Stock Trader II",  // 1
+    "Algorithmic Stock Trader III", // 2
+    "Algorithmic Stock Trader IV"   // 3
+  ].indexOf(c.type)
+  type >= 0 || err(ns, "Wrong contract type: %s", c.type)
+  var data = c.data
+  var trades = 0
+  switch (type) {
+    case 0:
+      trades = 1
+      break
+    case 1:
+      trades = data.length
+      break
+    case 2:
+      trades = 2
+      break
+    case 3:
+      trades = c.data[0]
+      data = c.data[1]
+      break
+    default:
+      ns.tprintf("Not implemented %d: %s", type, c.type)
+      return
+  }
+  ns.tprintf("%s x %j", trades, data)
+  var res = await solve2(ns, data, trades)
+  ns.tprint(res)
+  ns.tprint(c.submit(res))
+}
+
+/**
+ * @param {NS} ns
+ * @param {Number[]} data
+ * @param Number trades
+ * @return Number
+ */
+async function solve(ns, data, trades) {
+  await ns.asleep(10)
+  if (data.length < 2) {
+    return 0
+  }
+
+  if (trades == 1) {
+    return Math.max(...data.map(
+      (p, i) => i == data.length ? 0 : Math.max(...data.slice(i+1)) -p
+    ))
+  }
+
+  // ns.tprintf("%s x %j", trades, data)
+
+  var res = 0
+  for (var i=0; i<data.length; i++) {
+    var it = await solve(ns, data.slice(0, i), 1) + await solve(ns, data.slice(i), trades-1)
+    if (it > res) {
+      res = it
+    }
+  }
+
+  return res
+
+  /*
+   return Math.max(
+    ...data.map(async (_,i) => await solve(ns, data.slice(0, i), 1) + await solve(ns, data.slice(i), trades-1))
+   )
+  */
+}
+
+var ex = []
+/**
+ * @param {NS} ns
+ * @param {Number[]} data
+ * @param Number trades
+ * @return Number
+ */
+async function solve2(ns, data, trades) {
+  if (data.length < 2) {
+    return 0
+  }
+
+  // Identify all the local minimum, potential buy points
+  // Identify all the local max, potential sell points
+  // Pick the best deltas
+  var min = []
+  var max = []
+  var dir = data[1]-data[0]
+  if (dir > 0) {
+    min.push(data[0])
+  }
+  for (var i=1; i<data.length; i++) {
+    var change = data[i]-data[i-1]
+    if ((change<=0) == (dir<=0)) {
+      // Continuing trend
+      continue
+    }
+    dir = change
+    if (change > 0) {
+      // Local min
+      min.push(data[i-1])
+    } else {
+      // Local max
+      max.push(data[i-1])
+    }
+  }
+
+  // Last dataset - if we were trending up, it's a new max
+  if (dir > 0) {
+    // ns.tprintf("Final max: %d", data[data.length-1])
+    max.push(data[data.length-1])
+  }
+
+  return await selectTrades(ns, min, max, trades)
+}
+
+async function selectTrades(ns, min, max, trades) {
+  if (trades == 0 || min.length == 0 || max.length == 0) {
+    return 0
+  }
+  // ns.tprintf("min = %j", min)
+  // ns.tprintf("max = %j", max)
+  var res = 0
+  var buy, sell
+  for (var i=0; i<min.length; i++) {
+    for (var j=i; j<max.length; j++) {
+      var consider = max[j]-min[i]
+      var following = await selectTrades(ns, min.slice(j+1), max.slice(j+1), trades-1)
+      if (consider + following > res) {
+        buy = min[i]
+        sell = max[j]
+        res = consider + following
+        ex[trades-1] = ns.sprintf("%s->%s", buy, sell)
+      }
+    }
+  }
+
+  // ns.tprint(ex)
+  await ns.asleep(10)
+
+  return res
+}
