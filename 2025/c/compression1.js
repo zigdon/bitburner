@@ -23,7 +23,7 @@
   not use "", '', or ``.
 */
 
-import {err, flags} from "/contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var f = flags(ns)

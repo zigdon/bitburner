@@ -1,4 +1,4 @@
-import {err} from "/contracts.js"
+import {err} from "../contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   /*

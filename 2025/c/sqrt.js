@@ -1,4 +1,4 @@
-import {err} from "../contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   /*
@@ -16,20 +16,30 @@ export async function main(ns) {
   212944707162126806509262934660767282548802561525114580961832928758519796585180714802067298159526596192030677964074770173480215855362026691922772166021685250577908498248495244867239132531893326579190931
   */
 
-  var host = ns.args[0]
-  var file = ns.args[1]
+  var f = flags(ns)
+  var host = f._[0]
+  var file = f._[1]
 
   var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
+  if (f["toast"]) {
+    ns.toast("sqrt disabled")
+    return
+  }
   c.type == "Square Root" || err(ns, "Wrong contract type: %s", c.type)
   // ns.tprint(c.description)
   var data = c.data
-  ns.tprint(data)
   var res = solve(ns, data)
   if (!res) {
     ns.tprintf("Failed to solve %s@%s", file, host)
+    return
   }
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
+  if (f["toast"]) {
+    ns.toast(c.submit(res))
+  } else {
+    ns.tprint(data)
+    ns.tprint(res)
+    ns.tprint(c.submit(res))
+  }
 }
 
 /**
@@ -44,18 +54,31 @@ function solve(ns, data) {
   var sq = sqrt
   while (max-min > 1n) {
     var range = max-min
+    ns.print("wnt: ", data)
+    ns.print("min: ", min)
+    ns.print("max: ", max)
+    ns.print("range: ", range)
     if (sq < data) {
+      ns.print("too low: ", sqrt)
+      ns.print("delta = ", data-sq)
       min = sqrt
       sqrt = sqrt + (range/2n || 1n)
     } else {
+      ns.print("too high: ", sqrt)
+      ns.print("delta = ", sq-data)
       max = sqrt
       sqrt = sqrt - (range/2n || 1n)
     }
     sq = sqrt ** 2n
   }
 
-  if (min ** 2n - data > max ** 2n - data) {
-    return max
+  for (var n=min; n<=max; n+=1n) {
+    var delta = n ** 2n - data
+    ns.printf("===\n%s ** 2 =\n%s\n", n, n**2n, data)
+    ns.print(delta)
+    if (delta == 0) {
+      return n
+    }
   }
-  return min
+  return 0
 }

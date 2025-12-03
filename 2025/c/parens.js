@@ -19,11 +19,13 @@
     ")(" -> [""]
 */
 
-import {err} from "/contracts.js"
+import {err, flags} from "../contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var host = ns.args[0]
-  var file = ns.args[1]
+  ns.disableLog("asleep")
+  var f = flags(ns)
+  var host = f._[0]
+  var file = f._[1]
 
   var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
   var type = [
@@ -38,6 +40,7 @@ export async function main(ns) {
   // var data = "()())()" 
   // var data = "(a)())()" 
   ns.tprint(data)
+  var res = await solve(ns, data)
   var msg = c.submit(res)
   if (f["toast"]) {
     ns.print(res)
@@ -53,9 +56,9 @@ export async function main(ns) {
  * @param {NS} ns
  * @param {String} data
  */
-function solve(ns, data) {
+async function solve(ns, data) {
   var res = []
-  // ns.tprint(data)
+  ns.print(data)
   // If we don't have both ( and ), remove all of them
   if (data.indexOf("(") == -1 || data.indexOf(")") == -1) {
     // ns.tprintf("No parens in %s", data)
@@ -63,11 +66,13 @@ function solve(ns, data) {
   }
   // Trim the ends that are always invalid
   while (data.indexOf(")") < data.indexOf("(")) {
-    // ns.tprintf("Trimming ')' from %s", data)
-    data = data.replace("\\)", "")
+    ns.printf("Trimming ')' from %s", data)
+    await ns.asleep(10)
+    data = data.replace(")", "")
   }
   while (data.lastIndexOf("(") > data.lastIndexOf(")")) {
-    // ns.tprintf("Trimming '(' from %s", data)
+    ns.printf("Trimming '(' from %s", data)
+    await ns.asleep(10)
     data = data.substring(0, data.lastIndexOf("(")) + data.substring(1+data.lastIndexOf("("))
   }
 
@@ -82,6 +87,7 @@ function solve(ns, data) {
 
   // ns.tprintf("Removing %s from %s", extra, data)
   for (var m of data.matchAll(extra)) {
+    await ns.asleep(10)
     var removed = data.substr(0, m.index) + data.substr(m.index+1)
     var valid = checkValid(ns, removed)
     // Are we good?
@@ -95,7 +101,7 @@ function solve(ns, data) {
       continue
     }
     // ns.tprintf("Removing %s from %s -> %s", extra, data, removed)
-    res.push(...solve(ns, removed))
+    res.push(...await solve(ns, removed))
   }
 
   // Only keep valid, longest ones

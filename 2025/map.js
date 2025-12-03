@@ -1,5 +1,5 @@
-import { colors } from "/colors.js"
-import { table } from "/table.js"
+import { colors } from "./colors.js"
+import { table } from "./table.js"
 
 var playerHack = 0
 var tools = 0

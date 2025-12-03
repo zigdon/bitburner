@@ -33,7 +33,7 @@
     Hamming Codes. (https://youtube.com/watch?v=X8jsijhllIA)
  * */
 
-import {err, flags} from "../contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var fs = flags(ns)

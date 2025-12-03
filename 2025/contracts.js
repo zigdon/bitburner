@@ -6,6 +6,7 @@ export var types = new Map([
     ["Algorithmic Stock Trader IV", "/c/stock1.js"],
     ["Array Jumping Game II", "/c/jump.js"],
     ["Array Jumping Game", "/c/jump.js"],
+    ["Compression I: RLE Compression", "/c/compression1.js"],
     ["Encryption I: Caesar Cipher", "/c/enc1.js"],
     ["Encryption II: Vigenère Cipher", "/c/enc2.js"],
     ["Find All Valid Math Expressions", "/c/math.js"],
@@ -71,7 +72,15 @@ export async function main(ns) {
   err(ns, "%s", c.description)
 }
 
+/**
+ * @param {AutocompleteData} data - context about the game, useful when autocompleting
+ * @param {string[]} args - current arguments, not including "run script.js"
+ * @returns {string[]} - the array of possible autocomplete options
+ */
 export function autocomplete(data, args) {
+  if (args[0] != undefined) {
+    return [ ...data.servers.filter((h) => h.includes(args[0])) ]
+  }
   return [...data.servers];
 }
 

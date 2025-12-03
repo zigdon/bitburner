@@ -1,5 +1,5 @@
-import {dns} from "/hosts.js"
-import {ssh} from "/ssh.js"
+import {dns} from "./hosts.js"
+import {ssh} from "./ssh.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var target = ns.args[0]

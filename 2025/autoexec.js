@@ -1,5 +1,5 @@
-import { dns } from "/hosts.js"
-import { types } from "/contracts.js"
+import { dns } from "./hosts.js"
+import { types } from "./contracts.js"
 
 var cashBuffer = 10e6
 var minPserv = 256

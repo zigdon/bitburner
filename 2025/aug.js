@@ -1,5 +1,5 @@
-import { colors } from "/colors.js"
-import { table } from "/table.js"
+import { colors } from "./colors.js"
+import { table } from "./table.js"
 
 var factions = [
   "CyberSec",
