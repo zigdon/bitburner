@@ -1,5 +1,5 @@
-import { colors } from "./colors.js"
-import { table } from "./table.js"
+import { colors } from "@/colors.js"
+import { table } from "@/table.js"
 
 var playerHack = 0
 var tools = 0
@@ -98,12 +98,20 @@ export async function main(ns) {
       var hostsWithContracts = hosts.filter(
         (h) => h.files.filter(
           (f) => f.endsWith(".cct")).length > 0)
-      var contractList = hostsWithContracts.map(
-        (h) => Array.from(h.files.filter((f) => f.endsWith(".cct")).map((c) => [h.name, c])).flat())
-      var cs = Map.groupBy(contractList, (c) => ns.codingcontract.getContractType(c[1], c[0]))
+      var contracts = []
+       hostsWithContracts.forEach(
+        (h) => h.files.filter(
+          (f) => f.endsWith(".cct")
+        ).map(
+          (c) => [h.name, c]
+        ).forEach(
+          (c) => contracts.push(c)
+        )
+      )
+      var cs = Map.groupBy(contracts, (c) => ns.codingcontract.getContractType(c[1], c[0]))
       if (cs.size) {
-        ns.tprint("Contracts:")
-        ns.tprint(
+        ns.tprintf("Contracts:")
+        ns.tprintf(
           table(ns,
             ["Type", "Host"],
             Array.from(cs.keys()).toSorted().map((k) => [k, cs.get(k).map((c) => c[0]).join(", ")])))

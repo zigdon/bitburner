@@ -52,6 +52,7 @@ export async function main(ns) {
   } else {
     res = res > -1 ? res : 0
   }
+  var msg = c.submit(res)
   if (fs["toast"]) {
     ns.print(res)
     ns.print(msg)

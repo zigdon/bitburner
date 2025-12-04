@@ -1,5 +1,5 @@
-import { dns } from "./hosts.js"
-import { types } from "./contracts.js"
+import { dns } from "@/hosts.js"
+import { types } from "@/contracts.js"
 
 var cashBuffer = 10e6
 var minPserv = 256
@@ -19,6 +19,8 @@ export async function main(ns) {
     pserv(ns)
     // Find contracts
     findContracts(ns)
+    // Buy upgrades
+    ns.run("g/upgrade.js", 1)
     // Buy programs
     ns.run("g/program.js", 1)
     // Update hosts file

@@ -1,4 +1,4 @@
-import {colors, stripColors} from "./colors.js"
+import {colors, stripColors} from "@/colors.js"
 /** 
  * @param {NS} ns
  * @param {[]} headers

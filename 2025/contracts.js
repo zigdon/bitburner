@@ -86,6 +86,9 @@ export async function main(ns) {
       }
     } else {
       ns.print("Skipping blocked contract: "+ c.type)
+      if (!fs["toast"]) {
+        ns.toast("Skipping blocked contract: "+ c.type, "warning")
+      }
     }
     return
   }
@@ -151,7 +154,11 @@ export function block(ns, type) {
 }
 
 export function unblock(ns, type) {
-  var data = state(ns).filter((t) => t != type)
+  var data = state(ns)
+  var updated = data.filter((t) => t != type)
+  if (data.length != updated.length) {
+    ns.toast("Unblocking %s", type)
+  }
   save(ns, data)
 }
 

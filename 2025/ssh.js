@@ -1,11 +1,26 @@
-import { dns } from "./hosts.js"
+import { dns } from "@/hosts.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
+  var flags = ns.flags([
+    ["ls", false],
+  ])
   var hosts = dns(ns)
-  var n = ns.args[0]
+  var n = flags._[0]
   if (!hosts.has(n)) {
     ns.tprint("Unknown host %s")
+    return
+  }
+  if (flags["ls"]) {
+    var scripts = []
+    for (var f of ns.ls(n)) {
+      if (f.endsWith(".cct")) {
+        ns.tprintf("%s (%s)", f, ns.codingcontract.getContractType(f, n))
+      } else {
+        scripts.push(f)
+      }
+    }
+    ns.tprintf("Scripts: %s", scripts.toSorted().join(", "))
     return
   }
   var host = hosts.get(n)
@@ -14,6 +29,7 @@ export async function main(ns) {
   } else {
     ssh(ns, hosts, n)
   }
+
 }
 
 export function autocomplete(data, args) {

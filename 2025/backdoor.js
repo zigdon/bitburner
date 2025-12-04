@@ -1,10 +1,14 @@
-import {dns} from "./hosts.js"
-import {ssh} from "./ssh.js"
+import {dns} from "@/hosts.js"
+import {ssh} from "@/ssh.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var target = ns.args[0]
   var hosts = dns(ns)
   var host = hosts.get(target)
+  if (ns.ps().filter((p) => p.filename == ns.getScriptName() && p.args[0] == target)) {
+    ns.printf("%s already being backdoored", target)
+    return
+  }
   if (host.backdoor) {
     ns.printf("%s already backdoored", target)
     return
