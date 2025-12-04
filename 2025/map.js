@@ -114,7 +114,7 @@ export async function main(ns) {
     }
     ns.printf("hacked: %v", hacked)
 
-    ns.write("hosts.json", JSON.stringify(Array.from(seen.values())), "w")
+    ns.write("/data/hosts.json", JSON.stringify(Array.from(seen.values())), "w")
 
     if (wait == undefined) {
       return

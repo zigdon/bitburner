@@ -10,6 +10,7 @@ export async function main(ns) {
     return
   }
 
+  ns.singularity.connect("home")
   if (ssh(ns, hosts, target)) {
     await ns.singularity.installBackdoor()
   } else {

@@ -10,7 +10,7 @@
     How many different distinct ways can the number 80 be written as a sum of
     at least two positive integers?
 */
-import {err, flags} from "/contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   return

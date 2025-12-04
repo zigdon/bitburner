@@ -1,5 +1,5 @@
-import { colors } from "/colors.js"
-import { table } from "/table.js"
+import { colors } from "@/colors.js"
+import { table } from "@/table.js"
 
 var playerHack = 0
 var tools = 0
@@ -97,7 +97,7 @@ export async function main(ns) {
     }
     ns.printf("hacked: %v", hacked)
 
-    ns.write("hosts.json", JSON.stringify(Array.from(seen.values())), "w")
+    ns.write("/data/hosts.json", JSON.stringify(Array.from(seen.values())), "w")
 
     if (wait == undefined) {
       return

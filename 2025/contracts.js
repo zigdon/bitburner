@@ -1,4 +1,5 @@
-import { dns } from "./hosts.js"
+import { dns } from "@/hosts.js"
+import { table } from "@/table.js"
 export var types = new Map([
     ["Algorithmic Stock Trader I", "/c/stock1.js"],
     ["Algorithmic Stock Trader II", "/c/stock1.js"],
@@ -17,9 +18,10 @@ export var types = new Map([
     ["Minimum Path Sum in a Triangle", "/c/triangle.js"],
     ["Proper 2-Coloring of a Graph", "/c/graph.js"],
     ["Sanitize Parentheses in Expression", "/c/parens.js"],
+    ["Spiralize Matrix", "/c/spiral.js"],
     ["Square Root", "/c/sqrt.js"],
     ["Subarray with Maximum Sum", "/c/sumarray.js"], 
-    // ["Total Ways to Sum", "/c/sum.js"],
+    ["Total Ways to Sum", "/c/sum.js"],
     ["Unique Paths in a Grid I", "/c/grid2.js"],
     ["Unique Paths in a Grid II", "/c/grid2.js"],
   ])
@@ -31,11 +33,19 @@ export async function main(ns) {
   var file = fs._[1]
   if (host == undefined) {
     var hosts = Array.from(dns(ns).values()).
-      filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0).
-      map((h) => h.name)
+      filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0)
     if (hosts.length > 0) {
       ns.tprint("Hosts with contracts:")
-      hosts.forEach((h) => ns.tprintf("  %s", h))
+      var data = []
+      hosts.map(
+        (h) => h.files.filter(
+          (f) => f.endsWith(".cct")
+        ).forEach(
+          (f) => data.push([h.name, f, ns.codingcontract.getContractType(f, h.name)])
+        ))
+      // ns.tprint(data)
+      // data.forEach((l) => ns.tprint(l))
+      ns.tprint(table(ns, ["Host", "Filename", "Type"], data))
     } else {
       ns.tprint("No hosts with contracts")
     }
@@ -63,8 +73,20 @@ export async function main(ns) {
       host = "home"
       log(ns, "Created test contract: %s", file)
     }
-    ns.run(types.get(c.type), 1, host, file, fs["toast"] ? "--toast" : "") ||
-      err(ns, "Can't start %s", types.get(c.type))
+    if (fs["debug"]) {
+      ns.run(types.get(c.type), 1, host, file, "--tail")
+      return
+    }
+    if (host == "home" || fs["force"] || !blocked(ns, c.type)) {
+      if (ns.run(types.get(c.type), 1, host, file, (fs["toast"] ? "--toast" : ""), (fs["debug"] ? "--tail" : ""))) {
+        unblock(ns, c.type)
+      } else {
+        err(ns, "Can't start %s", types.get(c.type))
+        block(ns, c.type)
+      }
+    } else {
+      ns.print("Skipping blocked contract: "+ c.type)
+    }
     return
   }
 
@@ -99,7 +121,7 @@ export function err(ns, tmpl, ...args) {
  * @param {any} ...args
  */
 export function log(ns, tmpl, ...args) {
-  ns.tprintf(tmpl, ns.getScriptName(), ...args)
+  ns.tprintf(tmpl, ...args)
 }
 
 /**
@@ -110,5 +132,36 @@ export function flags(ns) {
   return ns.flags([
     ["test", false],
     ["toast", false],
+    ["force", false],
+    ["debug", false],
   ])
+}
+
+export function blocked(ns, type) {
+  var data = state(ns)
+  return data.includes(type)
+}
+
+export function block(ns, type) {
+  var data = state(ns)
+  if (!data.includes(type)) {
+    data.push(type)
+    save(ns, data)
+  }
+}
+
+export function unblock(ns, type) {
+  var data = state(ns).filter((t) => t != type)
+  save(ns, data)
+}
+
+function state(ns) {
+  if (ns.fileExists("/data/contracts.json")) {
+    return JSON.parse(ns.read("/data/contracts.json"))
+  }
+  return []
+}
+
+function save(ns, data) {
+  ns.write("/data/contracts.json", JSON.stringify(data), "w")
 }

@@ -30,7 +30,7 @@ export async function main(ns) {
  * */
 export function dns(ns) {
   var _hosts = new Map()
-  var data = Array.from(JSON.parse(ns.read("hosts.json")))
+  var data = Array.from(JSON.parse(ns.read("/data/hosts.json")))
   for (var k of data) {
     _hosts.set(k.name, k)
   }

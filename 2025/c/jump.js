@@ -26,11 +26,12 @@
 
 */
 
-import {err} from "/contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var host = ns.args[0]
-  var file = ns.args[1]
+  var fs = flags(ns)
+  var host = fs._[0]
+  var file = fs._[1]
 
   var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
   var type = [
@@ -43,13 +44,22 @@ export async function main(ns) {
   }
   // ns.tprint(c.description)
   var data = c.data
-  ns.tprint(data)
+  ns.print(data)
   var res = solve(ns, data, 0)
-  ns.tprint(res)
+  ns.print(res)
   if (type == 0) {
-    ns.tprint(c.submit(res > -1 ? 1 : 0))
+    res = res > -1 ? 1 : 0
   } else {
-    ns.tprint(c.submit(res > -1 ? res : 0))
+    res = res > -1 ? res : 0
+  }
+  if (fs["toast"]) {
+    ns.print(res)
+    ns.print(msg)
+    ns.toast(msg)
+  } else {
+    ns.tprint(data)
+    ns.tprint(res)
+    ns.tprint(msg)
   }
 }
 

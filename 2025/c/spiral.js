@@ -61,20 +61,22 @@ export async function main(ns) {
   } else {
     ns.tprint(data)
     ns.tprint(res)
-    // ns.tprint(c.submit(res))
+    ns.tprint(c.submit(res))
   }
 }
 
 function solve(ns, data) {
   var tl = {x:0, y:0}
   var br = {x:data[0].length-1, y:data.length-1}
-  var dir = {n: "r", h:1, v:0}
+  var dir = {n: "r", x:1, y:0}
   var pos = {x:0, y:0}
   var res = []
   var failsafe = data[0].length * data.length
-  data.forEach((l) => ns.tprint(l))
-  ns.tprintf("tl:%j br:%j dir:%j pos:%j", tl, br, dir, pos)
+  // data.forEach((l) => ns.tprint(l))
+  // ns.tprintf("tl:%j br:%j dir:%j pos:%j", tl, br, dir, pos)
   while (failsafe-- > 0) {
+    // ns.tprint(pos)
+    // ns.tprint(dir)
     res.push(data[pos.y][pos.x])
     var next = {x:pos.x+dir.x, y:pos.y+dir.y}
     if (next.x > br.x || next.y > br.y || next.x < tl.x || next.y < tl.y) {
@@ -101,6 +103,7 @@ function solve(ns, data) {
       }
       next = {x:pos.x+dir.x, y:pos.y+dir.y}
     }
+    // ns.tprintf("moved %s from %j to %j", dir.n, pos, next)
     pos = next
   }
 }

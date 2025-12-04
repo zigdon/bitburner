@@ -24,7 +24,7 @@ export async function main(ns) {
     // Update hosts file
     ns.run("map.js", 1, "--silent")
     ns.printf("Loop done: %s", Date())
-    await ns.asleep(10000)
+    await ns.asleep(60000)
   }
 
 }

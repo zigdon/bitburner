@@ -6,7 +6,7 @@
     7,9,-10,-8,-6,8,8,7,-4,-5,-6,-1,-9,3,10,0,5,-2,-9,-4,-9,-5,-2,2,8,0,2,-4,0,7,1,-2,-7,3,-8,-10,-5,-9,9
 */
 
-import {err, flags} from "/contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var f = flags(ns)

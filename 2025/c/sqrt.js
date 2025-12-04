@@ -21,10 +21,6 @@ export async function main(ns) {
   var file = f._[1]
 
   var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  if (f["toast"]) {
-    ns.toast("sqrt disabled")
-    return
-  }
   c.type == "Square Root" || err(ns, "Wrong contract type: %s", c.type)
   // ns.tprint(c.description)
   var data = c.data
@@ -34,11 +30,12 @@ export async function main(ns) {
     return
   }
   if (f["toast"]) {
-    ns.toast(c.submit(res))
+    ns.toast(c.submit(res[0]))
+    ns.toast(c.submit(res[1]))
   } else {
     ns.tprint(data)
-    ns.tprint(res)
-    ns.tprint(c.submit(res))
+    ns.tprint(c.submit(res[0]))
+    ns.tprint(c.submit(res[1]))
   }
 }
 
@@ -54,31 +51,37 @@ function solve(ns, data) {
   var sq = sqrt
   while (max-min > 1n) {
     var range = max-min
-    ns.print("wnt: ", data)
+    // ns.print("wnt: ", data)
     ns.print("min: ", min)
     ns.print("max: ", max)
     ns.print("range: ", range)
     if (sq < data) {
       ns.print("too low: ", sqrt)
-      ns.print("delta = ", data-sq)
+      // ns.print("delta = ", data-sq)
       min = sqrt
       sqrt = sqrt + (range/2n || 1n)
     } else {
       ns.print("too high: ", sqrt)
-      ns.print("delta = ", sq-data)
+      // ns.print("delta = ", sq-data)
       max = sqrt
       sqrt = sqrt - (range/2n || 1n)
     }
     sq = sqrt ** 2n
   }
 
+  return [min, max]
+
+  /*
   for (var n=min; n<=max; n+=1n) {
     var delta = n ** 2n - data
+    var eq = n ** 2n == data
     ns.printf("===\n%s ** 2 =\n%s\n", n, n**2n, data)
     ns.print(delta)
+    ns.print(eq)
     if (delta == 0) {
       return n
     }
   }
+  */
   return 0
 }
