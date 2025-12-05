@@ -34,11 +34,12 @@
         aaaaaaaaaaaaaa  ->  1a91041
 */
 
-import {err} from "/contracts.js"
+import {err, flags} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var host = ns.args[0]
-  var file = ns.args[1]
+  var fs = flags(ns)
+  var host = fs._[0]
+  var file = fs._[1]
 
   var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
   var type = [
@@ -46,11 +47,41 @@ export async function main(ns) {
   type >= 0 || err(ns, "Wrong contract type: %s", c.type)
   var data = c.data
   var res = solve(ns, data)
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
+  var msg = c.submit(res)
+  if (fs["toast"]) {
+    ns.print(res)
+    ns.print(msg)
+    ns.toast(msg)
+  } else {
+    ns.tprint(data)
+    ns.tprint(res)
+    ns.tprint(msg)
+  }
 }
 
 function solve(ns, data) {
   var res = ""
+  var block = ""
+
+  // read char by char.
+  // check match of at least 2 in the previous 9 chars
+  // If there isn't a match for 9, just dump out the block
+  // If there is, dump out the prefix
+  //
+  // abracadabra     ->  7abracad47
+  for (var c of data) {
+    if (res.length < 1) {
+      res += c
+      continue
+    }
+    if (block.length < 1) {
+      block += c
+      continue
+    }
+    if (res.indexOf(block, Math.max(0, res.length-9)) > -1) {
+      // as long as the next character still matches, and the total block 
+      // is less than 9 chars, keep adding them in.
+    }
+  }
 
 }

@@ -5,7 +5,10 @@ export async function main(ns) {
   var target = ns.args[0]
   var hosts = dns(ns)
   var host = hosts.get(target)
-  if (ns.ps().filter((p) => p.filename == ns.getScriptName() && p.args[0] == target)) {
+  if (ns.ps("home").filter(
+    (p) => p.pid != ns.pid &&
+           p.filename == ns.getScriptName() &&
+           p.args[0] == target).length > 0) {
     ns.printf("%s already being backdoored", target)
     return
   }
@@ -14,9 +17,9 @@ export async function main(ns) {
     return
   }
 
-  ns.singularity.connect("home")
   if (ssh(ns, hosts, target)) {
     await ns.singularity.installBackdoor()
+    ns.singularity.connect("home")
   } else {
     ns.printf("Failed to ssh to %s", target)
   }

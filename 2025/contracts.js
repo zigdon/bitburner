@@ -35,13 +35,16 @@ export async function main(ns) {
     var hosts = Array.from(dns(ns).values()).
       filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0)
     if (hosts.length > 0) {
-      ns.tprint("Hosts with contracts:")
+      ns.tprintf("Hosts with contracts:")
       var data = []
       hosts.map(
         (h) => h.files.filter(
           (f) => f.endsWith(".cct")
+        ).filter(
+          (f) => ns.fileExists(f, h.name)
         ).forEach(
-          (f) => data.push([h.name, f, ns.codingcontract.getContractType(f, h.name)])
+          (f) => data.push(
+            [h.name, f, ns.codingcontract.getContractType(f, h.name)])
         ))
       // ns.tprint(data)
       // data.forEach((l) => ns.tprint(l))
@@ -79,7 +82,9 @@ export async function main(ns) {
     }
     if (host == "home" || fs["force"] || !blocked(ns, c.type)) {
       if (ns.run(types.get(c.type), 1, host, file, (fs["toast"] ? "--toast" : ""), (fs["debug"] ? "--tail" : ""))) {
-        unblock(ns, c.type)
+        if (blocked(ns, c.type)) {
+          unblock(ns, c.type)
+        }
       } else {
         err(ns, "Can't start %s", types.get(c.type))
         block(ns, c.type)
@@ -149,6 +154,7 @@ export function block(ns, type) {
   var data = state(ns)
   if (!data.includes(type)) {
     data.push(type)
+    ns.notice(ns.sprintf("Blocking contract type %s", type), "warning")
     save(ns, data)
   }
 }
@@ -156,10 +162,13 @@ export function block(ns, type) {
 export function unblock(ns, type) {
   var data = state(ns)
   var updated = data.filter((t) => t != type)
+  ns.printf("%j", data)
   if (data.length != updated.length) {
-    ns.toast("Unblocking %s", type)
+    ns.printf("%j", updated)
+    ns.printf("Unblocking %s, %d still blocked", type, updated.length)
+    ns.toast(ns.sprintf("Unblocking %s, %d still blocked", type, updated.length))
+    save(ns, updated)
   }
-  save(ns, data)
 }
 
 function state(ns) {

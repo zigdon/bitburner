@@ -59,6 +59,7 @@ export async function main(ns) {
     var headers = ["Name", "Root", "RAM", "Security", "Money", "Hack", "Backdoor", "From", "Files"]
     var data = []
     var notice = []
+    var bd = false
     for (var h of hosts) {
       if (!flags.noroot && !h.root) {
         continue
@@ -72,9 +73,10 @@ export async function main(ns) {
       if (story.includes(h.name) && !h.backdoor && h.hack > playerHack) {
         notice.push(h.name)
       }
-      if (!h.backdoor && h.root && h.hack <= playerHack && !h.purchased ) {
+      if (!h.backdoor && !bd && h.root && h.hack <= playerHack && !h.purchased ) {
+        bd = true
         ns.toast(ns.sprintf("Backdooring %s", h.name), "info")
-        ns.run("backdoor.js", 1, h.name)
+        ns.run("g/backdoor.js", 1, h.name)
       }
       data.push([
         [h.name, story.includes(h.name) ? "white" : ""],

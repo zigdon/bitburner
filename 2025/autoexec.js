@@ -48,6 +48,7 @@ function toast(ns, name, tmpl, ...args) {
 function findContracts(ns) {
   var hosts = dns(ns)
   var count = 0
+  var solve = 0
   for (var h of hosts.values()) {
     if (h.name == "home") {
       continue
@@ -62,13 +63,14 @@ function findContracts(ns) {
       if (types.has(t)) {
         ns.printf("Solving %s on %s (%s)", c, h.name, t)
         ns.run("contracts.js", 1, h.name, c, "--toast")
+        solve++
       } else {
         count++
       }
     }
   }
   if (count > 0) {
-    toast(ns, "contract", "%s hosts with contracts", count)
+    toast(ns, "contract", "%d contracts found, %d attempted", count, count+solve)
   }
 }
 
