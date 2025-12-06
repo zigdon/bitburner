@@ -8,6 +8,8 @@ export var types = new Map([
     ["Array Jumping Game II", "/c/jump.js"],
     ["Array Jumping Game", "/c/jump.js"],
     ["Compression I: RLE Compression", "/c/compression1.js"],
+    ["Compression II: LZ Decompression", "/c/compression3.js"],
+    ["Compression III: LZ Compression", "/c/compression3.js"],
     ["Encryption I: Caesar Cipher", "/c/enc1.js"],
     ["Encryption II: Vigenère Cipher", "/c/enc2.js"],
     ["Find All Valid Math Expressions", "/c/math.js"],
@@ -154,7 +156,7 @@ export function block(ns, type) {
   var data = state(ns)
   if (!data.includes(type)) {
     data.push(type)
-    ns.notice(ns.sprintf("Blocking contract type %s", type), "warning")
+    ns.toast(ns.sprintf("Blocking contract type %s", type), "warning")
     save(ns, data)
   }
 }
