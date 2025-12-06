@@ -33,33 +33,17 @@
     not use "", '', or ``.
  */
 
-import {err, flags} from "../contracts.js"
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  if (c.type != "Proper 2-Coloring of a Graph") {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  var data = c.data
-  var res = await solve(ns, data)
-  var msg = c.submit(res)
-  if (f["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  var types = new Map([
+    [ "Proper 2-Coloring of a Graph", solve ],
+  ])
+  return init(ns, types, test, true)
 }
 
 async function solve(ns, data) {
-  // ns.tprint(data)
+  ns.printf("input: %j", data)
   var g = Array(data[0])
   for (var i=0; i<data[0]; i++) {
     g[i] = {id:i, color:-1, next:[]}
@@ -70,28 +54,90 @@ async function solve(ns, data) {
   }
 
   g[0].color = 0
-  // g.forEach((n) => ns.tprint(n))
+  g.forEach((n) => ns.print(n))
   var cont = true
   while (cont) {
     cont = false
     for (var node of g) {
+      ns.printf("Checking node %j", node)
       if (node.color == -1) {
         continue
       }
       await ns.asleep(10)
       var want = node.color ? 0 : 1
       for (var n of node.next) {
+        ns.printf("\-> %j", g[n])
         if (g[n].color == -1) {
-          // ns.tprintf("setting node %d to %d", n, want)
+          ns.printf("   setting node %d to %d", n, want)
           g[n].color = want
           cont = true
         } else if (g[n].color != want) {
-          // ns.tprintf("node %d conflicts", n)
+          ns.printf("   node %d conflicts", n)
           return []
         }
+        ns.printf("   => %j", g[n])
+      }
+    }
+
+    // If we got here, made no changes, but still have unassigned nodes (-1)
+    // it means they're a separate island. Pick one, assign it a color, and keep
+    // going.
+    if (!cont) {
+      var id = g.findIndex((n) => n.color == -1)
+      if (id >= 0) {
+        if (g[id].next.length == 0) {
+          ns.printf("Found isolated island at node #%d", id)
+          g[id].color = 1
+        } else {
+          ns.printf("Found new island chain at node #%d", id)
+          g[id].color = 0
+        }
+        cont = true
       }
     }
   }
 
   return g.map((n) => n.color)
+}
+
+async function test(ns, testdata) {
+  var tests = [
+    [
+      [4, [[0, 2], [0, 3], [1, 2], [1, 3]]],
+      [0, 0, 1, 1],
+    ],
+    [
+      [3, [[0, 1], [0, 2], [1, 2]]],
+      [],
+    ],
+    [
+      [11,[[2,7],[2,4],[3,7],[0,3],[5,9],[7,10],[2,5],[1,5],[0,9],[1,4],[3,7],[3,5]]],
+      [0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1],
+    ],
+  ]
+
+  if (testdata.length > 0) {
+    tests = [[testdata[0], testdata[1]]]
+  }
+  ns.tprintf("Running tests:")
+  tests.forEach((t) => ns.tprintf("%j", t))
+  for (var t of tests) {
+    var passed = true
+    var got = await solve(ns, t[0])
+    if (got.length != t[1].length) {
+      ns.tprintf("======= FAILED length:\n+%j\n-%j", got, t[1])
+      passed = false
+    } else if (!got.every((g, i) => g == t[1][i])) {
+      ns.tprintf("======= FAILED mismatch:\n+%j\n-%j", got, t[1])
+      passed = false
+    }
+
+    if (passed) {
+      ns.tprintf("======= PASSED")
+    } else {
+      ns.tprintf("======= FAILED")
+    }
+  }
+
+  return
 }

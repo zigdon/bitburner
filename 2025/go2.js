@@ -1,7 +1,7 @@
-import { dns } from "/hosts.js"
-import { table } from "/table.js"
-import { log } from "/log.js"
-import { colors } from "/colors.js"
+import { dns } from "@/hosts.js"
+import { table } from "@/table.js"
+import { critical, warning, info, debug } from "@/log.js"
+import { colors } from "@/colors.js"
 
 var buffer = 100
 
@@ -41,7 +41,7 @@ export async function main(ns) {
     // Check if any of our started jobs timed out
     while (ns.peek(20) != "NULL PORT DATA") {
       var ended = ns.readPort(20)
-      log(ns, "[%s] ended", ended)
+      debug(ns, "[%s] ended", ended)
       started.delete(ended)
     }
     // find out how many threads we can run
@@ -51,7 +51,7 @@ export async function main(ns) {
       await ns.asleep(5000)
       continue
     }
-    log(ns, "Can run %d threads total", capacity)
+    info(ns, "Can run %d threads total", capacity)
   
     var playerHack = ns.getPlayer().skills.hacking
     var opts = Array.from(hosts.keys()).filter((n) => {
@@ -59,7 +59,7 @@ export async function main(ns) {
       return !started.has(n) && h.root && h.hack <= playerHack && h.max > 0
     })
     if (opts.length == 0) {
-      log(ns, "*** No more targets")
+      warning(ns, "*** No more targets")
       await ns.nextPortWrite(20)
       continue
     }
@@ -78,7 +78,7 @@ export async function main(ns) {
   
     var target = hosts.get(opts[0])
     var tName = target.name
-    log(ns, "Selected %s: %d%% of %s @ %s", target.name, 100 * target.cur / target.max, ns.formatNumber(target.max), target.hack)
+    info(ns, "Selected %s: %d%% of %s @ %s", target.name, 100 * target.cur / target.max, ns.formatNumber(target.max), target.hack)
   
     // figure out number of threads needed to weaken
     var deltaSec = ns.getServerSecurityLevel(tName) - ns.getServerMinSecurityLevel(tName)
@@ -86,7 +86,7 @@ export async function main(ns) {
     if (deltaSec > ns.getServerMinSecurityLevel(tName) * 0.05) {
       var weakenThreads = countWT(ns, deltaSec)
       var wt = Math.min(weakenThreads, capacity)
-      log(ns, "Need %d/%d threads to weaken from %d to %d",
+      debug(ns, "Need %d/%d threads to weaken from %d to %d",
         weakenThreads, capacity, ns.getServerSecurityLevel(tName), ns.getServerMinSecurityLevel(tName))
       spread(ns, "weaken.js", wt, tName, 0)
       capacity -= wt
@@ -97,7 +97,7 @@ export async function main(ns) {
     var growThreads = countGT(ns, tName)
     if (delay == 0 && growThreads > 1 && capacity > 0) {
       var gt = Math.min(capacity, growThreads)
-      log(ns, "Need %d/%d threads to grow from %s to %s",
+      debug(ns, "Need %d/%d threads to grow from %s to %s",
         growThreads, capacity, ns.formatNumber(ns.getServerMoneyAvailable(tName)), ns.formatNumber(ns.getServerMaxMoney(tName)))
       spread(ns, "grow.js", gt, tName, delay)
       capacity -= gt
@@ -181,7 +181,7 @@ function findPlan(ns, tName, capacity) {
   var total = maxH + maxWH + maxG + maxWG
   var ret = {}
   if (capacity >= total) {
-    log(ns, "[%s] Hacking at full capacity: (%d/%d)", tName, total, capacity)
+    info(ns, "[%s] Hacking at full capacity: (%d/%d)", tName, total, capacity)
     ret = { h: maxH, wh: maxWH, g: maxG, wg: maxWG }
   } else {
     var ratio = capacity / total
@@ -191,10 +191,10 @@ function findPlan(ns, tName, capacity) {
       g: Math.floor(ratio * maxG),
       wg: Math.floor(ratio * maxWG),
     }
-    log(ns, "[%s] Hacking at %d%% capacity:", tName, 100 * ratio)
+    info(ns, "[%s] Hacking at %d%% capacity:", tName, 100 * ratio)
   }
 
-  log(ns, "[%s] %d/%d/%d/%d", tName, ret.h, ret.wh, ret.g, ret.wg)
+  debug(ns, "[%s] %d/%d/%d/%d", tName, ret.h, ret.wh, ret.g, ret.wg)
   return ret
 }
 
@@ -211,7 +211,7 @@ function batch(ns, tName, plan) {
     ns.getHackTime(tName),
     ns.getWeakenTime(tName)
   )
-  log(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
+  info(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
   // HWGW
   spread(ns, "hack.js", plan.h, tName, ts-100)
   spread(ns, "weaken.js", plan.wh, tName, ts-75)
@@ -246,7 +246,7 @@ function spread(ns, tool, threads, target, ts) {
     }
     // log(ns, "[%s] Starting %d threads of %s on %s", target, t, tool, h)
     if (!ns.exec(tool, h, t, target, ts)) {
-      log(ns, "[%s] %sFailed to run %s on %s%s", target, colors["red"], tool, h, colors["reset"]) 
+      warning(ns, "[%s] %sFailed to run %s on %s%s", target, colors["red"], tool, h, colors["reset"]) 
       continue
     }
     threads -= t

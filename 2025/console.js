@@ -1,4 +1,4 @@
-import { colors } from "/colors.js"
+import { colors } from "@/colors.js"
 
 /** @param {NS} ns */
 export async function main(ns) {

@@ -10,6 +10,7 @@ export async function main(ns) {
     "getServerMaxRam",
   ].forEach((i) => ns.disableLog(i))
   check(ns, "console.js", "console")
+  check(ns, "syslog.js", "syslog", "--tail")
   ns.run("g/tor.js", 1)
   ns.run("map.js", 1, "--silent")
   check(ns, "go2.js", "hack controller")
@@ -23,6 +24,8 @@ export async function main(ns) {
     ns.run("g/upgrade.js", 1)
     // Buy programs
     ns.run("g/program.js", 1)
+    // Join factions
+    ns.run("g/factions.js", 1)
     // Update hosts file
     ns.run("map.js", 1, "--silent")
     ns.printf("Loop done: %s", Date())
@@ -117,10 +120,10 @@ function pserv(ns) {
  * @param {String} fn
  * @param {String} name
  */
-function check(ns, fn, name) {
+function check(ns, fn, name, ...args) {
   var ps = ns.ps("home")
   if (ps.filter((p) => p.filename == fn).length == 0) {
     toast(ns, "start", "Starting %s", name)
-    ns.run(fn)
+    ns.run(fn, ...args)
   }
 }

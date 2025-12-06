@@ -33,44 +33,69 @@
     Hamming Codes. (https://youtube.com/watch?v=X8jsijhllIA)
  * */
 
-import {err, flags} from "@/contracts.js"
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var fs = flags(ns)
-  var host = fs._[0]
-  var file = fs._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  var type = [
-    "HammingCodes: Encoded Binary to Integer",
-  ].indexOf(c.type)
-  if (type == -1) {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  // ns.tprint(c.description)
-  var data = c.data
-  var res = solve(ns, data)
-  var msg = c.submit(res)
-  
-  if (fs["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(data)
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  var types = new Map([
+    [ "HammingCodes: Encoded Binary to Integer", decode ],
+    [ "HammingCodes: Integer to Encoded Binary", encode ],
+  ])
+  return init(ns, types, test, false)
 }
 
 /**
  * @param {NS} ns
  * @param {String} data
  * */
-function solve(ns, data) {
+function encode(ns, data) {
+  var bin = ns.sprintf("%b", data)
+  ns.printf("%d => %s", data, bin)
+
+  // Add 0s for all the parity bits
+  var res = "0"
+  var next = 1
+  var guide = "p"
+  for (var b of bin) {
+    // If n is a power of 2, add a 0 bit
+    while (res.length == next) {
+      ns.printf("parity bit at %d", next)
+      next*=2
+      res += "0"
+      guide += "p"
+    }
+    res += b
+    guide += "-"
+  }
+  ns.printf("padded => %s", res)
+  ns.printf(" pbits => %s", guide)
+
+  // Get each parity block, calculate the parity bits
+  for (var n = Math.floor(Math.sqrt(res.length)); n >=0; n--) {
+    var block = getBlock(res, n)
+    // If the current parity is correct, leave it as 0, otherwise, flip
+    var p = getParity(block) ? "0" : "1"
+    ns.printf("%d(%d): %s => %s", n, 2**n, block, p)
+
+    // Parity bit for block n is stored in bit 2**n
+    res = res.slice(0, 2**n) + String(p) + res.slice(2**n+1)
+    ns.printf("      => %s", res)
+  }
+
+  // Global parity bit
+  var gp = getParity(res) ? "0" : "1"
+  res = gp + res.slice(1)
+  ns.printf("      => %s", res)
+
+  return res
+}
+
+/**
+ * @param {NS} ns
+ * @param {String} data
+ * */
+function decode(ns, data) {
   ns.printf("              : %s", data)
-  var ex = decode(ns, data)
+  var ex = validate(ns, data)
   if (ex[0]) {
     return ex[1]
   }
@@ -79,7 +104,7 @@ function solve(ns, data) {
   for (var i=0; i<data.length; i++) {
     var fixed = data.slice(0,i) + (data[i] == "1" ? 0 : 1) + data.slice(i+1)
     ns.printf("Trying fix[%2d]: %s", i, fixed)
-    ex = decode(ns, fixed)
+    ex = validate(ns, fixed)
     if (ex[0]) {
       return ex[1]
     }
@@ -90,7 +115,7 @@ function solve(ns, data) {
  * @param {NS} ns
  * @param {String} data
  * */
-function decode(ns, data) {
+function validate(ns, data) {
   var parity = []
   var payload = ""
   // bit 0 is a full parity of the entire string
@@ -109,6 +134,7 @@ function decode(ns, data) {
   return [gparity && parity.every((p) => p[1]), Number("0b"+payload)]
 }
 
+// Returns true if the parity bit is correct, false if it needs flipped.
 function getParity(data) {
   return Array.from(data).reduce(
     (a, i) => a+Number(i), 0
@@ -126,4 +152,44 @@ function getBlock(data, n) {
     res += data.slice(size+i*size, 2*size+i*size)
   }
   return res
+}
+
+async function test(ns, testdata) {
+  var tests = [
+    [21, '1001101010', false],
+    [21, '1001101011', true],
+  ]
+  if (testdata.length > 0) {
+    tests = [[testdata[0], testdata[1]]]
+  }
+  ns.tprintf("Running tests:")
+  tests.forEach((t) => ns.tprintf("%j", t))
+  for (var t of tests) {
+    var passed = true
+    ns.tprintf("=== Decoding %s", t[1])
+    var got = await decode(ns, t[1])
+    ns.tprintf("=== => %j", got)
+    if (got != t[0]) {
+      ns.tprintf("======= FAILED:\n+%s\n-%s", got, t[0])
+      passed = false
+    }
+    if (!t[2]) {
+      continue
+    }
+    ns.tprintf("=== Encoding %s", t[0])
+    got = await encode(ns, t[0])
+    ns.tprintf("=== => %j", got)
+    var want = await decode(ns, got)
+    if (want != t[0]) {
+      ns.tprintf("======= FAILED decode:\n+%s\n-%s", want, t[0])
+      passed = false
+    }
+    if (passed) {
+      ns.tprintf("======= PASSED")
+    } else {
+      ns.tprintf("======= FAILED")
+    }
+  }
+
+  return
 }

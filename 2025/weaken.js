@@ -4,9 +4,12 @@ export async function main(ns) {
   var delay_ms = ns.args[1]
   await ns.sleep(delay_ms)
   await ns.weaken(target)
-  ns.writePort(10,
+  ns.writePort(11, [
+    "hack.js",
+    3, // DEBUG
     ns.sprintf(
       "[%s] Weakened for %s",
       target, await ns.weaken(target)
-    ))
+    )
+  ])
 }

@@ -34,32 +34,14 @@
         aaaaaaaaaaaaaa  ->  1a91041
 */
 
-import {err, flags} from "@/contracts.js"
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  // return await test(ns)
-  var fs = flags(ns)
-  var host = fs._[0]
-  var file = fs._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  var type = [
-    "Compression II: LZ Decompression",
-    "Compression III: LZ Compression",
-  ].indexOf(c.type)
-  type >= 0 || err(ns, "Wrong contract type: %s", c.type)
-  var data = c.data
-  var res = type == 0 ? await decompress(ns, data) : await compress(ns, data)
-  var msg = c.submit(res)
-  if (fs["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(data)
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  var types = new Map([
+    ["Compression II: LZ Decompression", decompress],
+    ["Compression III: LZ Compression", compress],
+  ])
+  await init(ns, types, test)
 }
 
 async function decompress(ns, data) {
@@ -71,19 +53,19 @@ async function decompress(ns, data) {
     data = data.slice(1)
     res += data.slice(0, l)
     data = data.slice(l)
-    // ns.tprintf("1: L=%d\ndata=%s\n res=%s", l, data, res)
+    ns.printf("1: L=%d\ndata=%s\n res=%s", l, data, res)
 
     // Block 2
     l = Number(data[0])
     data = data.slice(1)
     if (l > 0) {
       var x = Number(data[0])
-      // ns.tprintf("2: L=%d X=%d", l, x)
+      ns.printf("2: L=%d X=%d", l, x)
       data = data.slice(1)
       while (l-- > 0) {
         await ns.asleep(10)
         res += res[res.length-x]
-        // ns.tprintf(" res=%s", res)
+        ns.printf(" res=%s", res)
       }
     }
   }
@@ -106,27 +88,31 @@ async function compress(ns, data) {
     await ns.asleep(10)
     var l = 2  // length
     var x = 0  // offset
-    while (l < 9 && l < data.length-1) {
+    while (l < 10 && l < data.length-1) {
       await ns.asleep(10)
-      ns.tprintf("examining %s, l=%d %j", data, l, data.slice(data.length-l))
+      ns.printf("examining %s, l=%d %j", data, l, data.slice(data.length-l))
       var block = data.slice(data.length-l)
       var lif = data.lastIndexOf(block, data.length-l-1)
-      if (lif == -1) {
+      // Not found, or found too far back
+      if (lif == -1 || data.length-lif-l > 9) {
         l--
         break
       }
       if (lif >= Math.min(0, data.length-8-l)) {
         x = data.length-lif-l
-        ns.tprintf("found %s at %d offset of %s", block, x, data)
+        ns.printf("found %s at %d offset of %s", block, x, data)
       }
       l++
     }
-    if (x > 0) {
+
+    l = Math.min(l, 9)
+    if (x > 0) { // There is block2 data to write
       var extra = []
+      // Dump out any block1 we've collected
       while (block1.length > 0) {
         await ns.asleep(10)
         var l1 = Math.min(9, block1.length)
-        ns.tprintf("Block 1: l=%d, enc=%s", l1, block1.slice(0, l1))
+        ns.printf("Block 1: l=%d, enc=%s", l1, block1.slice(0, l1))
         extra.push([true, String(l1) + block1.slice(0,l1)])
         block1 = block1.slice(l1)
       }
@@ -134,20 +120,21 @@ async function compress(ns, data) {
         extra.reverse()
         blocks.push(...extra)
       }
-      ns.tprintf("Block 2: l=%d, x=%d, enc=%s", l, x, data.slice(data.length-l))
+      ns.printf("Block 2: l=%d, x=%d, enc=%s", l, x, data.slice(data.length-l))
       blocks.push([false, [l, x].join("")])
       data = data.slice(0, data.length-l)
-    } else {
-      ns.tprintf("Adding to block 1: l=%d, enc=%s", l, data.slice(data.length-l))
+    } else {  // No block 2, just add the constant
+      ns.printf("Adding to block 1: l=%d, enc=%s", l, data.slice(data.length-l))
       block1 = data.slice(data.length-l) + block1
       data = data.slice(0, data.length-l)
     }
   }
   var extra = []
+  // Write any remaining block1
   while (block1.length > 0) {
     await ns.asleep(10)
     l = Math.min(9, block1.length)
-    ns.tprintf("Block 1: l=%d, enc=%s", l, block1.slice(0, l))
+    ns.printf("Block 1: l=%d, enc=%s", l, block1.slice(0, l))
     extra.push([true, String(l) + block1.slice(0,l)])
     block1 = block1.slice(l)
   }
@@ -155,23 +142,25 @@ async function compress(ns, data) {
     extra.reverse()
     blocks.push(...extra)
   }
-  ns.tprintf("%j", blocks)
+  ns.printf("%j", blocks)
   var want = true
+  // connect the blocks alternating types. If the next block is the wrong type, just add a '0' block.
   while (blocks.length > 0) {
     await ns.asleep(10)
     var b = blocks.pop()
     if (b[0] != want) {
       res += "0"
+    } else {
+      want = !want
     }
     res += b[1]
-    want = !want
-    ns.tprintf("+%s => %s", b, res)
+    ns.printf("+%15s => %s", b, res)
   }
 
   return res
 }
 
-async function test(ns) {
+async function test(ns, testdata) {
   var tests = [
     ["abracadabra"    , "7abracad47"],
     ["mississippi"    , "4miss433ppi"],
@@ -181,24 +170,39 @@ async function test(ns) {
     ["aaaaaaaaaaaa"   , "3aaa91"],
     ["aaaaaaaaaaaaa"  , "1a91031"],
     ["aaaaaaaaaaaaaa" , "1a91041"],
+    [
+      "MFTGuSFbL64xhhhhhhadoghhhhadoghhhhhhhhhhhhhhhehhhehhhjgzUnMlkynMlkylkynMlkyv3CeKryK",
+      "9MFTGuSFbL0464xh514adog980510911e749jgzUnMlky550888v3CeKryK",
+    ],
+    [
+      "nnZnKdKsnnZZZUteo3UtN0XWkErOWkErOWkkkkkkkkkkFfhSZk67Lq3Lq3Lq3L",
+      "8nnZnKdKs380215Uteo3258N0XWkErO750919FfhSZk67L02q373",
+    ],
   ]
+  if (testdata.length > 0) {
+    tests = [[testdata[0], testdata[1]]]
+  }
+  ns.tprintf("Running tests:")
+  tests.forEach((t) => ns.tprintf("%j", t))
   for (var t of tests) {
-    ns.tprintf("======== Decoding %s", t[1])
-    var res = await decompress(ns, t[1])
-    if (res != t[0]) {
-      ns.tprintf("======= FAILED:\n+%s\n-%s", res, t[0])
-      return
+    ns.tprintf("=== Decoding %s", t[1])
+    var got = await decompress(ns, t[1])
+    ns.tprintf("=== => %j", got)
+    if (got != t[0]) {
+      ns.tprintf("======= FAILED:\n+%s\n-%s", got, t[0])
+      // return
     }
-    ns.tprintf("======== Encoding %s", t[0])
-    res = await compress(ns, t[0])
-    var check = await decompress(ns, res)
-    if (check != t[0]) {
-      ns.tprintf("======= FAILED:\n+%s\n-%s", check, t[0])
-      return
+    ns.tprintf("=== Encoding %s", t[0])
+    got = await compress(ns, t[0])
+    ns.tprintf("=== => %j", got)
+    var want = await decompress(ns, got)
+    if (want != t[0]) {
+      ns.tprintf("======= FAILED decompress:\n+%s\n-%s", want, t[0])
+      // return
     }
-    if (res.length > t[1].length) {
-      ns.tprintf("======= FAILED:\n+%s\n-%s", res, t[1])
-      return
+    if (got.length > t[1].length) {
+      ns.tprintf("======= FAILED length:\n+%s\n-%s", got, t[1])
+      // return
     }
     ns.tprintf("======= PASSED")
   }

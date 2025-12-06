@@ -27,6 +27,7 @@ function list(ns) {
     augs.push(...ns.singularity.getAugmentationsFromFaction(f))
   }
   augs = augs.sort().filter((a, i) => i==0 || a!=augs[i-1])
+  var owned = ns.singularity.getOwnedAugmentations(true)
   var data = []
   for (var a of augs) {
     var s = ns.singularity.getAugmentationStats(a)
@@ -37,13 +38,17 @@ function list(ns) {
       }
     }
     data.push([
-      ["$"+ns.formatNumber(ns.singularity.getAugmentationBasePrice(a))],
-      [stats],
-      [ns.singularity.getAugmentationPrereq(a)],
-      [ns.singularity.getAugmentationRepReq(a)],
-      [ns.singularity.getAugmentationFactions(a)],
+      a,
+      [
+        "$"+ns.formatNumber(ns.singularity.getAugmentationBasePrice(a)),
+        owned.includes(a) ? "black" : "green"
+      ],
+      //[stats],
+      //[ns.singularity.getAugmentationPrereq(a)],
+      [ns.formatNumber(ns.singularity.getAugmentationRepReq(a))],
+      ns.singularity.getAugmentationFactions(a).length,
     ])
   }
 
-  ns.tprint(table(ns, ["Price", "Stats", "Prereqs", "RepReq", "Factions"], data))
+  ns.tprint(table(ns, ["Name", "Price", "RepReq", "Factions"], data))
 }
