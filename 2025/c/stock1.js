@@ -1,76 +1,61 @@
-import {err} from "@/contracts.js"
+/*
+  Algorithmic Stock Trader I
+  You are given the following array of stock prices (which are numbers) where
+  the i-th element represents the stock price on day i:
+
+  11,163,173,25,98,117,25,82,114,176,23,104,18,4,27,151,129,124,111,120,112
+
+  Determine the maximum possible profit you can earn using at most one transaction
+  (i.e. you can only buy and sell the stock once). If no profit can be made then
+  the answer should be 0. Note that you have to buy the stock before you can sell it.
+
+  Algorithmic Stock Trader III
+  
+  Determine the maximum possible profit you can earn using at most two transactions.
+  A transaction is defined as buying and then selling one share of the stock.
+  Note that you cannot engage in multiple transactions at once. In other words,
+  you must sell the stock before you buy it again.
+  
+  If no profit can be made, then the answer should be 0.
+
+  Algorithmic Stock Trader IV
+  You are given the following array with two elements:
+
+  [7, [63,95,185,82,92,52,195,2,163,99,168,8,103,100,78,9,88,33]]
+
+  The first element is an integer k. The second element is an array of stock
+  prices (which are numbers) where the i-th element represents the stock price
+  on day i.
+
+  Determine the maximum possible profit you can earn using at most k transactions.
+  A transaction is defined as buying and then selling one share of the stock. Note
+  that you cannot engage in multiple transactions at once. In other words, you
+  must sell the stock before you can buy it again.
+*/
+
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  /*
-    Algorithmic Stock Trader I
-    You are given the following array of stock prices (which are numbers) where
-    the i-th element represents the stock price on day i:
+  var types = new Map([
+    ["Algorithmic Stock Trader I",   s1],
+    ["Algorithmic Stock Trader II",  s2],
+    ["Algorithmic Stock Trader III", s3],
+    ["Algorithmic Stock Trader IV",  s4],
+  ])
+  return init(ns, types, undefined, false)
+}
 
-    11,163,173,25,98,117,25,82,114,176,23,104,18,4,27,151,129,124,111,120,112
-
-    Determine the maximum possible profit you can earn using at most one transaction
-    (i.e. you can only buy and sell the stock once). If no profit can be made then
-    the answer should be 0. Note that you have to buy the stock before you can sell it.
-
-    Algorithmic Stock Trader III
-    
-    Determine the maximum possible profit you can earn using at most two transactions.
-    A transaction is defined as buying and then selling one share of the stock.
-    Note that you cannot engage in multiple transactions at once. In other words,
-    you must sell the stock before you buy it again.
-    
-    If no profit can be made, then the answer should be 0.
-
-    Algorithmic Stock Trader IV
-    You are given the following array with two elements:
-
-    [7, [63,95,185,82,92,52,195,2,163,99,168,8,103,100,78,9,88,33]]
-
-    The first element is an integer k. The second element is an array of stock
-    prices (which are numbers) where the i-th element represents the stock price
-    on day i.
-
-    Determine the maximum possible profit you can earn using at most k transactions.
-    A transaction is defined as buying and then selling one share of the stock. Note
-    that you cannot engage in multiple transactions at once. In other words, you
-    must sell the stock before you can buy it again.
-  */
-
-  var host = ns.args[0]
-  var file = ns.args[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  var type = [
-    "Algorithmic Stock Trader I",   // 0
-    "Algorithmic Stock Trader II",  // 1
-    "Algorithmic Stock Trader III", // 2
-    "Algorithmic Stock Trader IV"   // 3
-  ].indexOf(c.type)
-  type >= 0 || err(ns, "Wrong contract type: %s", c.type)
-  var data = c.data
-  var trades = 0
-  switch (type) {
-    case 0:
-      trades = 1
-      break
-    case 1:
-      trades = data.length
-      break
-    case 2:
-      trades = 2
-      break
-    case 3:
-      trades = c.data[0]
-      data = c.data[1]
-      break
-    default:
-      ns.tprintf("Not implemented %d: %s", type, c.type)
-      return
-  }
-  ns.tprintf("%s x %j", trades, data)
-  var res = await solve2(ns, data, trades)
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
+async function s1(ns, d) {
+  return await solve2(ns, d, 1)
+}
+async function s2(ns, d) {
+  return await solve2(ns, d, d.length)
+}
+async function s3(ns, d) {
+  return await solve2(ns, d, 2)
+}
+async function s4(ns, d) {
+  return await solve2(ns, d[1], d[0])
 }
 
 /**
@@ -118,6 +103,7 @@ var ex = []
  * @return Number
  */
 async function solve2(ns, data, trades) {
+  ns.printf("data=%j, trades=%j", data, trades)
   if (data.length < 2) {
     return 0
   }

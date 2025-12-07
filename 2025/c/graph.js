@@ -39,7 +39,7 @@ export async function main(ns) {
   var types = new Map([
     [ "Proper 2-Coloring of a Graph", solve ],
   ])
-  return init(ns, types, test, true)
+  return init(ns, types, test, false)
 }
 
 async function solve(ns, data) {

@@ -19,37 +19,13 @@
     ")(" -> [""]
 */
 
-import {err, flags} from "@/contracts.js"
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  ns.disableLog("asleep")
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  var type = [
-    "Sanitize Parentheses in Expression",
-  ].indexOf(c.type)
-  if (type == -1) {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  // ns.tprint(c.description)
-  var data = c.data
-  // var data = "()())()" 
-  // var data = "(a)())()" 
-  ns.tprint(data)
-  var res = await solve(ns, data)
-  var msg = c.submit(res)
-  if (f["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  var types = new Map([
+    ["Sanitize Parentheses in Expression", solve],
+  ])
+  return init(ns, types, test, false)
 }
 
 /**
@@ -61,31 +37,32 @@ async function solve(ns, data) {
   ns.print(data)
   // If we don't have both ( and ), remove all of them
   if (data.indexOf("(") == -1 || data.indexOf(")") == -1) {
-    // ns.tprintf("No parens in %s", data)
+    ns.printf("No parens in %s", data)
     return [data.replaceAll(/[()]/g, "")]
   }
   // Trim the ends that are always invalid
-  while (data.indexOf(")") < data.indexOf("(")) {
-    ns.printf("Trimming ')' from %s", data)
+  while (data.includes(")") && data.indexOf(")") < data.indexOf("(")) {
+    ns.printf("Trimming ')' from %j", data)
     await ns.asleep(10)
     data = data.replace(")", "")
   }
-  while (data.lastIndexOf("(") > data.lastIndexOf(")")) {
-    ns.printf("Trimming '(' from %s", data)
+  while (data.includes("(") && data.lastIndexOf("(") > data.lastIndexOf(")")) {
+    ns.printf("Trimming '(' from %j", data)
     await ns.asleep(10)
     data = data.substring(0, data.lastIndexOf("(")) + data.substring(1+data.lastIndexOf("("))
   }
+  ns.printf("Dont trimming")
 
   // Check if we're good
   var valid = checkValid(ns, data)
   if (valid[1] == -1) {
-    // ns.tprintf("%s is good", data)
+    ns.printf("%s is good", data)
     return [data]
   }
   var fi = valid[1]
   var extra = valid[0]
 
-  // ns.tprintf("Removing %s from %s", extra, data)
+  ns.printf("Removing %s from %s", extra, data)
   for (var m of data.matchAll(extra)) {
     await ns.asleep(10)
     var removed = data.substr(0, m.index) + data.substr(m.index+1)
@@ -97,10 +74,10 @@ async function solve(ns, data) {
     }
     // Make sure we didn't make it worse
     if (valid[1] < fi-1) {
-      // ns.tprintf("Worse: %s -> %s (%d<%d)", data, removed, valid[1], fi)
+      ns.printf("Worse: %s -> %s (%d<%d)", data, removed, valid[1], fi)
       continue
     }
-    // ns.tprintf("Removing %s from %s -> %s", extra, data, removed)
+    ns.printf("Removing %s from %s -> %s", extra, data, removed)
     res.push(...await solve(ns, removed))
   }
 
@@ -142,4 +119,56 @@ function checkValid(ns, data) {
   }
 
   return ["\\(", data.length]
+}
+
+async function test(ns, testdata) {
+  var tests = [
+    ["()())()", ["()()()", "(())()"]],
+    ["(a)())()", ["(a)()()", "(a())()"]],
+    [")(", [""]],
+  ]
+  if (testdata.length > 0) {
+    tests = [[testdata[0], testdata[1]]]
+  }
+  ns.tprintf("Running tests:")
+  tests.forEach((t) => ns.tprintf("%j", t))
+  for (var t of tests) {
+    var passed = true
+    ns.tprintf("=== Balancing %s", t[0])
+    var got = await solve(ns, t[0])
+    var want = t[1]
+    if (got.length != want.length) {
+      passed = false
+      ns.tprintf("======= FAILED length: got %d, want %d", got.length, want.length)
+    }
+    var extra = []
+    var missing = []
+    for (var g of got) {
+      if (!want.includes(g)) {
+        extra.push(g)
+      }
+    }
+    for (var w of want) {
+      if (!got.includes(w)) {
+        missing.push(w)
+      }
+    }
+    if (extra.length > 0) {
+      passed = false
+      ns.tprintf("======= FAILED got extra:")
+      extra.forEach((e) => ns.tprintf("+ %s", e))
+    }
+    if (missing.length > 0) {
+      passed = false
+      ns.tprintf("======= FAILED missing:")
+      missing.forEach((e) => ns.tprintf("0 %s", e))
+    }
+    if (passed) {
+      ns.tprintf("======= PASSED")
+    } else {
+      ns.tprintf("======= FAILED")
+    }
+  }
+
+  return
 }
