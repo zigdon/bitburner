@@ -51,7 +51,7 @@ export async function main(ns) {
       await ns.asleep(5000)
       continue
     }
-    info(ns, "Can run %d threads total", capacity)
+    debug(ns, "Can run %d threads total", capacity)
   
     var playerHack = ns.getPlayer().skills.hacking
     var opts = Array.from(hosts.keys()).filter((n) => {
@@ -78,7 +78,7 @@ export async function main(ns) {
   
     var target = hosts.get(opts[0])
     var tName = target.name
-    info(ns, "Selected %s: %d%% of %s @ %s", target.name, 100 * target.cur / target.max, ns.formatNumber(target.max), target.hack)
+    debug(ns, "Selected %s: %d%% of %s @ %s", target.name, 100 * target.cur / target.max, ns.formatNumber(target.max), target.hack)
   
     // figure out number of threads needed to weaken
     var deltaSec = ns.getServerSecurityLevel(tName) - ns.getServerMinSecurityLevel(tName)
@@ -181,7 +181,7 @@ function findPlan(ns, tName, capacity) {
   var total = maxH + maxWH + maxG + maxWG
   var ret = {}
   if (capacity >= total) {
-    info(ns, "[%s] Hacking at full capacity: (%d/%d)", tName, total, capacity)
+    debug(ns, "[%s] Hacking at full capacity: (%d/%d)", tName, total, capacity)
     ret = { h: maxH, wh: maxWH, g: maxG, wg: maxWG }
   } else {
     var ratio = capacity / total
@@ -191,7 +191,7 @@ function findPlan(ns, tName, capacity) {
       g: Math.floor(ratio * maxG),
       wg: Math.floor(ratio * maxWG),
     }
-    info(ns, "[%s] Hacking at %d%% capacity:", tName, 100 * ratio)
+    debug(ns, "[%s] Hacking at %d%% capacity:", tName, 100 * ratio)
   }
 
   debug(ns, "[%s] %d/%d/%d/%d", tName, ret.h, ret.wh, ret.g, ret.wg)
@@ -211,7 +211,7 @@ function batch(ns, tName, plan) {
     ns.getHackTime(tName),
     ns.getWeakenTime(tName)
   )
-  info(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
+  debug(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
   // HWGW
   spread(ns, "hack.js", plan.h, tName, ts-100)
   spread(ns, "weaken.js", plan.wh, tName, ts-75)

@@ -124,6 +124,6 @@ function check(ns, fn, name, ...args) {
   var ps = ns.ps("home")
   if (ps.filter((p) => p.filename == fn).length == 0) {
     toast(ns, "start", "Starting %s", name)
-    ns.run(fn, ...args)
+    ns.run(fn, 1, ...args)
   }
 }
