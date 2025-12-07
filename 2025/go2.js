@@ -59,7 +59,7 @@ export async function main(ns) {
       return !started.has(n) && h.root && h.hack <= playerHack && h.max > 0
     })
     if (opts.length == 0) {
-      warning(ns, "*** No more targets")
+      debug(ns, "*** No more targets")
       await ns.nextPortWrite(20)
       continue
     }

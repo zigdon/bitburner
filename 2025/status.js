@@ -1,5 +1,5 @@
-import { dns } from "/hosts.js"
-import { table } from "/table.js"
+import { dns } from "@/hosts.js"
+import { table } from "@/table.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var hosts = dns(ns)
@@ -39,7 +39,14 @@ export async function main(ns) {
     table(
       ns,
       ["Target", "Hack", "Grow", "Weaken", "Money", "Security"],
-      Array.from(summary.values()).map((h) => [h.host, h.h, h.g, h.w, h.mon, h.sec])
+      Array.from(summary.keys()).sort().map((h) => [
+        summary.get(h).host,
+        summary.get(h).h,
+        summary.get(h).g,
+        summary.get(h).w,
+        summary.get(h).mon,
+        summary.get(h).sec,
+      ])
     )
   )
   ns.tprintf(

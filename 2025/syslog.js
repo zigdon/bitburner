@@ -31,9 +31,11 @@ export async function main(ns) {
     }
 
     var now = new Date()
-    if (level == "DEBUG" && ["hack.js", "grow.js", "weakened.js"].includes(script)) {
+    if (level == "DEBUG" && ["hack.js", "grow.js", "weaken.js"].includes(script)) {
       var words = msg.split(" ")
       var key = script+words[0]
+      var target = words[0].slice(1,words[0].length-1)
+      ns.write(ns.sprintf("/logs/%s.txt", target), [now.getTime(), script, words[3]].join(",") + "\n", "a")
       var cache = last.has(key) ? last.get(key) : {ts: now.getTime(), val: 0, cnt: 0}
       cache.val += Number(words[3])
       cache.cnt++
@@ -49,7 +51,7 @@ export async function main(ns) {
             break
           case "weaken.js":
             cmd = "weakened"
-            breal
+            break
           default:
             cmd = "something"
         }

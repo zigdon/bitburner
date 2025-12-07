@@ -1,5 +1,6 @@
 import { dns } from "@/hosts.js"
 import { table } from "@/table.js"
+import { info } from "@/log.js"
 export var types = new Map([
     ["Algorithmic Stock Trader I", "/c/stock1.js"],
     ["Algorithmic Stock Trader II", "/c/stock1.js"],
@@ -149,7 +150,7 @@ export function err(ns, tmpl, ...args) {
  * @param {any} ...args
  */
 export function log(ns, tmpl, ...args) {
-  ns.tprintf(tmpl, ...args)
+  ns.printf(tmpl, ...args)
 }
 
 /**
@@ -234,8 +235,10 @@ export async function init(ns, types, testfn, nosubmit) {
     err(ns, "Wrong contract type: %s", c.type)
     return
   }
+  ns.printf("type=%s", c.type)
   var fn = types.get(c.type)
   var data = c.data
+  ns.printf("data=%j", data)
   var res = await fn(ns, data)
   var msg = nosubmit ? "Not submitted" : c.submit(res)
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
@@ -250,6 +253,8 @@ export async function init(ns, types, testfn, nosubmit) {
     ns.tprint(res)
     ns.tprint(msg)
   }
+
+  info(ns, "Attempted to solve contract %s: %s", c.type, msg)
 }
 
 function listContracts(ns) {

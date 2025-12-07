@@ -10,7 +10,7 @@ export async function main(ns) {
     "getServerMaxRam",
   ].forEach((i) => ns.disableLog(i))
   check(ns, "console.js", "console")
-  check(ns, "syslog.js", "syslog", "--tail")
+  check(ns, "syslog.js", "syslog")
   ns.run("g/tor.js", 1)
   ns.run("map.js", 1, "--silent")
   check(ns, "go2.js", "hack controller")
@@ -20,12 +20,16 @@ export async function main(ns) {
     pserv(ns)
     // Find contracts
     findContracts(ns)
+    await ns.asleep(100)
     // Buy upgrades
     ns.run("g/upgrade.js", 1)
+    await ns.asleep(100)
     // Buy programs
     ns.run("g/program.js", 1)
+    await ns.asleep(100)
     // Join factions
     ns.run("g/factions.js", 1)
+    await ns.asleep(100)
     // Update hosts file
     ns.run("map.js", 1, "--silent")
     ns.printf("Loop done: %s", Date())

@@ -5,7 +5,7 @@ export async function main(ns) {
   await ns.sleep(delay_ms)
   await ns.weaken(target)
   ns.writePort(11, [
-    "hack.js",
+    "weaken.js",
     3, // DEBUG
     ns.sprintf(
       "[%s] Weakened for %s",

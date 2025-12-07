@@ -4,7 +4,7 @@ export async function main(ns) {
   var delay_ms = ns.args[1]
   await ns.sleep(delay_ms)
   ns.writePort(11, [
-    "hack.js",
+    "grow.js",
     3, // DEBUG
     ns.sprintf("[%s] Grew for %s", target, await ns.grow(target))
   ])
