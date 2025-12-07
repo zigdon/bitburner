@@ -1,5 +1,6 @@
 import { colors } from "@/colors.js"
 import { table } from "@/table.js"
+import { ssh } from "@/ssh.js"
 
 var playerHack = 0
 var tools = 0
@@ -77,6 +78,7 @@ export async function main(ns) {
         bd = true
         ns.toast(ns.sprintf("Backdooring %s", h.name), "info")
         ns.run("g/backdoor.js", 1, h.name)
+        ns.run("ssh.js", 1, "home")
       }
       data.push([
         [h.name, story.includes(h.name) ? "white" : ""],
@@ -125,11 +127,29 @@ export async function main(ns) {
     ns.printf("hacked: %v", hacked)
 
     ns.write("/data/hosts.json", JSON.stringify(Array.from(seen.values())), "w")
+    installHosts(ns, Array.from(seen.keys()))
 
     if (wait == undefined) {
       return
     }
     await ns.asleep(wait * 1000)
+  }
+}
+
+/**
+  @param {NS} ns
+  @param {String[]} hosts
+*/
+function installHosts(ns, hosts) {
+  for (var h of hosts) {
+    if (ns.fileExists("hosts.txt", h)) {
+      continue
+    }
+    var f = ns.sprintf("/tmp/hosts.%s.txt", h)
+    ns.write(f, h)
+    ns.scp(f, h)
+    ns.mv(h, f, "hosts.txt")
+    ns.printf("Installed hosts.txt on %s", h)
   }
 }
 
@@ -145,7 +165,7 @@ function scan(ns, s, host) {
     return []
   }
   var added = []
-  var files = ns.ls(host).filter((f) => !f.endsWith(".js"))
+  var files = ns.ls(host).filter((f) => !f.endsWith(".js") && f != "hosts.txt")
   if (host != "home") {
     files.filter((f) => {
       if (f.endsWith(".lit")) {
