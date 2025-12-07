@@ -120,6 +120,28 @@ async function compress(ns, data) {
         extra.reverse()
         blocks.push(...extra)
       }
+
+      // Check if the encoded length is actually shorter than writing a block1.
+      // Encoded length is either 2 or 3 characters, depending on the previous block.
+      // Writing a new block1 is 1+data, extending an earlier block1 is just data length.
+      if (blocks.length > 0) {
+        var b2l = 2
+        var b1l = l
+        var prev = blocks[blocks.length-1]
+        if (!prev[0]) { // Are we following another block2?
+          b2l++
+        } else if (l+Number(prev[1][0]) >= 9) { // If we're following a block1, can we just add the data there?
+          b1l++
+        }
+        if (b2l > b1l) {
+          ns.printf("Wasteful block2: b2l=%d, b1l=%d", b2l, b1l)
+          ns.printf("Adding to block 1: l=%d, enc=%s", l, data.slice(data.length-l))
+          block1 = data.slice(data.length-l) + block1
+          data = data.slice(0, data.length-l)
+          continue
+        }
+      }
+
       ns.printf("Block 2: l=%d, x=%d, enc=%s", l, x, data.slice(data.length-l))
       blocks.push([false, [l, x].join("")])
       data = data.slice(0, data.length-l)
@@ -164,12 +186,12 @@ async function test(ns, testdata) {
   var tests = [
     ["abracadabra"    , "7abracad47"],
     ["mississippi"    , "4miss433ppi"],
-    ["aAAaAAaAaAA"    , "3aAA53035"],
+    ["aAAaAAaAaAA"    , "3aAA43045"],  // 3aAA53035
     ["2718281828"     , "627182844"],
     ["abcdefghijk"    , "9abcdefghi02jk"],
     ["aaaaaaaaaaaa"   , "3aaa91"],
-    ["aaaaaaaaaaaaa"  , "1a91031"],
-    ["aaaaaaaaaaaaaa" , "1a91041"],
+    ["aaaaaaaaaaaaa"  , "1a31091"], // 1a91031
+    ["aaaaaaaaaaaaaa" , "1a41091"], // 1a91041
     [
       "MFTGuSFbL64xhhhhhhadoghhhhadoghhhhhhhhhhhhhhhehhhehhhjgzUnMlkynMlkylkynMlkyv3CeKryK",
       "9MFTGuSFbL0464xh514adog980510911e749jgzUnMlky550888v3CeKryK",
@@ -177,6 +199,10 @@ async function test(ns, testdata) {
     [
       "nnZnKdKsnnZZZUteo3UtN0XWkErOWkErOWkkkkkkkkkkFfhSZk67Lq3Lq3Lq3L",
       "8nnZnKdKs380215Uteo3258N0XWkErO750919FfhSZk67L02q373",
+    ],
+    [
+      "p7Igl2IgWyj6tr0fH5Qo6o66o66oopQp6yTrG7yTrG7yTRrTrG7y7y7y7y7yy7y7y77iYTNpppppppppppp",
+      "6p7Igl2249Wyj6tr0fH065Qo6o6539opQp6yTrG017752Rr5808206787iYTNppp91",
     ],
   ]
   if (testdata.length > 0) {
@@ -190,19 +216,19 @@ async function test(ns, testdata) {
     ns.tprintf("=== => %j", got)
     if (got != t[0]) {
       ns.tprintf("======= FAILED:\n+%s\n-%s", got, t[0])
-      // return
     }
     ns.tprintf("=== Encoding %s", t[0])
     got = await compress(ns, t[0])
     ns.tprintf("=== => %j", got)
+    if (got != t[1]) {
+      ns.tprintf("======= FAILED decompress:\n+%s\n-%s", got, t[1])
+    }
     var want = await decompress(ns, got)
     if (want != t[0]) {
       ns.tprintf("======= FAILED decompress:\n+%s\n-%s", want, t[0])
-      // return
     }
     if (got.length > t[1].length) {
       ns.tprintf("======= FAILED length:\n+%s\n-%s", got, t[1])
-      // return
     }
     ns.tprintf("======= PASSED")
   }
