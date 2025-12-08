@@ -1,7 +1,10 @@
 /** @param {NS} ns */
 export async function main(ns) {
   // Check and accept any faction invites.
-  var skip = []
+  var skip = [
+    "Aevum",
+    "Sector-12",
+  ]
   var joined = []
   var failed = []
   for (var f of ns.singularity.checkFactionInvitations()) {
