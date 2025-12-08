@@ -9,6 +9,8 @@ export async function main(ns) {
   [
     "getServerMaxRam",
   ].forEach((i) => ns.disableLog(i))
+  ns.ls("home", "/bak").forEach((f) => ns.rm(f, "home"))
+  ns.ls("home", "/logs/*.txt").forEach((f) => ns.mv("home", f, "/bak/"+f))
   check(ns, "console.js", "console")
   check(ns, "syslog.js", "syslog")
   ns.run("g/tor.js", 1)

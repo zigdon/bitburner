@@ -135,7 +135,7 @@ async function solve2(ns, data, trades) {
 
   // Last dataset - if we were trending up, it's a new max
   if (dir > 0) {
-    // ns.tprintf("Final max: %d", data[data.length-1])
+    ns.printf("Final max: %d", data[data.length-1])
     max.push(data[data.length-1])
   }
 
@@ -146,8 +146,8 @@ async function selectTrades(ns, min, max, trades) {
   if (trades == 0 || min.length == 0 || max.length == 0) {
     return 0
   }
-  // ns.tprintf("min = %j", min)
-  // ns.tprintf("max = %j", max)
+  ns.printf("min = %j", min)
+  ns.printf("max = %j", max)
   var res = 0
   var buy, sell
   for (var i=0; i<min.length; i++) {
@@ -163,7 +163,7 @@ async function selectTrades(ns, min, max, trades) {
     }
   }
 
-  // ns.tprint(ex)
+  ns.print(ex)
   await ns.asleep(10)
 
   return res

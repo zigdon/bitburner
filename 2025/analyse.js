@@ -43,7 +43,19 @@ export async function main(ns) {
     last.end=ts
   }
   if (last.start > 0) {
-    data.push([last.type, last.amt, last.cnt, last.start, last.end, last.end-last.start])
+    data.push([
+      last.type,
+      last.type == "hack.js" ?
+        "$"+ns.formatNumber(last.amt) :
+        ns.formatNumber(last.amt),
+      last.cnt,
+      last.end-last.start > 1000 ?
+        ns.tFormat(last.end-last.start) :
+        last.end-last.start + " ms",
+      ts-last.end > 1000 ?
+        ns.tFormat(ts-last.end) :
+        ts-last.end + " ms",
+    ])
   }
 
   ns.tprint(table(ns, ["What", "Amt", "Count", "Duration", "Delta"], data))

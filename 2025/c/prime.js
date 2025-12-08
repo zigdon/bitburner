@@ -1,24 +1,15 @@
-import {err} from "@/contracts.js"
+/*
+  A prime factor is a factor that is a prime number.
+  What is the largest prime factor of 574756370?
+*/
+
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  /*
-    A prime factor is a factor that is a prime number.
-    What is the largest prime factor of 574756370?
-  */
-  var host = ns.args[0]
-  var file = ns.args[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Find Largest Prime Factor" || err(ns, "Wrong contract type: %s", c.type)
-  // ns.tprint(c.description)
-  var data = c.data
-  ns.tprint(data)
-  var res = solve(ns, data)
-  if (!res) {
-    ns.tprintf("Failed to solve %s@%s", file, host)
-  }
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
+  var types = new Map([
+    ["Find Largest Prime Factor", solve],
+  ])
+  return await init(ns, types, undefined, false)
 }
 
 /** @param {Number} data */
