@@ -10,6 +10,7 @@ export async function main(ns) {
     "Ishima",
     "NiteSec",
     "Sector-12",
+    "Slum Snakes",
     "The Black Hand",
     "Tian Di Hui",
   ]
