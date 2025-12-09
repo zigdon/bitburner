@@ -1,36 +1,29 @@
-import {err} from "/contracts.js"
+/*
+  Merge Overlapping Intervals
+  Given the following array of arrays of numbers representing a list of intervals,
+  merge all overlapping intervals.
+
+  [[5,11],[15,21],[14,15],[9,14],[4,8],[18,21],[14,20],[5,9],[3,12],[17,20],[19,25],
+    [19,20],[14,20],[2,8]]
+
+  Example:
+
+  [[1, 3], [8, 10], [2, 6], [10, 16]]
+
+  would merge into [[1, 6], [8, 16]].
+
+  The intervals must be returned in ASCENDING order. You can assume that in an
+  interval, the first number will always be smaller than the second.
+*/
+
+import {err, init} from "/contracts.js"
+
 /** @param {NS} ns */
 export async function main(ns) {
-  /*
-    Merge Overlapping Intervals
-    Given the following array of arrays of numbers representing a list of intervals,
-    merge all overlapping intervals.
-
-    [[5,11],[15,21],[14,15],[9,14],[4,8],[18,21],[14,20],[5,9],[3,12],[17,20],[19,25],
-     [19,20],[14,20],[2,8]]
-
-    Example:
-
-    [[1, 3], [8, 10], [2, 6], [10, 16]]
-
-    would merge into [[1, 6], [8, 16]].
-
-    The intervals must be returned in ASCENDING order. You can assume that in an
-    interval, the first number will always be smaller than the second.
-  */
-
-  var host = ns.args[0]
-  var file = ns.args[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Merge Overlapping Intervals" || err(ns, "Wrong contract type: %s", c.type)
-  // ns.tprint(c.description)
-  var data = c.data
-  ns.tprint(data)
-  var res = solve(ns, data)
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
-}
+  var types = new Map([
+    ["Merge Overlapping Intervals", solve],
+  ])
+  return await init(ns, types, undefined, false)
 
 /**
  * @param {NS} ns

@@ -25,19 +25,25 @@
  */
 
 import {err, init} from "@/contracts.js"
+import {table} from "@/table.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var types = [
-    "Total Ways to Sum I",
-  ]
+  var types = new Map([
+    ["Total Ways to Sum", euler],
+  ])
   return init(ns, types, test, false)
 }
 
+var eul = new Map()
 /**
  * @param {NS} ns
  * @param {Number[]} data
  */
 async function euler(ns, data) {
+  if (eul.has(data)) {
+    return eul.get(data)
+  }
+
   await ns.asleep(10)
   if (data == 0) {
     return 1
@@ -53,18 +59,21 @@ async function euler(ns, data) {
       break
     }
     if (n%4 < 2) {
-      ns.printf("+p(%d-%d) => +p(%d)", data, gpn[n], data-gpn[n])
-      res += await euler(ns, data-gpn[n])
+      var eu = await euler(ns, data-gpn[n])
+      ns.printf("+p(%d-%d) => +p(%d) => %d", data, gpn[n], data-gpn[n], eu)
+      res += eu
       ns.printf(" => %d", res)
     } else {
-      ns.printf("-p(%d-%d) => +p(%d)", data, gpn[n], data-gpn[n])
-      res -= await euler(ns, data-gpn[n])
+      var eu = await euler(ns, data-gpn[n])
+      ns.printf("-p(%d-%d) => -p(%d) => %d", data, gpn[n], data-gpn[n], eu)
+      res -= eu
       ns.printf(" => %d", res)
     }
   }
 
   ns.printf("=== euler(%d) = %d", data, res)
 
+  eul.set(data, res)
   return res
 }
 
@@ -78,9 +87,11 @@ function w(ns, n) {
   var k = 1
   while (res.length == 0 || res[res.length-1] < n) {
     res.push((k*(3*k-1))/2)
-    if (res[res.length-1] >= n) { break }
     res.push((k*(3*k+1))/2)
     k++
+  }
+  while (res[res.length-1] > n) {
+    res.pop()
   }
 
   pent.set(n, res)
@@ -96,14 +107,29 @@ export function autocomplete(data, args) {
 }
 
 async function test(ns, testdata) {
+  eul.clear()
+  pent.clear()
   var tests = [
     [1, 1],
     [2, 2],
     [3, 3],
-    [4, 4],
+    [4, 5],
     [5, 7],
     [6, 11],
     [7, 15],
+    [8, 22],
+    [9, 30],
+    [10, 42],
+    [11, 56],
+    [12, 77],
+    [13, 101],
+    [14, 135],
+    [15, 176],
+    [16, 231],
+    [17, 297],
+    [18, 385],
+    [19, 490],
+    [20, 627],
   ]
   if (testdata.length > 0) {
     tests = [[testdata[0], testdata[1]]]
@@ -124,6 +150,14 @@ async function test(ns, testdata) {
       ns.tprintf("======= FAILED")
     }
   }
+
+  var data = []
+  for (var n=1; n<Math.max(tests.map((t) => t[0])); n++) {
+    data.push([n, eul.get(n), ns.sprintf("%j", pent.get(n))])
+  }
+
+  ns.tprintf(table(ns, ["n", "euler", "w"], data))
+
 
   return
 }

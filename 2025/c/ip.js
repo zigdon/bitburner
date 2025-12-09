@@ -1,36 +1,30 @@
-import {err} from "/contracts.js"
+/*
+Generate IP Addresses
+Given the following string containing only digits, return an array with all
+possible valid IP address combinations that can be created from the string:
+
+  24212784125
+
+  Note that an octet cannot begin with a '0' unless the number itself is exactly
+  '0'. For example, '192.168.010.1' is not a valid IP.
+
+  Examples:
+
+  25525511135 -> ["255.255.11.135", "255.255.111.35"]
+  1938718066 -> ["193.87.180.66"]
+*/
+
+import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  /*
-  Generate IP Addresses
-  Given the following string containing only digits, return an array with all
-  possible valid IP address combinations that can be created from the string:
+  var types = new Map([
+    ["Generate IP Addresses", solve],
+  ])
+  return init(ns, types, undefined, false)
+}
 
-   24212784125
-
-   Note that an octet cannot begin with a '0' unless the number itself is exactly
-   '0'. For example, '192.168.010.1' is not a valid IP.
-
-   Examples:
-  
-   25525511135 -> ["255.255.11.135", "255.255.111.35"]
-   1938718066 -> ["193.87.180.66"]
-  */
-
-  var host = ns.args[0]
-  var file = ns.args[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Generate IP Addresses" || err(ns, "Wrong contract type: %s", c.type)
-  // ns.tprint(c.description)
-  var data = c.data
-  ns.tprint(data)
-  var res = solve(ns, data, 4)
-  if (!res) {
-    ns.tprintf("Failed to solve %s@%s", file, host)
-  }
-  ns.tprint(res)
-  ns.tprint(c.submit(res))
+function solve(ns, data) {
+  return ip(ns, data, 4)
 }
 
 /**
@@ -39,7 +33,7 @@ export async function main(ns) {
  * @param {Number} octets
  * @return String[]
  */
-function solve(ns, data, octets) {
+function ip(ns, data, octets) {
   var res = []
   // If we are out of digits, make sure we're out of charactes too.
   if (octets == 1) {
@@ -52,14 +46,19 @@ function solve(ns, data, octets) {
     return [-1]
   }
 
-  res.push(...mult(data[0], solve(ns, data.substring(1), octets-1)))
+  ns.printf("Adding %s * ip(%s, %d)", data[0], data.slice(1), octets-1)
+  res.push(...mult(data[0], ip(ns, data.slice(1), octets-1)))
   // Leading 0 can only be a "0"
   if (data[0] != "0") {
-    res.push(...mult(data.substring(0, 2), solve(ns, data.substring(2), octets-1)))
-    if (data.substring(0,3) < 256) {
-      res.push(...mult(data.substring(0, 3), solve(ns, data.substring(3), octets-1)))
+    ns.printf("Adding %s * ip(%s, %d)", data.slice(0,2), data.slice(2), octets-1)
+    res.push(...mult(data.slice(0, 2), ip(ns, data.slice(2), octets-1)))
+    if (Number(data.slice(0,3)) < 256) {
+      ns.printf("Adding %s * ip(%s, %d)", data.slice(0,3), data.slice(3), octets-1)
+      res.push(...mult(data.slice(0, 3), ip(ns, data.slice(3), octets-1)))
     }
   }
+
+  ns.printf("input=[%j,%d], res=%j", data, octets, res)
 
   return res
 }
