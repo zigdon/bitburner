@@ -1,4 +1,4 @@
-import { dns } from "/hosts.js"
+import { dns } from "@/hosts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var reserve = 50

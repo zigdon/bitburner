@@ -4,6 +4,10 @@ var loglevels = [ "CRITICAL", "WARNING", "INFO", "DEBUG" ]
 /** @param {NS} ns */
 export async function main(ns) {
   ns.disableLog("asleep")
+  ns.ui.openTail()
+  var ws = ns.ui.windowSize()
+  ns.ui.resizeTail(ws[0]/3, ws[1]/8)
+  ns.ui.moveTail(1.75*ws[0]/3, 0)
   var last = new Map()
   while (true) {
     var data = String(ns.readPort(11))

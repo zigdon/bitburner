@@ -25,7 +25,7 @@ export var types = new Map([
     ["Spiralize Matrix", "/c/spiral.js"],
     ["Square Root", "/c/sqrt.js"],
     ["Subarray with Maximum Sum", "/c/sumarray.js"], 
-    ["Total Ways to Sum", "/c/sum.js"],
+    ["Total Ways to Sum", "/c/sum2.js"],
     ["Unique Paths in a Grid I", "/c/grid2.js"],
     ["Unique Paths in a Grid II", "/c/grid2.js"],
   ])
@@ -45,9 +45,12 @@ export async function main(ns) {
       err(ns, "No contracts found on ", host)
       return
     } else if (files.length > 1) {
-      if (!fs["toast"]) {
+      if (fs["toast"]) {
         log(ns, "Found contracts:")
         files.forEach((f) => log(ns, "%s: %s", f, ns.codingcontract.getContract(f, host).type))
+      } else {
+        ns.tprint("Found contracts:")
+        files.forEach((f) => ns.tprintf("%s: %s", f, ns.codingcontract.getContract(f, host).type))
       }
       return
     }
@@ -164,6 +167,7 @@ export function flags(ns) {
     ["force", false],
     ["debug", false],
     ["check", false],
+    ["autotest", ""],
   ])
 }
 
@@ -225,6 +229,10 @@ export async function init(ns, types, testfn, nosubmit) {
   var host = fs._[0]
   var file = fs._[1]
 
+  if (fs["autotest"] != "") {
+    return await autotest(ns, types, fs["autotest"])
+  }
+
   var c = ns.codingcontract.getContract(file, host)
   if (!c) {
     err(ns, "Can't get contract %s@%s", file, host)
@@ -279,4 +287,35 @@ function listContracts(ns) {
     ns.tprint("No hosts with contracts")
   }
   return
+}
+
+async function autotest(ns, types, type) {
+  var allTypes = Array.from(types.keys())
+  if (allTypes.length == 1) {
+    type = allTypes[0]
+  } else {
+    type = allTypes.filter((t) => t.includes(type))
+    if (type.length != 1) {
+      ns.tprintf("Select type:")
+      Array.from(types.keys()).forEach((t) => ns.tprintf("  %s", t))
+      return
+    }
+    type = type[0]
+  }
+  while(true) {
+    var file = ns.codingcontract.createDummyContract(type)
+    ns.printf("Created contract: %s", file)
+    var c = ns.codingcontract.getContract(file, "home")
+    ns.printf("data=%j", c.data)
+    var res = await types.get(type)(ns, c.data)
+    ns.printf("res=%j", res)
+    if (c.submit(res)) {
+      ns.tprintf("Test success!")
+    } else {
+      ns.tprintf("Test failed:\ndata=%j\nres=%j\nfile=%s", c.data, res, file)
+      return
+    }
+    ns.tprintf("Test done, restarting in 5s...")
+    await ns.asleep(5000)
+  }
 }

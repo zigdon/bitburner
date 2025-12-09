@@ -53,6 +53,7 @@ export function ssh(ns, hosts, target) {
     }
   }
   ns.print(path)
+  ns.singularity.connect("home")
   while (path.length > 0) {
     if (!ns.singularity.connect(path[0])) {
       ns.tprintf("Failed to connect to %s", path[0])

@@ -1,9 +1,9 @@
 import { dns } from "@/hosts.js"
 import { types } from "@/contracts.js"
+import { info, toast } from "@/log.js"
 
 var cashBuffer = 10e6
 var minPserv = 256
-var toasts = new Map()
 /** @param {NS} ns */
 export async function main(ns) {
   [
@@ -43,17 +43,6 @@ export async function main(ns) {
 /**
  * @param {NS} ns
  */
-function toast(ns, name, tmpl, ...args) {
-  ns.printf(tmpl, ...args)
-  if (!toasts.has(name) || toasts.get(name) < Date.now() - 60e3) {
-    ns.toast(ns.sprintf(tmpl, ...args))
-    toasts.set(name, Date.now())
-  }
-}
-
-/**
- * @param {NS} ns
- */
 function findContracts(ns) {
   var hosts = dns(ns)
   var count = 0
@@ -70,7 +59,7 @@ function findContracts(ns) {
       }
       var t = ns.codingcontract.getContractType(c, h.name)
       if (types.has(t)) {
-        ns.printf("Solving %s on %s (%s)", c, h.name, t)
+        info(ns, "Solving %s on %s (%s)", c, h.name, t)
         ns.run("contracts.js", 1, h.name, c, "--toast")
         solve++
       } else {
@@ -79,7 +68,7 @@ function findContracts(ns) {
     }
   }
   if (count > 0) {
-    toast(ns, "contract", "%d contracts found, %d attempted", count, count+solve)
+    toast(ns, "%d contracts found, %d attempted", count, count+solve)
   }
 }
 
@@ -95,10 +84,7 @@ function pserv(ns) {
       size *= 2
     }
     var name = ns.purchaseServer("pserv", size)
-    ns.printf("Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
-    if (name != "") {
-      toast(ns, "newsrv", "Bought %s server", ns.formatRam(size))
-    }
+    toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
     return
   }
 
@@ -113,7 +99,7 @@ function pserv(ns) {
       continue
     }
     if (ns.upgradePurchasedServer(s, size)) {
-      toast(ns, "upserv", "Upgraded server from %s to %s", ns.formatRam(orig), ns.formatRam(size))
+      toast(ns, "Upgraded server from %s to %s", ns.formatRam(orig), ns.formatRam(size))
       break
     } else {
       ns.printf("Failed to upgrade %s to %s", s, ns.formatRam(size))
@@ -129,7 +115,7 @@ function pserv(ns) {
 function check(ns, fn, name, ...args) {
   var ps = ns.ps("home")
   if (ps.filter((p) => p.filename == fn).length == 0) {
-    toast(ns, "start", "Starting %s", name)
+    toast(ns, "Starting %s", name)
     ns.run(fn, 1, ...args)
   }
 }

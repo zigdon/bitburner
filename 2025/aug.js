@@ -39,6 +39,12 @@ var factions = [
   "Volhaven",
 ]
 
+var cmds = new Map([
+  ["list", list],
+  ["show", show],
+  ["faction", listFaction],
+])
+
 /** @param {NS} ns */
 export async function main(ns) {
   var fs = ns.flags([
@@ -47,16 +53,20 @@ export async function main(ns) {
     ["factions", ""],
   ])
   var cmd = fs._[0]
-  var cmds = new Map([
-    ["list", list],
-    ["show", show],
-    ["faction", listFaction],
-  ])
   if (cmds.has(cmd)) {
     cmds.get(cmd)(ns, fs)
   } else {
     ns.tprintf("Commands: %s", Array.from(cmds.keys()).join(", "))
   }
+}
+
+/**
+ * @param {AutocompleteData} data - context about the game, useful when autocompleting
+ * @param {string[]} args - current arguments, not including "run script.js"
+ * @returns {string[]} - the array of possible autocomplete options
+ */
+export function autocomplete(data, args) {
+  return [...Array.from(cmds.keys()), ...factions]
 }
 
 /**
@@ -89,6 +99,8 @@ function listFaction(ns, flags) {
         "   "+r.type,
         ["money"].includes(r.type) ?
           ns.formatNumber(r[r.type]) :
+        ["skills"].includes(r.type) ?
+          Object.entries(r.skills).map((v) => v[0]+": "+v[1]) :
           r[r.type],
       ])
     }
@@ -175,6 +187,9 @@ function list(ns, flags) {
   var joined = getFactions(ns, {all: false})
   var data = []
   for (var a of augs) {
+    if (owned.includes(a)) {
+      continue
+    }
     var fs = ns.singularity.getAugmentationFactions(a).filter(
       (f) => joined.includes(f)
     )
@@ -184,9 +199,13 @@ function list(ns, flags) {
         "$"+ns.formatNumber(ns.singularity.getAugmentationBasePrice(a)),
         owned.includes(a) ? "black" : "green"
       ],
-      //[stats],
-      //[ns.singularity.getAugmentationPrereq(a)],
-      [ns.formatNumber(ns.singularity.getAugmentationRepReq(a))],
+      [ns.formatNumber(ns.singularity.getAugmentationRepReq(a)),
+        ns.singularity.getAugmentationFactions(a).filter(
+          (f) => joined.includes(f) &&
+                 ns.singularity.getFactionRep(f) >=
+                   ns.singularity.getAugmentationRepReq(a)
+        ).length > 0 ? "green" : "red"
+      ],
       [
         fs.length == 0 ?
           ns.singularity.getAugmentationFactions(a).length :

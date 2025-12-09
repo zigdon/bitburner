@@ -29,6 +29,16 @@ export function logn(ns, level, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
+export function toast(ns, tmpl, ...args) {
+  info(ns, tmpl, ...args)
+  ns.toast(ns.sprintf(tmpl, ...args), "info")
+}
+
+/**
+ * @param {NS} ns
+ * @param {String} tmpl
+ * @param {any} ...args
+ * */
 export function debug(ns, tmpl, ...args) {
   logn(ns, "DEBUG", tmpl, ...args)
 }
