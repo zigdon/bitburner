@@ -1,9 +1,17 @@
+import {toast} from "@/log.js"
 /** @param {NS} ns */
 export async function main(ns) {
   // Check and accept any faction invites.
   var skip = [
     "Aevum",
+    "BitRunners",
+    "Chongqing",
+    "CyberSec",
+    "Ishima",
+    "NiteSec",
     "Sector-12",
+    "The Black Hand",
+    "Tian Di Hui",
   ]
   var joined = []
   var failed = []
@@ -19,9 +27,9 @@ export async function main(ns) {
     }
   }
   if (joined.length > 0) {
-    ns.toast(ns.sprintf("Joined factions: %s", joined.join(", ")), "success")
+    toast(ns, ns.sprintf("Joined factions: %s", joined.join(", ")), "success")
   }
   if (failed.length > 0) {
-    ns.toast(ns.sprintf("Failed to join factions: %s", joined.join(", ")), "error")
+    toast(ns, ns.sprintf("Failed to join factions: %s", joined.join(", ")), "error")
   }
 }

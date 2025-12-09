@@ -1,3 +1,4 @@
+import { toast } "@/log.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var s = ns.singularity
@@ -17,8 +18,8 @@ export async function main(ns) {
   if (up.cores == 0 && up.ram == 0) {
     return
   }
-  ns.toast(ns.sprintf("Upgrade home computer: %d cores, %d RAM", up.cores, up.ram))
+  toast(ns, ns.sprintf("Upgrade home computer: %d cores, %d RAM", up.cores, up.ram))
   if (up.ram > 0) {
-    ns.toast(ns.sprintf("Home RAM: %s", ns.formatRam(ns.getServerMaxRam("home"))))
+    toast(ns, ns.sprintf("Home RAM: %s", ns.formatRam(ns.getServerMaxRam("home"))))
   }
 }
