@@ -15,12 +15,13 @@ possible valid IP address combinations that can be created from the string:
 */
 
 import {err, init} from "@/contracts.js"
+import {diff} from "@/lib/util.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var types = new Map([
     ["Generate IP Addresses", solve],
   ])
-  return init(ns, types, undefined, false)
+  return init(ns, types, test, false)
 }
 
 function solve(ns, data) {
@@ -35,6 +36,10 @@ function solve(ns, data) {
  */
 function ip(ns, data, octets) {
   var res = []
+  // If we just have too many digits, we don't have a valid solution.
+  if (data.length > octets*3) {
+    return []
+  }
   // If we are out of digits, make sure we're out of charactes too.
   if (octets == 1) {
     if (data.length == 0 || data > 256) { return [-1] }
@@ -78,4 +83,33 @@ export function mult(a, b) {
   }
 
   return res
+}
+
+async function test(ns, testdata) {
+  var tests = [
+    ['171141140169', ['171.141.140.169']],
+  ]
+  if (testdata.length > 0) {
+    tests = [[testdata[0], testdata[1]]]
+  }
+  ns.tprintf("Running tests:")
+  tests.forEach((t) => ns.tprintf("%j", t))
+  for (var t of tests) {
+    var passed = true
+    ns.tprintf("=== Finding IPs in %s", t[0])
+    var got = ip(ns, t[0], 4)
+    var d = diff(ns, t[1], got)
+    if (d != "") {
+      passed = false
+      ns.tprintf("=== Diff found:\n%s", d)
+    }
+
+    if (passed) {
+      ns.tprintf("======= PASSED")
+    } else {
+      ns.tprintf("======= FAILED")
+    }
+  }
+
+  return
 }

@@ -1,4 +1,4 @@
-import { table } from "/table.js"
+import { table } from "@/table.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var cmd = ns.args[0]

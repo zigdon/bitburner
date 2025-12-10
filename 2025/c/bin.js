@@ -33,7 +33,7 @@
     Hamming Codes. (https://youtube.com/watch?v=X8jsijhllIA)
  * */
 
-import {err, init} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var types = new Map([

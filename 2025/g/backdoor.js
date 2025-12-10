@@ -14,7 +14,7 @@ export async function main(ns) {
   if (target == undefined) {
     var ph = ns.getPlayer().skills.hacking
     var targets = Array.from(hosts.values()).filter(
-      (h) => !h.purchased && !h.backdoor && h.hack <= ph
+      (h) => !h.purchased && !h.backdoor && h.root && h.hack <= ph
     ).sort(
       (a,b) => b.hack - a.hack
     )
