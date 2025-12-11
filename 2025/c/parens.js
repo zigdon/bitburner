@@ -28,11 +28,16 @@ export async function main(ns) {
   return init(ns, types, test, false)
 }
 
+var cache = new Map()
+
 /**
  * @param {NS} ns
  * @param {String} data
  */
 async function solve(ns, data) {
+  if (cache.has(data)) {
+    return cache.get(data)
+  }
   var res = []
   ns.print(data)
   // If we don't have both ( and ), remove all of them
@@ -51,7 +56,7 @@ async function solve(ns, data) {
     await ns.asleep(10)
     data = data.substring(0, data.lastIndexOf("(")) + data.substring(1+data.lastIndexOf("("))
   }
-  ns.printf("Dont trimming")
+  ns.printf("Done trimming")
 
   // Check if we're good
   var valid = checkValid(ns, data)
@@ -89,6 +94,7 @@ async function solve(ns, data) {
   // Remove any duplicates
   res = res.sort().filter((r, i) => i == 0 || r != res[i-1])
 
+  cache.set(data, res)
   return res
 }
 

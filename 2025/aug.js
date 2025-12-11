@@ -39,7 +39,11 @@ export function autocomplete(data, args) {
 function show(ns, flags) {
   var name = flags._[1]
   var augs = getAllAugs(ns, flags).filter(
-    (a) => a.toLowerCase().includes(name.toLowerCase()))
+    (a) => a.toLowerCase() == name.toLowerCase())
+  if (augs.length == 0) {
+    augs = getAllAugs(ns, flags).filter(
+      (a) => a.toLowerCase().includes(name.toLowerCase()))
+  }
   if (augs.length == 0) {
     ns.tprintf("No augs match %j", name)
     return
@@ -113,9 +117,11 @@ function list(ns, flags) {
 }
 
 function findFactionForAug(ns, a) {
-  return ns.singularity.getAugmentationFactions(a).filter(
+  var fs = ns.singularity.getAugmentationFactions(a).filter(
     (f) => ns.singularity.getFactionRep(f) >=
              ns.singularity.getAugmentationRepReq(a))
+  ns.tprintf("%s can be bought from %j", a, fs)
+  return fs[0]
 }
 
 function buy(ns, flags) {
@@ -124,7 +130,7 @@ function buy(ns, flags) {
     (a) => !owned.includes(a) && a.includes(flags["augs"])
   ).map((a) => [a, findFactionForAug(ns, a)]
   ).filter(
-    (a) => a[1].length > 0
+    (a) => a[1]?.length > 0
   ).sort(
     (a,b) => ns.singularity.getAugmentationPrice(b[0]) -
              ns.singularity.getAugmentationPrice(a[0])
@@ -133,29 +139,33 @@ function buy(ns, flags) {
   ns.tprintf("Buying %d augs", augs.length)
   while (augs.length > 0 && 
     ns.getPlayer().money >= ns.singularity.getAugmentationPrice(augs[0][0])) {
-    if (!buyAug(ns, augs.shift)) {
+    if (!buyAug(ns, augs.shift())) {
       break
     }
   }
 }
 
 function buyAug(ns, a) {
-  if (owned.includes(a)) {
+  ns.printf("Buying %s from %s", a[0], a[1])
+  var owned = ns.singularity.getOwnedAugmentations(true)
+  if (owned.includes(a[0])) {
     return true
   }
 
-  for (var pre of ns.singularity.getAugmentationPrereq()) {
-    ns.tprintf("Buying prereq %s", pre)
-    if (!buy(ns, [pre, findFactionForAug(ns, pre)])) {
+  for (var pre of ns.singularity.getAugmentationPrereq(a[0])) {
+    var seller = findFactionForAug(ns, pre)
+    ns.printf("Buying prereq %s from %s", pre)
+    if (!buyAug(ns, [pre, seller])) {
+      ns.printf("Buying failed!")
       return false
     }
   }
 
-  if (ns.singularity.purchaseAugmentation(a[1][0], a[0])) {
-    ns.tprintf("Bought %s from %s", a[0], a[1][0])
+  if (ns.singularity.purchaseAugmentation(a[1], a[0])) {
+    ns.tprintf("Bought %s from %s", a[0], a[1])
     return true
   } else{
-    ns.tprintf("Couldn't buy %s from %s", a[0], a[1][0])
+    ns.tprintf("Couldn't buy %s from %s", a[0], a[1])
     return false
   }
 }

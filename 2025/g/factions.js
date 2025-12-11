@@ -2,22 +2,15 @@ import {toast} from "@/log.js"
 /** @param {NS} ns */
 export async function main(ns) {
   // Check and accept any faction invites.
-  var skip = [
-    "Aevum",
-    "BitRunners",
-    "Chongqing",
-    "CyberSec",
-    "Ishima",
-    "NiteSec",
-    "Sector-12",
-    "Slum Snakes",
-    "The Black Hand",
-    "Tian Di Hui",
-  ]
   var joined = []
   var failed = []
+  var owned = ns.singularity.getOwnedAugmentations(true)
   for (var f of ns.singularity.checkFactionInvitations()) {
-    if (skip.includes(f)) {
+    var offered = ns.singularity.getAugmentationsFromFaction(f).filter(
+      (f) => !owned.includes(f)
+    )
+
+    if (offered.length == 0) {
       ns.printf("Skipping faction invite: %s", f)
       continue
     }

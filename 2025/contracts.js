@@ -243,6 +243,17 @@ export async function init(ns, types, testfn, nosubmit) {
     err(ns, "Wrong contract type: %s", c.type)
     return
   }
+
+  // Check if we're already solving this.
+  if (ns.ps("home").filter(
+    (p) => p.name == ns.getScriptName() &&
+           p.args[0] == host &&
+           p.args[1] == file
+  ).length > 0) {
+    ns.printf("Already solving %s@%s", file, host)
+    return
+  }
+
   ns.printf("type=%s", c.type)
   var fn = types.get(c.type)
   var data = c.data

@@ -53,7 +53,7 @@ export async function main(ns) {
   ])
   var cmd = fs._[0]
   if (cmds.has(cmd)) {
-    cmds.get(cmd)(ns, fs)
+    cmds.get(cmd)(ns, fs._[1])
   } else {
     ns.tprintf("Commands: %s", Array.from(cmds.keys()).join(", "))
   }
@@ -64,31 +64,36 @@ export async function main(ns) {
  * @param {NS} ns
  * @param {String} name
  * */
-function listFactions(ns, flags) {
+function listFactions(ns, name) {
   var s = ns.singularity
-  var name = flags._[1] || ""
   var data = []
   var joined = getFactions(ns, {all: false})
+  var owned = ns.singularity.getOwnedAugmentations(true)
   var fs = getFactions(ns, {all: true}).filter(
-    (f) => f.toLowerCase().includes(name.toLowerCase()))
+    (f) => f.toLowerCase().includes(name?.toLowerCase() ?? ""))
   if (fs.length == 1) {
     return showFaction(ns, fs[0])
   }
 
   for (var f of fs) {
+    var augs = s.getAugmentationsFromFaction(f).filter(
+      (f) => !owned.includes(f)
+    ).length
+    var c = augs == 0 ? "black" : "green"
     data.push([
-      f,
-      ns.formatNumber(s.getFactionRep(f)),
-      ns.formatNumber(s.getFactionFavor(f)),
+      [f, c],
+      [ns.formatNumber(s.getFactionRep(f)), c],
+      [ns.formatNumber(s.getFactionFavor(f)), c],
       [s.getFactionEnemies(f).length,
         s.getFactionEnemies(f).reduce(
           (a, e) => a || joined.includes(e), false) ? "red" : "green"
       ],
-      s.getFactionWorkTypes(f).map((w)=>w[0]).join("").toUpperCase(),
+      [s.getFactionWorkTypes(f).map((w)=>w[0]).join("").toUpperCase(), c],
+      [augs, c],
     ])
   }
 
-  ns.tprint(table(ns, ["Name", "Rep", "Favor", "Enemies", "Work Types"], data))
+  ns.tprint(table(ns, ["Name", "Rep", "Favor", "Enemies", "Work Types", "Augs"], data))
 }
 
 function showFaction(ns, f) {
@@ -208,6 +213,10 @@ function formatReq(ns, r) {
       return [["  Hacknet cores", r.hacknetCores]]
     case "hacknetLevels":
       return [["  Hacknet levels", r.hacknetLevels]]
+    case "not":
+      let not = formatReq(ns, r.condition)
+      not[0][0]+= " not"
+      return not
     default:
       return [["unknown", ns.sprintf("%j", r)]]
   }
