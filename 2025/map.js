@@ -75,10 +75,19 @@ export async function main(ns) {
         notice.push(h.name)
       }
       if (!h.backdoor && !bd && h.root && h.hack <= playerHack && !h.purchased ) {
-        bd = true
-        ns.toast(ns.sprintf("Backdooring %s", h.name), "info")
-        ns.run("g/backdoor.js", 1, h.name)
-        ns.run("ssh.js", 1, "home")
+        if (h.name == "w0r1d_d43m0n") {
+          if (!ns.fileExists("data/wd.txt")) {
+            var msg = "w0r1d_d43m0n is hackable"
+            ns.toast(msg, "warning", null)
+            critical(ns, msg)
+            ns.write("data/wd.txt", "", "w")
+          }
+        } else {
+          bd = true
+          ns.toast(ns.sprintf("Backdooring %s", h.name), "info")
+          ns.run("g/backdoor.js", 1, h.name)
+          ns.run("ssh.js", 1, "home")
+        }
       }
       data.push([
         [h.name, story.includes(h.name) ? "white" : ""],

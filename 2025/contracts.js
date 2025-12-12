@@ -26,7 +26,8 @@ export var types = new Map([
     ["Spiralize Matrix", "/c/spiral.js"],
     ["Square Root", "/c/sqrt.js"],
     ["Subarray with Maximum Sum", "/c/sumarray.js"], 
-    ["Total Ways to Sum", "/c/sum2.js"],
+    ["Total Ways to Sum", "/c/sum.js"],
+    ["Total Ways to Sum II", "/c/sum2.js"],
     ["Unique Paths in a Grid I", "/c/grid2.js"],
     ["Unique Paths in a Grid II", "/c/grid2.js"],
   ])
