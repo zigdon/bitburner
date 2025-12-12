@@ -47,15 +47,18 @@ export async function main(ns) {
   var types = new Map([
     [ "Shortest Path in a Grid", solve ],
   ])
-  return init(ns, types, undefined, true)
+  return init(ns, types, undefined, false)
 }
 
 async function solve(ns, data) {
-  data.forEach((l) => ns.tprintf(l.join("")))
-  var paths = Array(data.length).fill(Array(data[0].length))
+  // data.forEach((l) => ns.tprintf(l.join("")))
+  var paths = Array(data.length)
+  for (var n=0; n<paths.length; n++) {
+    paths[n] = Array(data[0].length)
+  }
   // Valid options are 0 on the board, and never been visited before i.e. path=""
   const opts = (x,y) => {
-    ns.tprintf("Looking for options from %d,%d", x, y)
+    // ns.tprintf("Looking for options from %d,%d", x, y)
     let res = []
     for (let dir of "UDLR") {
       let [dx, dy] = [0, 0]
@@ -75,35 +78,39 @@ async function solve(ns, data) {
       }
       let nx = x+dx
       let ny = y+dy
+      // ns.tprintf("Checking %s -> %d,%d: %j %j",
+      //   dir, nx, ny, paths[ny]?.[nx], data[ny]?.[nx])
       if (paths[ny]?.[nx] == undefined && data[ny]?.[nx] == 0) {
-        ns.tprintf("  moving %s to %d,%d", dir, nx, ny)
         paths[ny][nx] = paths[y][x]+dir
+        // ns.tprintf("  adding %s to %d,%d (%j)", dir, nx, ny, paths[ny][nx])
         res.push({x: nx, y: ny})
       }
     }
 
-    ns.tprintf("options: %j", res)
+    // ns.tprintf("options: %j", res)
     return res
   }
 
-  var dest = {x:data[0].length, y: data.length}
+  var dest = {x:data[0].length-1, y: data.length-1}
   var todo = []
   paths[0][0] = ""
   todo.push(...opts(0,0))
   while (todo.length > 0) {
     await ns.asleep(10)
+    // paths.forEach((l) => ns.tprint(l))
     let next = todo.shift()
-    ns.tprintf("Moving to %j", next)
+    ns.printf("Moving to %j", next)
     if (next.x == dest.x && next.y == dest.y) {
       break
     }
     todo.push(...opts(next.x, next.y))
-    ns.tprintf("")
+    ns.printf("")
     data.forEach(
-      (l, x) => ns.tprintf(l.map(
-        (c, y) => c == 1 ? " x" : paths[x][y]?.length ?? 0)))
+      (l, x) => ns.print(l.map(
+        (c, y) => c == 1 ? " x" 
+        : ns.sprintf("%2s", paths[x][y]?.length ?? 0)).join("")))
   }
 
-  return paths[dest.x][dest.y]
+  return paths[dest.y][dest.x] ?? ""
 
 }

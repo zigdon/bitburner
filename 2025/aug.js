@@ -85,6 +85,7 @@ function list(ns, flags) {
   var owned = ns.singularity.getOwnedAugmentations(true)
   var joined = getFactions(ns, {all: false})
   var data = []
+  var missing = []
   for (var a of augs) {
     if (owned.includes(a)) {
       continue
@@ -92,6 +93,7 @@ function list(ns, flags) {
     var fs = ns.singularity.getAugmentationFactions(a).filter(
       (f) => joined.includes(f)
     )
+    fs.forEach((f) => !missing.includes(f) && missing.push(f))
     data.push([
       a,
       [
@@ -106,14 +108,21 @@ function list(ns, flags) {
         ).length > 0 ? "green" : "red"
       ],
       [
-        fs.length == 0 ?
-          ns.singularity.getAugmentationFactions(a).length :
-          fs.join(", ")
+        fs.length > 0
+        ? fs.join(", ")
+        : ns.singularity.getAugmentationFactions(a).length > 1
+        ? ns.singularity.getAugmentationFactions(a).length
+        : ns.sprintf("(%s)", ns.singularity.getAugmentationFactions(a))
       ],
     ])
   }
 
-  ns.tprint(table(ns, ["Name", "Price", "RepReq", "Factions"], data))
+  ns.tprintf(table(ns, ["Name", "Price", "RepReq", "Factions"], data))
+  missing.sort().forEach(
+    (f) => ns.tprintf("%s: %s%s%s", f, colors["white"],
+      ns.formatNumber(ns.singularity.getFactionRep(f)),
+      colors["reset"],
+    ))
 }
 
 function findFactionForAug(ns, a) {

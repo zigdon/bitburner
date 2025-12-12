@@ -22,6 +22,7 @@ export var types = new Map([
     ["Minimum Path Sum in a Triangle", "/c/triangle.js"],
     ["Proper 2-Coloring of a Graph", "/c/graph.js"],
     ["Sanitize Parentheses in Expression", "/c/parens.js"],
+    ["Shortest Path in a Grid", "/c/grid1.js"],
     ["Spiralize Matrix", "/c/spiral.js"],
     ["Square Root", "/c/sqrt.js"],
     ["Subarray with Maximum Sum", "/c/sumarray.js"], 
@@ -39,8 +40,9 @@ export async function main(ns) {
     return listContracts(ns)
   }
 
-  if (file == undefined || file.match(/^[0-9]+$/)) {
+  if (file == undefined || String(file).match(/^[0-9]+$/)) {
     var files = ns.ls(host, ".cct")
+    ns.printf("Contracts found: %j", files)
     if (files.length == 0) {
       err(ns, "No contracts found on ", host)
       return
@@ -53,7 +55,9 @@ export async function main(ns) {
         ns.tprint("Found contracts:")
         files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, ns.codingcontract.getContract(f, host).type))
         if (Number(file) > 0 && Number(file) <= files.length) {
-          file = files[file+1]
+          ns.printf("Selecting %j", file)
+          file = files[Number(file)-1]
+          ns.printf("Selected %s", file)
         } else {
           return
         }
@@ -63,6 +67,7 @@ export async function main(ns) {
     }
   }
 
+  ns.printf("Reading %s@%s", file, host)
   var c = ns.codingcontract.getContract(file, host)
   if (!types.has(c.type)) {
     err(ns, "Unknown contract type %s", c.type)
