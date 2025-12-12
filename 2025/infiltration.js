@@ -5,13 +5,14 @@ import { table } from "@/table.js"
 export async function main(ns) {
   var targets = ns.infiltration.getPossibleLocations().sort(
     (a,b) => a.name < b.name ? -1 : a.name == b.name ? 0 : 1)
+  var loc = ns.getPlayer().city
+  ns.tprint(loc)
   var data = []
   for (var target of targets) {
     var t = ns.infiltration.getInfiltration(target.name)
-    ns.tprint(t)
     data.push([
       target.name,
-      target.city,
+      [target.city, target.city == loc ? "white" : "green"],
       ns.sprintf("%.2f", t.difficulty),
       t.maxClearanceLevel,
       t.startingSecurityLevel,

@@ -39,7 +39,7 @@ export async function main(ns) {
     return listContracts(ns)
   }
 
-  if (file == undefined) {
+  if (file == undefined || file.match(/^[0-9]+$/)) {
     var files = ns.ls(host, ".cct")
     if (files.length == 0) {
       err(ns, "No contracts found on ", host)
@@ -48,13 +48,19 @@ export async function main(ns) {
       if (fs["toast"]) {
         log(ns, "Found contracts:")
         files.forEach((f) => log(ns, "%s: %s", f, ns.codingcontract.getContract(f, host).type))
+        return
       } else {
         ns.tprint("Found contracts:")
-        files.forEach((f) => ns.tprintf("%s: %s", f, ns.codingcontract.getContract(f, host).type))
+        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, ns.codingcontract.getContract(f, host).type))
+        if (Number(file) > 0 && Number(file) <= files.length) {
+          file = files[file+1]
+        } else {
+          return
+        }
       }
-      return
+    } else {
+      file = files[0]
     }
-    file = files[0]
   }
 
   var c = ns.codingcontract.getContract(file, host)
