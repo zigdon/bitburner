@@ -14,7 +14,7 @@ export async function main(ns) {
 
   var summary = new Map()
   for (var p of ps) {
-    if (!["grow.js", "hack.js", "weaken.js"].includes(p.filename)) {
+    if (!["bin/grow.js", "bin/hack.js", "bin/weaken.js"].includes(p.filename)) {
       continue
     }
     var target = p.args[0]

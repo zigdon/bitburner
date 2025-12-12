@@ -21,7 +21,7 @@ export async function main(ns) {
   // When exiting kill all pending messages
   ns.atExit(() => {
     ns.ps().forEach((p) => 
-      p.args[0] == "send.js" && p.args[1] == "20" && ns.kill(p.pid)
+      p.args[0] == "bin/send.js" && p.args[1] == "20" && ns.kill(p.pid)
     )
   })
 
@@ -33,7 +33,7 @@ export async function main(ns) {
     var hosts = dns(ns)
   
     // copy scripts
-    const tools = ["hack.js", "weaken.js", "grow.js", "colors.js"]
+    const tools = ["bin/hack.js", "bin/weaken.js", "bin/grow.js", "bin/colors.js"]
     for (var h of hosts.keys()) {
       ns.scp(tools, h)
     }
@@ -88,7 +88,7 @@ export async function main(ns) {
       var wt = Math.min(weakenThreads, capacity)
       debug(ns, "Need %d/%d threads to weaken from %d to %d",
         weakenThreads, capacity, ns.getServerSecurityLevel(tName), ns.getServerMinSecurityLevel(tName))
-      spread(ns, "weaken.js", wt, tName, 0)
+      spread(ns, "bin/weaken.js", wt, tName, 0)
       capacity -= wt
       delay = ns.getWeakenTime(tName) + 25
     }
@@ -99,7 +99,7 @@ export async function main(ns) {
       var gt = Math.min(capacity, growThreads)
       debug(ns, "Need %d/%d threads to grow from %s to %s",
         growThreads, capacity, ns.formatNumber(ns.getServerMoneyAvailable(tName)), ns.formatNumber(ns.getServerMaxMoney(tName)))
-      spread(ns, "grow.js", gt, tName, delay)
+      spread(ns, "bin/grow.js", gt, tName, delay)
       capacity -= gt
       delay = ns.getGrowTime(tName) + 25
     }
@@ -112,7 +112,7 @@ export async function main(ns) {
   
     started.set(tName, true)
     // Schedule clearing the mark
-    ns.run("send.js", 1, 20, delay, tName)
+    ns.run("bin/send.js", 1, 20, delay, tName)
   }
 }
 
@@ -213,10 +213,10 @@ function batch(ns, tName, plan) {
   )
   debug(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
   // HWGW
-  spread(ns, "hack.js", plan.h, tName, ts-100)
-  spread(ns, "weaken.js", plan.wh, tName, ts-75)
-  spread(ns, "grow.js", plan.g, tName, ts-50)
-  spread(ns, "weaken.js", plan.wg, tName, ts-25)
+  spread(ns, "bin/hack.js", plan.h, tName, ts-100)
+  spread(ns, "bin/weaken.js", plan.wh, tName, ts-75)
+  spread(ns, "bin/grow.js", plan.g, tName, ts-50)
+  spread(ns, "bin/weaken.js", plan.wg, tName, ts-25)
 
   return ts
 }

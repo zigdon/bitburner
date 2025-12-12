@@ -7,7 +7,7 @@ export async function main(ns) {
   var target = ns.args[1]
 
   while (true) {
-    ns.scp(["hack.js", "grow.js", "weaken.js", "colors.js"], host)
+    ns.scp(["bin/hack.js", "bin/grow.js", "bin/weaken.js", "colors.js"], host)
     // Weaken to min
     var maxVal = ns.getServerMaxMoney(target)
     var min = ns.getServerMinSecurityLevel(target)
@@ -31,7 +31,7 @@ export async function main(ns) {
       while (min * 1.1 < cur) {
         var prep_ms = ns.getWeakenTime(target)
         log(ns, "[%s->%s] Weakening (%.3f > %f) with %d threads (%.2f)", host, target, cur, min, t, prep_ms / 1000)
-        var pid = ns.exec("weaken.js", host, t, target, 0)
+        var pid = ns.exec("bin/weaken.js", host, t, target, 0)
         if (pid > 0) {
           await ns.asleep(prep_ms)
         } else {
@@ -53,7 +53,7 @@ export async function main(ns) {
 
         var prep_ms = ns.getGrowTime(target)
         log(ns, "[%s->%s] Growing (%s < %s) with %d threads (%.2f)", host, target, ns.formatNumber(curVal), ns.formatNumber(maxVal), t, prep_ms / 1000)
-        var pid = ns.exec("grow.js", host, t, target, 0)
+        var pid = ns.exec("bin/grow.js", host, t, target, 0)
         if (pid > 0) {
           await ns.asleep(prep_ms)
         } else {
@@ -76,13 +76,13 @@ export async function main(ns) {
     }
     log(ns, "[%s->%s] Starting batch with %d threads (%d)", host, target, maxThreads, ts / 1000)
     // HWGW
-    ns.exec("hack.js", host, maxThreads / 4, target, ts - 100) ||
+    ns.exec("bin/hack.js", host, maxThreads / 4, target, ts - 100) ||
       log(ns, "[%s-%s] %sFailed to run hack%s", host, target, colors["red"], colors["reset"])
-    ns.exec("weaken.js", host, maxThreads / 4, target, ts - 75) ||
+    ns.exec("bin/weaken.js", host, maxThreads / 4, target, ts - 75) ||
       log(ns, "[%s-%s] %sFailed to run weaken1%s", host, target, colors["red"], colors["reset"])
-    ns.exec("grow.js", host, maxThreads / 4, target, ts - 50) ||
+    ns.exec("bin/grow.js", host, maxThreads / 4, target, ts - 50) ||
       log(ns, "[%s-%s] %sFailed to run grow%s", host, target, colors["red"], colors["reset"])
-    ns.exec("weaken.js", host, maxThreads / 4, target, ts - 25) ||
+    ns.exec("bin/weaken.js", host, maxThreads / 4, target, ts - 25) ||
       log(ns, "[%s-%s] %sFailed to run weaken2%s", host, target, colors["red"], colors["reset"])
 
     await ns.asleep(ts)
