@@ -65,7 +65,6 @@ function show(ns, flags) {
       data.push(["  "+p, ns.formatNumber(s[p])])
     }
   }
-  ns.tprint(data)
   ns.tprint(table(ns, ["Name", augs[0]], data))
 }
 

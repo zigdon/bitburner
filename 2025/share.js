@@ -6,7 +6,7 @@ export async function main(ns) {
   do {
     var total = 0
     for (var h of hosts.keys()) {
-      ns.scp("server-share.js", h)
+      ns.scp("bin/share.js", h)
       var avail = ns.getServerMaxRam(h) - ns.getServerUsedRam(h)
       if (h == "home") {
         avail -= reserve
@@ -15,7 +15,7 @@ export async function main(ns) {
         continue
       }
       total += Math.floor(avail/4)*4
-      ns.exec("server-share.js", h, Math.floor(avail/4))
+      ns.exec("bin/share.js", h, Math.floor(avail/4))
     }
     ns.toast(ns.sprintf("Sharing %s", ns.formatRam(total)), "info")
     await ns.asleep(11000)

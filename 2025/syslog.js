@@ -66,6 +66,9 @@ export async function main(ns) {
       }
     }
     
+    if (level == "DEBUG") {
+      continue
+    }
     ns.printf("%s %s[%8s]%s %s", now.toLocaleTimeString(), c, level, colors["reset"], msg)
 
     await ns.asleep(1)

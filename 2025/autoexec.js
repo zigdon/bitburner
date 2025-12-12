@@ -16,6 +16,7 @@ export async function main(ns) {
   ns.run("g/tor.js", 1)
   ns.run("map.js", 1, "--silent")
   check(ns, "go2.js", "hack controller")
+  check(ns, "ipvgo.js", "IPvGO player")
 
   while(true) {
     // Handle pserv
