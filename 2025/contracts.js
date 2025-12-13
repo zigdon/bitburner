@@ -1,6 +1,6 @@
 import { dns } from "@/hosts.js"
 import { table } from "@/table.js"
-import { info } from "@/log.js"
+import { warning, info } from "@/log.js"
 export var types = new Map([
     ["Algorithmic Stock Trader I", "/c/stock1.js"],
     ["Algorithmic Stock Trader II", "/c/stock1.js"],
@@ -133,6 +133,7 @@ export async function main(ns) {
     ns.print("Skipping blocked contract: "+ c.type)
     if (!fs["toast"]) {
       ns.toast("Skipping blocked contract: "+ c.type, "warning")
+      info(ns, "Skipping blocked contract: %s", c.type)
     }
   }
   return
@@ -193,6 +194,7 @@ export function block(ns, type) {
   if (!data.includes(type)) {
     data.push(type)
     ns.toast(ns.sprintf("Blocking contract type %s", type), "warning")
+    warning(ns, "Blocking contract type %s", type)
     save(ns, data)
   }
 }
@@ -205,6 +207,7 @@ export function unblock(ns, type) {
     ns.printf("%j", updated)
     ns.printf("Unblocking %s, %d still blocked", type, updated.length)
     ns.toast(ns.sprintf("Unblocking %s, %d still blocked", type, updated.length))
+    info(ns, "Unblocking %s, %d still blocked", type, updated.length)
     save(ns, updated)
   }
 }
@@ -278,11 +281,13 @@ export async function init(ns, types, testfn, nosubmit) {
     ns.print(res)
     ns.print(msg)
     ns.toast(msg)
+    info(ns, msg)
   } else {
     ns.tprintf("Input data:\n%j", data)
     ns.tprint(data)
     ns.tprint(res)
     ns.tprint(msg)
+    info(ns, msg)
   }
 
   info(ns, "Attempted to solve contract %s: %s", c.type, msg)
@@ -301,7 +306,7 @@ function listContracts(ns) {
         (f) => ns.fileExists(f, h.name)
       ).forEach(
         (f) => data.push(
-          [h.name, f, ns.codingcontract.getContractType(f, h.name)])
+          [h.name, f, ns.codingcontract.getContract(f, h.name)?.type])
       ))
     // ns.tprint(data)
     // data.forEach((l) => ns.tprint(l))

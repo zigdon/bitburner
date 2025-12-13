@@ -1,13 +1,14 @@
 import { colors } from "@/colors.js"
 import { table } from "@/table.js"
 import { ssh } from "@/ssh.js"
+import { critical } from "@/log.js"
 
 var playerHack = 0
 var tools = 0
 var lit = []
 
 var story = [
-  "CSEC", "I.I.I.I", "avmnite-02h", "run4theh111z",
+  "CSEC", "I.I.I.I", "avmnite-02h", "run4theh111z", "w0r1d_d43m0n",
 ]
 
 /** @param {NS} ns */

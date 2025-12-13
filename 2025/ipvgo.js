@@ -13,6 +13,21 @@ import { table } from "@/table.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
+  let flags = ns.flags([
+    ["op", 4],
+    ["size", 7],
+  ]);
+  if (flags["op"] == 0) {
+    ops.forEach((o, i) => ns.tprintf("%d. %s", i+1, o));
+    return;
+  } else {
+    ns.tprintf("Start IPvGO automation against %s", ops[flags["op"]-1]);
+  }
+  if (![5, 7, 9, 13].includes(flags["size"])) {
+    ns.tprintf("Invalid size, pick oned of 5, 7, 9, 13");
+    return;
+  }
+
   ns.disableLog("sleep")
   const play = (board, move) => {
     let next = board.map((l) => String(l))
@@ -136,7 +151,7 @@ export async function main(ns) {
   while (true) {
     // If game is over, start a new game.
     if (ns.go.getCurrentPlayer() == "None") {
-      ns.go.resetBoardState(ops[4], 7)
+      ns.go.resetBoardState(ops[flags["op"]-1], 7)
     }
 
     let result, x, y;

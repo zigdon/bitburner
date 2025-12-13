@@ -18,7 +18,7 @@ function solve(ns, data) {
   var div = 2
   while (div <= sqrt) {
     while (Math.floor(data/div) == data/div) {
-      ns.tprintf("%f/%f=%f", data, div, data/div)
+      ns.printf("%f/%f=%f", data, div, data/div)
       data /= div
       if (data == 1) {
         return div

@@ -9,8 +9,13 @@ export async function main(ns) {
   [
     "getServerMaxRam",
   ].forEach((i) => ns.disableLog(i))
+  ns.rm("data/wd.txt", "home")
   ns.ls("home", "/bak").forEach((f) => ns.rm(f, "home"))
-  ns.ls("home", "/logs/*.txt").forEach((f) => ns.mv("home", f, "/bak/"+f))
+  ns.ls("home", "/logs").filter(
+    (f) => f.endsWith(".txt")
+  ).forEach(
+    (f) => ns.mv("home", f, "/bak/"+f)
+  )
   check(ns, "console.js", "console")
   check(ns, "syslog.js", "syslog")
   ns.run("g/tor.js", 1)
@@ -47,29 +52,19 @@ export async function main(ns) {
 function findContracts(ns) {
   var hosts = dns(ns)
   var count = 0
-  var solve = 0
-  for (var h of hosts.values()) {
-    if (h.name == "home") {
+  for (var h of hosts.keys()) {
+    if (h == "home") {
       continue
     }
-    var cs = Array.from(h.files.filter((f) => f.endsWith(".cct")))
+    var cs = ns.ls(h).filter((f) => f.endsWith(".cct"))
     for (var c of cs) {
-      if (ns.ls(h.name).filter((f) => f == c).length == 0) {
-        ns.printf("Can't find %s on %s, skipping.", c, h.name)
-        continue
-      }
-      var t = ns.codingcontract.getContractType(c, h.name)
-      if (types.has(t)) {
-        info(ns, "Solving %s on %s (%s)", c, h.name, t)
-        ns.run("contracts.js", 1, h.name, c, "--toast")
-        solve++
-      } else {
-        count++
-      }
+      info(ns, "Found contract %s on %s", c, h)
+      ns.run("contracts.js", 1, h, c, "--toast")
+      count++
     }
   }
   if (count > 0) {
-    toast(ns, "%d contracts found, %d attempted", count, count+solve)
+    toast(ns, "%d contracts found", count)
   }
 }
 
@@ -85,7 +80,9 @@ function pserv(ns) {
       size *= 2
     }
     var name = ns.purchaseServer("pserv", size)
-    toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
+    if (name != "") {
+      toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
+    }
     return
   }
 

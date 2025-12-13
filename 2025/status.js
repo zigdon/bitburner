@@ -31,7 +31,7 @@ export async function main(ns) {
         sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
       }
     }
-    ent[p.filename[0]] += p.threads
+    ent[p.filename[p.filename.indexOf("/")+1]] += p.threads
     summary.set(target, ent)
   }
 

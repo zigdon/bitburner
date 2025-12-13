@@ -33,7 +33,7 @@ export async function main(ns) {
     var hosts = dns(ns)
   
     // copy scripts
-    const tools = ["bin/hack.js", "bin/weaken.js", "bin/grow.js", "bin/colors.js"]
+    const tools = ["bin/hack.js", "bin/weaken.js", "bin/grow.js", "colors.js"]
     for (var h of hosts.keys()) {
       ns.scp(tools, h)
     }
