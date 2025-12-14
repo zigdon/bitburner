@@ -2,13 +2,14 @@ import { dns } from "@/hosts.js"
 import { types } from "@/contracts.js"
 import { info, toast } from "@/log.js"
 
-var cashBuffer = 10e6
-var minPserv = 256
+const config = "data/autoexec.json"
+var cfg = {valid:false}
 /** @param {NS} ns */
 export async function main(ns) {
   [
     "getServerMaxRam",
   ].forEach((i) => ns.disableLog(i))
+  ns.clearLog()
   ns.rm("data/wd.txt", "home")
   ns.ls("home", "/bak").forEach((f) => ns.rm(f, "home"))
   ns.ls("home", "/logs").filter(
@@ -16,34 +17,61 @@ export async function main(ns) {
   ).forEach(
     (f) => ns.mv("home", f, "/bak/"+f)
   )
-  check(ns, "console.js", "console")
-  check(ns, "syslog.js", "syslog")
-  ns.run("g/tor.js", 1)
-  ns.run("map.js", 1, "--silent")
-  check(ns, "go2.js", "hack controller")
-  check(ns, "ipvgo.js", "IPvGO player")
+  cfg = loadCfg(ns, config)
+  if (!cfg?.valid) {
+    ns.tprintf("Failed to load config at startup")
+    return
+  }
+  for (var p of cfg.run) {
+    if (p.oneTime) {
+      ns.run(p.name, 1, ...(p.args ?? []))
+    } else {
+      check(ns, p)
+    }
+  }
 
+  if (cfg.pserv.disabled) {
+    ns.toast("Server buying disabled", "warning")
+  }
   while(true) {
-    // Handle pserv
-    pserv(ns)
-    // Find contracts
-    findContracts(ns)
+    // Update config
+    var next = loadCfg(ns, config)
+    if (next.valid) {
+      cfg = next
+    }
+
+    // Restart what we expect should be running.
+    for (var p of cfg.run) {
+      if (p.oneTime) {
+        continue
+      }
+      check(ns, p)
+      await ns.asleep(100)
+    }
+
+    // Handle pserv.
+    if (cfg.loop.pserv) { pserv(ns) }
+    // Find contracts.
+    if (cfg.loop.contracts) { findContracts(ns) }
     await ns.asleep(100)
-    // Buy upgrades
-    ns.run("g/upgrade.js", 1)
-    await ns.asleep(100)
-    // Buy programs
-    ns.run("g/program.js", 1)
-    await ns.asleep(100)
-    // Join factions
-    ns.run("g/factions.js", 1)
-    await ns.asleep(100)
-    // Update hosts file
-    ns.run("map.js", 1, "--silent")
+
     ns.printf("Loop done: %s", Date())
     await ns.asleep(60000)
   }
 
+}
+
+function loadCfg(ns, name) {
+  if (!ns.fileExists(name)) {
+    ns.toast(ns.sprintf("%s not found", name), "error")
+    return
+  }
+  var next = JSON.parse(ns.read(name))
+  if (next?.valid) {
+    ns.printf("new config: %j", next)
+    return next
+  }
+  ns.toast(ns.sprintf("Error parsing %s", name), "error")
 }
 
 /**
@@ -72,10 +100,14 @@ function findContracts(ns) {
  * @param {NS} ns
  */
 function pserv(ns) {
-  var m = ns.getPlayer().money - cashBuffer
+  if (cfg.pserv.disabled) {
+    ns.printf("Buying servers disabled")
+    return
+  }
+  var m = ns.getPlayer().money - cfg.pserv.cashBuffer
   // find larger pserv we can afford to buy with our budget
   if (ns.getPurchasedServers().length < ns.getPurchasedServerLimit()) {
-    var size = minPserv
+    var size = cfg.pserv.min
     while (ns.getPurchasedServerCost(size*2) < m) {
       size *= 2
     }
@@ -110,10 +142,16 @@ function pserv(ns) {
  * @param {String} fn
  * @param {String} name
  */
-function check(ns, fn, name, ...args) {
-  var ps = ns.ps("home")
-  if (ps.filter((p) => p.filename == fn).length == 0) {
-    toast(ns, "Starting %s", name)
-    ns.run(fn, 1, ...args)
+function check(ns, def) {
+  ns.print(def)
+  if (def.disabled) {
+    ns.printf("%s disabled in loop config", def.name)
+    return
+  }
+  if (ns.ps("home").filter((p) => p.filename == def.name).length == 0) {
+    if (def.title) {
+      toast(ns, "Starting %s", def.title)
+    }
+    ns.run(def.name, 1, ...(def.args ?? []))
   }
 }

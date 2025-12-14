@@ -66,11 +66,18 @@ function encode(ns, data) {
     res += b
     guide += "-"
   }
+  ns.printf("          %s",
+    Array(res.length).fill(0).map(
+      (_, i) => Math.floor((i/10))%10
+    ).map(
+      (n) => n == 0 ? " " : n
+    ).join(""))
+  ns.printf("          %s", Array(res.length).fill(0).map((_, i) => i%10).join(""))
   ns.printf("padded => %s", res)
   ns.printf(" pbits => %s", guide)
 
   // Get each parity block, calculate the parity bits
-  for (var n = Math.floor(Math.sqrt(res.length)); n >=0; n--) {
+  for (var n = Math.floor(Math.sqrt(res.length))-1; n >=0; n--) {
     var block = getBlock(res, n)
     // If the current parity is correct, leave it as 0, otherwise, flip
     var p = getParity(block) ? "0" : "1"

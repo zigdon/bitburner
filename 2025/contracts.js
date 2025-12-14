@@ -56,7 +56,7 @@ export async function main(ns) {
         ns.tprint("Found contracts:")
         files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, ns.codingcontract.getContract(f, host).type))
         if (Number(file) > 0 && Number(file) <= files.length) {
-          ns.printf("Selecting %j", file)
+          ns.tprintf("Selecting %j", file)
           file = files[Number(file)-1]
           ns.printf("Selected %s", file)
         } else {
@@ -261,11 +261,18 @@ export async function init(ns, types, testfn, nosubmit) {
 
   // Check if we're already solving this.
   if (ns.ps("home").filter(
-    (p) => p.name == ns.getScriptName() &&
+    (p) => p.filename == ns.getScriptName() &&
            p.args[0] == host &&
-           p.args[1] == file
+           p.args[1] == file &&
+           p.pid != ns.pid
   ).length > 0) {
-    ns.printf("Already solving %s@%s", file, host)
+    ns.printf("Already solving %s@%s:", file, host)
+    ns.ps("home").filter(
+      (p) => p.filename == ns.getScriptName() &&
+            p.args[0] == host &&
+            p.args[1] == file &&
+           p.pid != ns.pid
+    ).forEach((p) => ns.print(p))
     return
   }
 
@@ -278,14 +285,13 @@ export async function init(ns, types, testfn, nosubmit) {
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
   if (fs["toast"]) {
     ns.printf("Input data:\n%j", data)
-    ns.print(res)
+    ns.printf("Result: %j", res)
     ns.print(msg)
     ns.toast(msg)
     info(ns, msg)
   } else {
     ns.tprintf("Input data:\n%j", data)
-    ns.tprint(data)
-    ns.tprint(res)
+    ns.tprintf("Result: %j", res)
     ns.tprint(msg)
     info(ns, msg)
   }

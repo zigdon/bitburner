@@ -29,9 +29,24 @@ import {table} from "@/table.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var types = new Map([
-    ["Total Ways to Sum", euler],
+    ["Total Ways to Sum", solve],
   ])
   return init(ns, types, test, false)
+}
+
+/**
+ * @param {NS} ns
+ * @param {Number[]} data
+ */
+async function solve(ns, data) {
+  var e = await euler(ns, data)
+  if (e > 0) {
+    // The partition includes the sum using any number of positive integers,
+    // including just the number itself. So skip that.
+    return e-1
+  } else {
+    return ""
+  }
 }
 
 var eul = new Map()

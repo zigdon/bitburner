@@ -152,6 +152,9 @@ export async function main(ns) {
     // If game is over, start a new game.
     if (ns.go.getCurrentPlayer() == "None") {
       ns.go.resetBoardState(ops[flags["op"]-1], 7)
+    } else if (ns.go.getCurrentPlayer() == "White") {
+      // Wait for our turn
+      await ns.go.opponentNextTurn();
     }
 
     let result, x, y;

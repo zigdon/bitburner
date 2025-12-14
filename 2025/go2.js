@@ -238,7 +238,7 @@ function spread(ns, tool, threads, target, ts) {
   for (var h of hosts) {
     var max = ns.getServerMaxRam(h)
     if (h == "home") {
-      max -= buffer
+      max -= Math.max(buffer, max/2)
     }
     var t = Math.floor((max - ns.getServerUsedRam(h)) / 1.75, threads)
     if (t <= 0) {

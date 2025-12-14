@@ -47,9 +47,10 @@ var cmds = new Map([
 /** @param {NS} ns */
 export async function main(ns) {
   var fs = ns.flags([
-    ["all", false],
     ["augs", ""],
     ["factions", ""],
+    ["joined", false],
+    ["sort", ""],
   ])
   var cmd = fs._[0]
   if (cmds.has(cmd)) {
@@ -110,14 +111,24 @@ function getAllAugs(ns, flags) {
 /** @param {NS} ns */
 function list(ns, flags) {
   var augs = getAllAugs(ns, flags).filter((a) => a.includes(flags["augs"]))
-  var joined = factions
+  var joined = factions.filter(
+    (f) => ns.singularity.getFactionRep(f) != 0
+  )
   var data = []
   var missing = []
+  if (flags["sort"] == "price") {
+    augs = augs.sort(
+      (a,b) => ns.singularity.getAugmentationPrice(a) -
+               ns.singularity.getAugmentationPrice(b))
+  }
   for (var a of augs) {
     var fs = ns.singularity.getAugmentationFactions(a).filter(
       (f) => joined.includes(f)
     )
     fs.forEach((f) => !missing.includes(f) && missing.push(f))
+    if (flags["joined"] && !fs.reduce((a, f) => a || joined.includes(f), false)) {
+      continue
+    }
     data.push([
       a,
       "$"+ns.formatNumber(ns.singularity.getAugmentationPrice(a)),
@@ -132,7 +143,9 @@ function list(ns, flags) {
   }
 
   ns.tprintf(table(ns, ["Name", "Price", "Factions"], data))
-  missing.sort().forEach(
+  missing.sort().filter(
+    (f) => ns.singularity.getFactionRep(f) != 0
+  ).forEach(
     (f) => ns.tprintf("%s: %s%s%s", f, colors["white"],
       ns.formatNumber(ns.singularity.getFactionRep(f)),
       colors["reset"],

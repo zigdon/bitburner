@@ -112,7 +112,6 @@ const cities = [
   "New Tokyo",
   "Ishima",
 ]
-
 const jobs = {
   ops: "Operations",
   eng: "Engineer",
@@ -136,22 +135,9 @@ export async function main(ns) {
   if (!createCorp(ns, corp)) { return }
   if (!createDiv(ns, industry.ag, names.ag)) { return }
   if (!unlock(ns, "Smart Supply")) { return }
-  for (let c of cities) {
-    if (!ns.corporation.getDivision(names.ag).cities.includes(c)) {
-      if (ns.corporation.getCorporation().funds < 5000000000) {
-        ns.printf("Not enough funds to expand %s to %s, skipping", names.ag, c)
-        continue
-      }
-      ns.printf("Expanding %s to %s", names.ag, c)
-      expandCity(ns, names.ag, c)
-    }
-    setSmartSupply(ns, names.ag, c, "Food", "Plants")
-    if (!assign(ns, names.ag, c, {ops: 1, eng: 1, mgt: 1})) { return }
-    upgradeWarehouse(ns, names.ag, c, 1)
-    sellMat(ns, names.ag, c, "Food", "MAX", "MP")
-    sellMat(ns, names.ag, c, "Plants", "MAX", "MP")
-    buyWarehouseFactors(ns, names.ag, c, industry.ag, 10)
-  }
+  expand(ns, names.ag, "Food", "Plants")
+  // ongoing loop:
+  //   manage research
 }
 
 function createCorp(ns, name) {
@@ -229,22 +215,61 @@ function buyWarehouseFactors(ns, name, city, industry, amt) {
     hardware: data.hardwareFactor,
     re: data.realEstateFactor,
   }
-  let stock = {
-    ai: c.getMaterial(name, city, "AI Cores").stored,
-    robot: c.getMaterial(name, city, "Robots").stored,
-    hardware: c.getMaterial(name, city, "Hardware").stored,
-    re: c.getMaterial(name, city, "Real Estate").stored,
+  let cont = true
+  while (cont) {
+    cont = false
+    let stock = {
+      ai: c.getMaterial(name, city, "AI Cores").stored,
+      robot: c.getMaterial(name, city, "Robots").stored,
+      hardware: c.getMaterial(name, city, "Hardware").stored,
+      re: c.getMaterial(name, city, "Real Estate").stored,
+    }
+    if (stock.ai < target.ai*amt) {
+      cont = true
+      c.buyMaterial(name, city, "AI Cores", (target.ai*amt-stock.ai)/10)
+    } else {
+      c.buyMaterial(name, city, "AI Cores", 0)
+    }
+    if (stock.robot < target.robot*amt) {
+      cont = true
+      c.buyMaterial(name, city, "Robots", (target.robot*amt-stock.robot)/10)
+    } else {
+      c.buyMaterial(name, city, "Robots", 0)
+    }
+    if (stock.hardware < target.hardware*amt) {
+      cont = true
+      c.buyMaterial(name, city, "Hardware", (target.hardware*amt-stock.hardware)/10)
+    } else {
+      c.buyMaterial(name, city, "Hardware", 0)
+    }
+    if (stock.re < target.re*amt) {
+      cont = true
+      c.buyMaterial(name, city, "Real Estate", (target.re*amt-stock.re)/10)
+    } else {
+      c.buyMaterial(name, city, "Real Estate", 0)
+    }
   }
-  if (stock.ai < target.ai*amt) {
-    c.buyMaterial(name, city, "AI Cores", target.ai*amt-stock.ai)
-  }
-  if (stock.robot < target.robot*amt) {
-    c.buyMaterial(name, city, "Robots", target.robot*amt-stock.robot)
-  }
-  if (stock.hardware < target.hardware*amt) {
-    c.buyMaterial(name, city, "Hardware", target.hardware*amt-stock.hardware)
-  }
-  if (stock.re < target.re*amt) {
-    c.buyMaterial(name, city, "Real Estate", target.re*amt-stock.re)
+}
+
+function expand(ns, name, ...mats) {
+  for (let c of cities) {
+    if (!ns.corporation.getDivision(name).cities.includes(c)) {
+      if (ns.corporation.getCorporation().funds < 5000000000) {
+        ns.printf("Not enough funds to expand %s to %s, skipping", name, c)
+        continue
+      }
+      ns.printf("Expanding %s to %s", name, c)
+      ns.corporation.expandCity(name, c)
+    }
+    if (!assign(ns, name, c, {ops: 1, eng: 1, mgt: 1})) { return }
+    if (ns.corporation.getWarehouse().size == 0) {
+      upgradeWarehouse(ns, name, c, 1)
+    }
+    for (let m of mats) {
+      setSmartSupply(ns, name, c, m)
+      sellMat(ns, name, c, "Food", "MAX", "MP")
+      sellMat(ns, name, c, "Plants", "MAX", "MP")
+    }
+    buyWarehouseFactors(ns, name, c, industry.ag, 10)
   }
 }

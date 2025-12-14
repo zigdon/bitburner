@@ -1,0 +1,23 @@
+{
+  "pserv": {
+    "cashBuffer": 10e6,
+    "min": 256,
+    "disable": true
+  },
+  "run": [
+    {"name": "console.js", "title": "Console"},
+    {"name": "syslog.js", "title": "Syslog"},
+    {"name": "g/tor.js", "oneTime": true},
+    {"name": "map.js", "args": ["--silent"], "oneTime": true},
+    {"name": "go2.js", "title": "Hack Controller"},
+    {"name": "ipvgo.js", "title": "IPvGO Player"},
+    {"name": "g/upgrade.js"},
+    {"name": "g/program.js"},
+    {"name": "g/factions.js"}
+  ],
+  "loop": {
+    "pserv": false,
+    "contracts": true
+  },
+  "valid": true
+}

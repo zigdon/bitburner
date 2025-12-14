@@ -142,9 +142,14 @@ async function solve2(ns, data, trades) {
   return await selectTrades(ns, min, max, trades)
 }
 
+var stCache = new Map()
 async function selectTrades(ns, min, max, trades) {
   if (trades == 0 || min.length == 0 || max.length == 0) {
     return 0
+  }
+  var key = ns.sprintf("%j %j %j", min, max, trades)
+  if (stCache.has(key)) {
+    return stCache.get(key)
   }
   ns.printf("min = %j", min)
   ns.printf("max = %j", max)
@@ -166,5 +171,6 @@ async function selectTrades(ns, min, max, trades) {
   ns.print(ex)
   await ns.asleep(10)
 
+  stCache.set(key, res)
   return res
 }
