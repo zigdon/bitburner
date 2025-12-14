@@ -113,43 +113,65 @@ const cities = [
   "Ishima",
 ]
 
+const jobs = {
+  ops: "Operations",
+  eng: "Engineer",
+  bus: "Business",
+  mgt: "Management",
+  rnd: "Research & Development",
+  intern: "Intern",
+}
+const corp = "NotAVamp"
+const industry = {
+  ag: "Agriculture",
+}
+const names = {
+  ag: "AgriVamp",
+}
+
 /** @param {NS} ns */
 export async function main(ns) {
   // Implementing the old guide from 
   // https://www.reddit.com/r/Bitburner/comments/ss609n/corporation_quick_guide_v140/
-  createCorp(ns, "NotAVamp") || return
-  createDiv(ns, "Agriculture", "AgriVamp") || return
-  unlock(ns, "SmartSupply") || return
+  if (!createCorp(ns, corp)) { return }
+  if (!createDiv(ns, industry.ag, names.ag)) { return }
+  if (!unlock(ns, "Smart Supply")) { return }
   for (let c of cities) {
-    if (!ns.corporation.getDivision(dn).cities.includes(c)) {
-      expandCity(ns, dn, c)
+    if (!ns.corporation.getDivision(names.ag).cities.includes(c)) {
+      if (ns.corporation.getCorporation().funds < 5000000000) {
+        ns.printf("Not enough funds to expand %s to %s, skipping", names.ag, c)
+        continue
+      }
+      ns.printf("Expanding %s to %s", names.ag, c)
+      expandCity(ns, names.ag, c)
     }
-    setSmartSupply(ns, "AgriVamp", c, "Food", "Plants")
-    assign(ns, {ops: 1, eng: 1, mgt: 1})
-    upgradeWarehouse(ns, dn, c, 1)
-    sell(ns, "Food", "MAX", "MP")
-    sell(ns, "Plants", "MAX", "MP")
-    buyWarehouseFactors(ns, "Agriculture", c)
+    setSmartSupply(ns, names.ag, c, "Food", "Plants")
+    if (!assign(ns, names.ag, c, {ops: 1, eng: 1, mgt: 1})) { return }
+    upgradeWarehouse(ns, names.ag, c, 1)
+    sellMat(ns, names.ag, c, "Food", "MAX", "MP")
+    sellMat(ns, names.ag, c, "Plants", "MAX", "MP")
+    buyWarehouseFactors(ns, names.ag, c, industry.ag, 10)
   }
 }
 
 function createCorp(ns, name) {
   let c = ns.corporation
+  if (c.hasCorporation()) { return true }
   if (c.canCreateCorporation(true)) {
-    ns.tprintf("Creating a self-funded corp: %s", name)
-    c.createCorporation(name, true) && return true
+    ns.printf("Creating a self-funded corp: %s", name)
+    return c.createCorporation(name, true)
   } else if (c.canCreateCorporation(false)) {
-    ns.tprintf("Creating a grant-funded corp: %s", name)
-    c.createCorporation(name, false) && return true
+    ns.printf("Creating a grant-funded corp: %s", name)
+    return c.createCorporation(name, false)
   }
-  ns.tprintf("Can't create corp")
+  ns.printf("Can't create corp")
   return false
 }
 
 function createDiv(ns, ind, name) {
   let c = ns.corporation
   if (c.getDivision(name) == undefined) {
-    ns.tprintf("Creating a new %s division: %s", ind, name)
+    ns.printf("Creating a new %s division: %s", ind, name)
     ns.corporation.expandIndustry(ind, name)
   }
   return c.getDivision(name) != undefined
@@ -160,7 +182,7 @@ function unlock(ns, upgrade) {
   if (c.hasUnlock(upgrade)) {
     return true
   }
-  ns.tprintf("Unlocking %s", upgrade)
+  ns.printf("Unlocking %s", upgrade)
   c.purchaseUnlock(upgrade)
   return c.hasUnlock(upgrade)
 }
@@ -170,5 +192,59 @@ function setSmartSupply(ns, name, city, ...mats) {
   c.setSmartSupply(name, city, true)
   for (let mat of mats) {
     c.setSmartSupplyOption(name, city, mat, "leftovers")
+  }
+}
+
+function assign(ns, name, city, assignments) {
+  let c = ns.corporation
+  for (var job in assignments) {
+    if (c.setAutoJobAssignment(name, city, jobs[job], assignments[job])) {
+      ns.printf("Set %s@%s %s to %d", name, city, jobs[job], assignments[job])
+    } else {
+      ns.printf("Couldn't set %s@%s %s to %d", name, city, jobs[job], assignments[job])
+      return false
+    }
+  }
+
+  return true
+}
+
+function upgradeWarehouse(ns, name, city, amt) {
+  let c = ns.corporation
+  c.upgradeWarehouse(name, city, amt)
+  return true
+}
+
+function sellMat(ns, name, city, mat, amt, price) {
+  let c = ns.corporation
+  c.sellMaterial(name, city, mat, amt, price)
+}
+
+function buyWarehouseFactors(ns, name, city, industry, amt) {
+  let c = ns.corporation
+  let data = c.getIndustryData(industry)
+  let target = {
+    ai: data.aiCoreFactor,
+    robot: data.robotFactor,
+    hardware: data.hardwareFactor,
+    re: data.realEstateFactor,
+  }
+  let stock = {
+    ai: c.getMaterial(name, city, "AI Cores").stored,
+    robot: c.getMaterial(name, city, "Robots").stored,
+    hardware: c.getMaterial(name, city, "Hardware").stored,
+    re: c.getMaterial(name, city, "Real Estate").stored,
+  }
+  if (stock.ai < target.ai*amt) {
+    c.buyMaterial(name, city, "AI Cores", target.ai*amt-stock.ai)
+  }
+  if (stock.robot < target.robot*amt) {
+    c.buyMaterial(name, city, "Robots", target.robot*amt-stock.robot)
+  }
+  if (stock.hardware < target.hardware*amt) {
+    c.buyMaterial(name, city, "Hardware", target.hardware*amt-stock.hardware)
+  }
+  if (stock.re < target.re*amt) {
+    c.buyMaterial(name, city, "Real Estate", target.re*amt-stock.re)
   }
 }
