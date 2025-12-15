@@ -3,7 +3,7 @@ import { table } from "@/table.js"
 import { critical, warning, info, debug } from "@/log.js"
 import { colors } from "@/colors.js"
 
-var buffer = 100
+var buffer = 300
 
 /** @param {NS} ns */
 export async function main(ns) {

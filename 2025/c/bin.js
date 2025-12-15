@@ -77,7 +77,7 @@ function encode(ns, data) {
   ns.printf(" pbits => %s", guide)
 
   // Get each parity block, calculate the parity bits
-  for (var n = Math.floor(Math.sqrt(res.length))-1; n >=0; n--) {
+  for (var n = Math.ceil(Math.sqrt(res.length))-1; n >=0; n--) {
     var block = getBlock(res, n)
     // If the current parity is correct, leave it as 0, otherwise, flip
     var p = getParity(block) ? "0" : "1"
