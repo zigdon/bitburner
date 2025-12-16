@@ -24,6 +24,7 @@ const names = {
 
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.disableLog("asleep")
   ns.clearLog()
   // Implementing the old guide from 
   // https://www.reddit.com/r/Bitburner/comments/ss609n/corporation_quick_guide_v140/
@@ -41,10 +42,14 @@ export async function main(ns) {
     ["ABC SalesBots", 1],
   ])
   for (var c of cities) {
-    await assign(ns, names.ag, c, {ops: 1, eng: 1, bus: 1, mgt: 1, rnd: 1, intern: 1})) { return }
+    if (!await assign(
+      ns, names.ag, c,
+      {ops: 1, eng: 1, bus: 1, mgt: 1, rnd: 1, intern: 1})
+    ) { return }
   }
-  // ongoing loop:
-  //   manage research
+  for (var c of cities) {
+    await buyWarehouseFactors(ns, names.ag, c, industry.ag, 20)
+  }
 }
 
 async function buyUpgrades(ns, name, upgrades) {
@@ -141,14 +146,14 @@ function sellMat(ns, name, city, mat, amt, price) {
 }
 
 async function buyWarehouseFactors(ns, name, city, industry, amt) {
-  ns.printf("Buying the right mix for %s in %s", industry, city)
+  ns.printf("Buying the right mix for %s in %s x %d", industry, city, amt)
   let c = ns.corporation
   let data = c.getIndustryData(industry)
   let target = {
-    ai: data.aiCoreFactor,
-    robot: data.robotFactor,
-    hardware: data.hardwareFactor,
-    re: data.realEstateFactor,
+    ai: data.aiCoreFactor * amt,
+    robot: data.robotFactor * amt,
+    hardware: data.hardwareFactor * amt,
+    re: data.realEstateFactor * amt,
   }
   let cont = true
   while (cont) {
@@ -159,31 +164,37 @@ async function buyWarehouseFactors(ns, name, city, industry, amt) {
       hardware: c.getMaterial(name, city, "Hardware").stored,
       re: c.getMaterial(name, city, "Real Estate").stored,
     }
-    ns.printf("Current stock: %j", stock)
-    if (stock.ai < target.ai*amt) {
+    let shopping = []
+    ns.printf("Current stock at %s:\n got: %j\nwant: %j", city, stock, target)
+    if (stock.ai < target.ai) {
       cont = true
-      c.buyMaterial(name, city, "AI Cores", (target.ai*amt-stock.ai)/10)
+      shopping.push("AI")
+      c.buyMaterial(name, city, "AI Cores", (target.ai-stock.ai)/10)
     } else {
       c.buyMaterial(name, city, "AI Cores", 0)
     }
-    if (stock.robot < target.robot*amt) {
+    if (stock.robot < target.robot) {
       cont = true
-      c.buyMaterial(name, city, "Robots", (target.robot*amt-stock.robot)/10)
+      shopping.push("robots")
+      c.buyMaterial(name, city, "Robots", (target.robot-stock.robot)/10)
     } else {
       c.buyMaterial(name, city, "Robots", 0)
     }
-    if (stock.hardware < target.hardware*amt) {
+    if (stock.hardware < target.hardware) {
       cont = true
-      c.buyMaterial(name, city, "Hardware", (target.hardware*amt-stock.hardware)/10)
+      shopping.push("hardware")
+      c.buyMaterial(name, city, "Hardware", (target.hardware-stock.hardware)/10)
     } else {
       c.buyMaterial(name, city, "Hardware", 0)
     }
-    if (stock.re < target.re*amt) {
+    if (stock.re < target.re) {
       cont = true
-      c.buyMaterial(name, city, "Real Estate", (target.re*amt-stock.re)/10)
+      shopping.push("real estate")
+      c.buyMaterial(name, city, "Real Estate", (target.re-stock.re)/10)
     } else {
       c.buyMaterial(name, city, "Real Estate", 0)
     }
+    ns.printf("Still waiting for %s", shopping.join(", "))
     await ns.asleep(500)
   }
 }

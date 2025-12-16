@@ -37,8 +37,11 @@ export async function main(ns) {
   var fs = flags(ns)
   var host = fs._[0]
   var file = fs._[1]
+  ns.disableLog("getServerMaxRam")
+  ns.disableLog("getServerUsedRam")
+  ns.disableLog("asleep")
   if (host == undefined) {
-    return listContracts(ns)
+    return await listContracts(ns, fs)
   }
 
   if (file == undefined || String(file).match(/^[0-9]+$/)) {
@@ -175,6 +178,7 @@ export function log(ns, tmpl, ...args) {
  */
 export function flags(ns) {
   return ns.flags([
+    ["all", false],
     ["test", false],
     ["toast", false],
     ["force", false],
@@ -299,7 +303,7 @@ export async function init(ns, types, testfn, nosubmit) {
   info(ns, "Attempted to solve contract %s: %s", c.type, msg)
 }
 
-function listContracts(ns) {
+async function listContracts(ns, flags) {
   var hosts = Array.from(dns(ns).values()).
     filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0)
   if (hosts.length > 0) {
@@ -319,7 +323,48 @@ function listContracts(ns) {
     ns.tprint(table(ns, ["Host", "Filename", "Type"], data))
   } else {
     ns.tprint("No hosts with contracts")
+    return
   }
+
+  if (flags["all"]) {
+    ns.tprintf("Attempting to solve all contracts...")
+    for (var d of data) {
+      var [host, file, type] = d
+      if (!ns.fileExists(file, host)) {
+        continue
+      }
+      ns.tprintf("Reading %s@%s", file, host)
+      var c = ns.codingcontract.getContract(file, host)
+      if (!types.has(c.type)) {
+        ns.tprintf("Unknown contract type %s", c.type)
+        ns.printf("Unknown contract type %s", c.type)
+        continue
+      }
+      ns.printf("%d attempts remaining", c.numTriesRemaining)
+      if (c.numTriesRemaining < 10) {
+        ns.tprintf("Skipping with %d attempts remaining...", c.numTriesRemaining)
+        continue
+      }
+      var code = types.get(c.type)
+      if (ns.getScriptRam(code) > ns.getServerMaxRam("home") - ns.getServerUsedRam("home")) {
+        ns.tprintf(
+          "Can't start %s, needs %s but only have %s available",
+          code, ns.formatRam(ns.getScriptRam(code)),
+          ns.formatRam(ns.getServerMaxRam("home") - ns.getServerUsedRam("home")))
+        continue
+      }
+      if (blocked(ns, type)) {
+        ns.tprintf("Skipping blocked contract: %s", type)
+        continue
+      }
+      var pid = ns.run(code, 1, host, file, "--toast")
+      while (ns.isRunning(pid)) {
+        await ns.asleep(5000)
+      }
+    }
+    ns.tprintf("Done processing contracts.")
+  }
+
   return
 }
 
