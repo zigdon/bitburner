@@ -1,4 +1,4 @@
-import {err} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   /*
@@ -31,42 +31,39 @@ export async function main(ns) {
   Output: ["1*0+5", "10-5"]
   */
 
-  var host = ns.args[0]
-  var file = ns.args[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Find All Valid Math Expressions" || err(ns, "Wrong contract type: %s", c.type)
-  // ns.tprint(c.description)
-  var data = c.data
-  // ns.tprint(data)
-  var res = solve(ns, data, 4).map((r) => r.join(""))
-  // ns.tprint(res)
-  ns.tprint(c.submit(res))
+  var types = new Map([
+    ["Find All Valid Math Expressions", solve],
+  ])
+  await init(ns, types, undefined, false)
 }
 
+var ccache = new Map()
 /**
  * @param {NS} ns
  * @param {[String, Number]} data
  */
-function solve(ns, data) {
+async function solve(ns, data) {
+  ccache.clear()
   var res = []
   var nums = getNumbers(ns, data[0])
 
+  ns.printf("nums=%j", nums)
   for (var num of nums) {
-    res.push(...combine(ns, num))
+    ns.printf("num=%j", num)
+    res.push(...await combine(ns, num))
   }
 
   return res.filter((r) => eval(r.join("")) == data[1])
 }
 
-var ccache = new Map()
 
 /**
  * @param {NS} ns
  * @param {Number[]} nums
  * @return String[]
  */
-function combine(ns, nums) {
+async function combine(ns, nums) {
+  await ns.asleep(10)
   var res = []
   if (nums.length == 1) {
     return [nums]
@@ -74,7 +71,8 @@ function combine(ns, nums) {
   if (ccache.has(nums)) {
     return ccache.get(nums)
   }
-  var sub = combine(ns, nums.slice(1))
+  ns.printf("sub(%j)", nums.slice(1))
+  var sub = await combine(ns, nums.slice(1))
   res.push(sub.map((s) => [nums[0], "+", ...s].flat()))
   res.push(sub.map((s) => [nums[0], "-", ...s].flat()))
   res.push(sub.map((s) => [nums[0], "*", ...s].flat()))
@@ -111,6 +109,7 @@ function getNumbers(ns, data) {
   res = res.filter((s) => s.every((d) => d == "0" || d[0] != "0"))
 
   cache.set(data, res)
+  ns.printf("getnumbers(%j)=%j", data, res)
 
   return res
 }

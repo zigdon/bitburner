@@ -37,6 +37,9 @@ export async function main(ns) {
     // Update config
     var next = loadCfg(ns, config)
     if (next.valid) {
+      if (JSON.stringify(next) != JSON.stringify(cfg)) {
+        ns.printf("New config: %j", next)
+      }
       cfg = next
     }
 
@@ -68,7 +71,6 @@ function loadCfg(ns, name) {
   }
   var next = JSON.parse(ns.read(name))
   if (next?.valid) {
-    ns.printf("new config: %j", next)
     return next
   }
   ns.toast(ns.sprintf("Error parsing %s", name), "error")
@@ -104,7 +106,12 @@ function pserv(ns) {
     ns.printf("Buying servers disabled")
     return
   }
+
   var m = ns.getPlayer().money - cfg.pserv.cashBuffer
+  if (m < 0) {
+    return
+  }
+
   // find larger pserv we can afford to buy with our budget
   if (ns.getPurchasedServers().length < ns.getPurchasedServerLimit()) {
     var size = cfg.pserv.min

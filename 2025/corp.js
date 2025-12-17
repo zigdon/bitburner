@@ -48,8 +48,24 @@ export async function main(ns) {
     ) { return }
   }
   for (var c of cities) {
-    await buyWarehouseFactors(ns, names.ag, c, industry.ag, 20)
+    await buyWarehouseFactors(ns, names.ag, c, industry.ag, 400)
   }
+  research(ns, names.ag, "Hi-Tech R&D Laboratory")
+  research(ns, names.ag, "Overclock")
+}
+
+function research(ns, name, topic) {
+  let c = ns.corporation
+  if (c.hasResearched(name, topic)) {
+    return
+  }
+  let cost = c.getResearchCost(name, topic)
+  if (c.getDivision(name).researchPoints < cost) {
+    return
+  }
+
+  ns.printf("Researching %s for %s", topic, name)
+  c.research(name, topic)
 }
 
 async function buyUpgrades(ns, name, upgrades) {
@@ -165,36 +181,67 @@ async function buyWarehouseFactors(ns, name, city, industry, amt) {
       re: c.getMaterial(name, city, "Real Estate").stored,
     }
     let shopping = []
+    let selling = []
     ns.printf("Current stock at %s:\n got: %j\nwant: %j", city, stock, target)
     if (stock.ai < target.ai) {
       cont = true
       shopping.push("AI")
       c.buyMaterial(name, city, "AI Cores", (target.ai-stock.ai)/10)
+      c.sellMaterial(name, city, "AI Cores", 0, "MP")
+    } else if (stock.ai > target.ai*1.2) {
+      cont = true
+      selling.push("AI")
+      c.buyMaterial(name, city, "AI Cores", 0)
+      c.sellMaterial(name, city, "AI Cores", (stock.ai-target.ai)/10, "MP")
     } else {
       c.buyMaterial(name, city, "AI Cores", 0)
+      c.sellMaterial(name, city, "AI Cores", 0, "MP")
     }
     if (stock.robot < target.robot) {
       cont = true
       shopping.push("robots")
       c.buyMaterial(name, city, "Robots", (target.robot-stock.robot)/10)
+      c.sellMaterial(name, city, "Robots", 0, "MP")
+    } else if (stock.robot > target.robot*1.2) {
+      cont = true
+      selling.push("robots")
+      c.buyMaterial(name, city, "Robots", 0)
+      c.sellMaterial(name, city, "Robots", (stock.robot-target.robot)/10, "MP")
     } else {
       c.buyMaterial(name, city, "Robots", 0)
+      c.sellMaterial(name, city, "Robots", 0, "MP")
     }
     if (stock.hardware < target.hardware) {
       cont = true
       shopping.push("hardware")
       c.buyMaterial(name, city, "Hardware", (target.hardware-stock.hardware)/10)
+      c.sellMaterial(name, city, "Hardware", 0, "MP")
+    } else if (stock.hardware > target.hardware*1.2) {
+      cont = true
+      selling.push("hardware")
+      c.buyMaterial(name, city, "Hardware", 0)
+      c.sellMaterial(name, city, "Hardware", (stock.hardware-target.hardware)/10, "MP")
     } else {
       c.buyMaterial(name, city, "Hardware", 0)
+      c.sellMaterial(name, city, "Hardware", 0, "MP")
     }
     if (stock.re < target.re) {
       cont = true
       shopping.push("real estate")
       c.buyMaterial(name, city, "Real Estate", (target.re-stock.re)/10)
+      c.sellMaterial(name, city, "Real Estate", 0, "MP")
+    } else if (stock.re > target.re*1.2) {
+      cont = true
+      selling.push("real estate")
+      c.buyMaterial(name, city, "Real Estate", 0)
+      c.sellMaterial(name, city, "Real Estate", (stock.re-target.re)/10, "MP")
     } else {
       c.buyMaterial(name, city, "Real Estate", 0)
+      c.sellMaterial(name, city, "Real Estate", 0, "MP")
     }
-    ns.printf("Still waiting for %s", shopping.join(", "))
+    if (cont) {
+      ns.printf("Still waiting for buying %s, selling %s", shopping.join(", "), selling.join(", "))
+    }
     await ns.asleep(500)
   }
 }
