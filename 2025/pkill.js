@@ -20,3 +20,7 @@ export async function main(ns) {
   } 
   ns.tprint("pass -kill to terminate")
 }
+
+export function autocomplete(data, args) {
+  return [...data.scripts]
+}

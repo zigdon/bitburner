@@ -114,6 +114,7 @@ function list(ns, flags) {
   var joined = factions.filter(
     (f) => ns.singularity.getFactionRep(f) != 0
   )
+  var money = ns.getPlayer().money
   var data = []
   var missing = []
   if (flags["sort"] == "price") {
@@ -131,7 +132,10 @@ function list(ns, flags) {
     }
     data.push([
       a,
-      "$"+ns.formatNumber(ns.singularity.getAugmentationPrice(a)),
+      [
+        "$"+ns.formatNumber(ns.singularity.getAugmentationPrice(a)),
+        ns.singularity.getAugmentationPrice(a) > money ? "red" : "green"
+      ],
       [
         fs.length > 0
         ? fs.join(", ")
