@@ -1,3 +1,5 @@
+import { info } from "@/log.js"
+
 const cities = [
   "Sector-12",
   "Aevum",
@@ -17,9 +19,11 @@ const jobs = {
 const corp = "NotAVamp"
 const industry = {
   ag: "Agriculture",
+  ph: "Pharmaceutical",
 }
 const names = {
   ag: "AgriVamp",
+  ph: "PharmaVamp",
 }
 
 /** @param {NS} ns */
@@ -29,11 +33,17 @@ export async function main(ns) {
   // Implementing the old guide from 
   // https://www.reddit.com/r/Bitburner/comments/ss609n/corporation_quick_guide_v140/
   if (!await createCorp(ns, corp)) { return }
-  if (!await createDiv(ns, industry.ag, names.ag)) { return }
+  if (!await setupDiv(ns, names.ag, industry.ag, "Food", "Plants")) { return }
+  if (!await setupDiv(ns, names.ph, industry.ph, "Drugs")) { return }
+  await run(ns, "lib/corp/products.js", names.ph, "WonderDrug", 0.1, 0.1)
+}
+
+async function setupDiv(ns, name, ind, ...mats) {
+  if (!await createDiv(ns, ind, name)) { return }
   if (!await unlock(ns, "Smart Supply")) { return }
-  await expand(ns, names.ag, "Food", "Plants")
-  await advert(ns, names.ag, 1)
-  await buyUpgrades(ns, names.ag, [
+  await expand(ns, ind, name, ...mats)
+  await advert(ns, name, 1)
+  await buyUpgrades(ns, name, [
     ["Smart Factories", 1],
     ["Wilson Analytics", 1],
     ["Project Insight", 1],
@@ -43,15 +53,24 @@ export async function main(ns) {
   ])
   for (var c of cities) {
     if (!await assign(
-      ns, names.ag, c,
+      ns, name, c,
       {ops: 1, eng: 1, bus: 1, mgt: 1, rnd: 1, intern: 1})
     ) { return }
   }
   for (var c of cities) {
-    await buyWarehouseFactors(ns, names.ag, c, industry.ag, 400)
+    await buyWarehouseFactors(ns, name, c, ind)
   }
-  research(ns, names.ag, "Hi-Tech R&D Laboratory")
-  research(ns, names.ag, "Overclock")
+  research(ns, name, "Hi-Tech R&D Laboratory")
+  research(ns, name, "Overclock")
+  research(ns, name, "Self-Correcting Assemblers")
+  research(ns, name, "Drones")
+  research(ns, name, "Drones - Assembly")
+  research(ns, name, "Drones - Transport")
+  for (var c of cities) {
+    upgradeWarehouse(ns, name, c, 2)
+    await buyWarehouseFactors(ns, name, c, ind)
+  }
+  return true
 }
 
 function research(ns, name, topic) {
@@ -64,14 +83,14 @@ function research(ns, name, topic) {
     return
   }
 
-  ns.printf("Researching %s for %s", topic, name)
+  info(ns, "Researching %s for %s", topic, name)
   c.research(name, topic)
 }
 
 async function buyUpgrades(ns, name, upgrades) {
   let c = ns.corporation
   for (let [up, n] of upgrades) {
-    ns.printf("Upgrading %s to %d", up, n)
+    info(ns, "Upgrading %s to %d", up, n)
     while (c.getUpgradeLevel(up) < n) {
       c.levelUpgrade(up)
       await ns.asleep(1000)
@@ -80,7 +99,7 @@ async function buyUpgrades(ns, name, upgrades) {
 }
 
 async function advert(ns, name, count) {
-  ns.printf("Hiring ads for %s: %d", name, count)
+  info(ns, "Hiring ads for %s: %d", name, count)
   while (ns.corporation.getHireAdVertCount(name) < count) {
     ns.corporation.hireAdVert(name)
     await ns.asleep(10)
@@ -88,7 +107,7 @@ async function advert(ns, name, count) {
 }
 
 async function createCorp(ns, name) {
-  ns.printf("Creating corp %s", name)
+  info(ns, "Creating corp %s", name)
   await run(ns, "lib/corp/create.js", name)
   return ns.corporation.hasCorporation()
 }
@@ -98,7 +117,7 @@ async function createDiv(ns, ind, name) {
     ns.printf("%s division %s already exists", ind, name)
     return true
   }
-  ns.printf("Creating %s division %s", ind, name)
+  info(ns, "Creating %s division %s", ind, name)
   await run(ns, "lib/corp/createDiv.js", ind, name)
   return ns.corporation.getCorporation().divisions.includes(name)
 }
@@ -108,13 +127,13 @@ async function unlock(ns, upgrade) {
     ns.printf("Already have %s unlocked", upgrade)
     return true
   }
-  ns.printf("Unlocking %s", upgrade)
+  info(ns, "Unlocking %s", upgrade)
   await run(ns, "lib/corp/unlock.js", upgrade)
   return ns.corporation.hasUnlock(upgrade)
 }
 
 async function setSmartSupply(ns, name, city, ...mats) {
-  ns.printf("Settings smart supply for %s@s: %j", name, city, mats)
+  ns.printf("Settings smart supply for %s@%s: %j", name, city, mats)
   await run(ns, "lib/corp/smartSupply.js", name, city, ...mats)
 }
 
@@ -152,6 +171,8 @@ async function assign(ns, name, city, assignments) {
 
 function upgradeWarehouse(ns, name, city, amt) {
   let c = ns.corporation
+  if (c.getWarehouse(name, city).level >= amt) { return true }
+  info(ns, "Upgrading warehouse for %s@%s to %d", name, city, amt)
   c.upgradeWarehouse(name, city, amt)
   return true
 }
@@ -161,16 +182,30 @@ function sellMat(ns, name, city, mat, amt, price) {
   c.sellMaterial(name, city, mat, amt, price)
 }
 
-async function buyWarehouseFactors(ns, name, city, industry, amt) {
-  ns.printf("Buying the right mix for %s in %s x %d", industry, city, amt)
+let sizes = {
+  ai: 0.1,
+  robot: 0.5,
+  hardware: 0.06,
+  re: 0.005,
+};
+
+async function buyWarehouseFactors(ns, name, city, industry) {
   let c = ns.corporation
+  let size = c.getWarehouse(name, city).size
   let data = c.getIndustryData(industry)
+  let pkgSize = data.aiCoreFactor * sizes.ai +
+                data.robotFactor * sizes.robot +
+                data.hardwareFactor * sizes.hardware +
+                data.realEstateFactor * sizes.re;
+
+  let amt = (size*0.8)/pkgSize;
   let target = {
     ai: data.aiCoreFactor * amt,
     robot: data.robotFactor * amt,
     hardware: data.hardwareFactor * amt,
     re: data.realEstateFactor * amt,
   }
+  info(ns, "Buying the right mix for %s in %s x %d", industry, city, amt)
   let cont = true
   while (cont) {
     cont = false
@@ -246,7 +281,7 @@ async function buyWarehouseFactors(ns, name, city, industry, amt) {
   }
 }
 
-async function expand(ns, name, ...mats) {
+async function expand(ns, ind, name, ...mats) {
   for (let c of cities) {
     ns.printf("Expanding %s into %s", name, c)
     if (!ns.corporation.getDivision(name).cities.includes(c)) {
@@ -254,12 +289,12 @@ async function expand(ns, name, ...mats) {
         ns.printf("Not enough funds to expand %s to %s, skipping", name, c)
         continue
       }
-      ns.printf("Expanding %s to %s", name, c)
+      info(ns, "Expanding %s to %s", name, c)
       ns.corporation.expandCity(name, c)
     }
     if (!await assign(ns, name, c, {ops: 1, eng: 1, mgt: 1})) { return }
     if (!ns.corporation.hasWarehouse(name, c)) {
-      ns.printf("Buying warehouse in %s", c)
+      info(ns, "Buying warehouse in %s", c)
       ns.corporation.purchaseWarehouse(name, c)
     }
     if (ns.corporation.getWarehouse(name, c).size == 0) {
@@ -269,7 +304,7 @@ async function expand(ns, name, ...mats) {
       await setSmartSupply(ns, name, c, m)
       sellMat(ns, name, c, m, "MAX", "MP")
     }
-    await buyWarehouseFactors(ns, name, c, industry.ag, 10)
+    await buyWarehouseFactors(ns, name, c, ind)
   }
 }
 

@@ -53,7 +53,10 @@ async function solve(ns, data) {
     res.push(...await combine(ns, num))
   }
 
-  return res.filter((r) => eval(r.join("")) == data[1])
+  res = res.filter((r) => eval(r.join("")) == data[1])
+  ns.printf("totalling %d:", data[1])
+  res.forEach((r) => ns.printf("%j", r))
+  return res
 }
 
 
