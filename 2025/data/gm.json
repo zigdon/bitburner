@@ -12,9 +12,21 @@
     ], "run": "createDiv", "args": [
       "PharmaVamp", "Pharmaceutical", "Drugs"]},
     {"triggers": [
+      {"corp": "500b", "needDiv": "FisherVamp"}
+    ], "run": "createDiv", "args": [
+      "FisherVamp", "Fishing", "Food"]},
+    {"triggers": [
+      {"corp": "100b", "needDiv": "RestVamp"}
+    ], "run": "createDiv", "args": [
+      "RestVamp", "Restaurant"]},
+    {"triggers": [
       {"every": "5m", "noRND": "PharmaVamp"}
     ], "title": "Research Drugs", "run": "products",
     "args": ["PharmaVamp", "WonderDrug"]},
+    {"triggers": [
+      {"every": "5m", "noRND": "RestVamp"}
+    ], "title": "Research Dishes", "run": "products",
+    "args": ["RestVamp", "WonderDish"]},
     {"triggers": [{"income": "1m", "isPublic": false}],
       "title": "Go Public", "run": "ipo", "args":["1000000"]},
     {"triggers": [{"income": "2m", "dividendBelow": 10}],

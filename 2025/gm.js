@@ -22,8 +22,8 @@ export async function main(ns) {
 
   await info(ns, "Starting loop")
   while (true) {
-    await ns.asleep(1000)
-    // ns.print("=================================================")
+    await ns.asleep(5000)
+    ns.printf("=== %s", Date().toString())
     cfg = await loadCfg(ns, config, cfg)
 
     if (cfg.disabled) {
@@ -52,6 +52,9 @@ export async function main(ns) {
           }
           let ready = false
           for (let cond of a.triggers) {
+            if (a.debug) {
+              cond.debug = true
+            }
             if (!check(ns, n, cond, d, c)) {
               continue
             }
@@ -123,64 +126,65 @@ function parseTime(str) {
 function check(ns, n, cond, divName, city) {
   let c = ns.corporation
   let m = ns.getPlayer().money
-  // ns.printf("Checking %j", cond)
+  const print = (tmpl, ...args) => cond?.debug ? ns.printf(tmpl, ...args) : ""
+  print("Checking %j (%s@%s)", cond, divName, city)
 
   if (cond.isPublic != undefined && c.getCorporation().public != cond.isPublic) {
     return false
-  // } else if (cond.isPublic != undefined) {
-    // ns.printf("isPublic: %j pass", cond.isPublic)
+  } else if (cond.isPublic != undefined) {
+    print("isPublic: %j pass", cond.isPublic)
   }
   if (cond.hasCorp != undefined && c.hasCorporation() != cond.hasCorp) {
     return false
-  // } else if (cond.hasCorp != undefined) {
-    // ns.printf("hasCorp: %j pass", cond.hasCorp)
+  } else if (cond.hasCorp != undefined) {
+    print("hasCorp: %j pass", cond.hasCorp)
   }
   if (cond.dividendBelow &&
-    cond.dividendBelow < c.getCorporation().dividendRate*100) {
+    cond.dividendBelow <= c.getCorporation().dividendRate*100) {
     return false
-  // } else if (cond.dividendBelow) {
-    // ns.printf("dividendBelow: %j pass", cond.dividendBelow)
+  } else if (cond.dividendBelow) {
+    print("dividendBelow: %j pass", cond.dividendBelow)
   }
   if (cond.player && cond.player < m) {
     return false
-  // } else if (cond.player) {
-    // ns.printf("player: %j pass", cond.player)
+  } else if (cond.player) {
+    print("player: %j pass", cond.player)
   }
   if (cond.corp && cond.corp < c.getCorporation().funds) {
     return false
-  // } else if (cond.corp) {
-    // ns.printf("corp: %j pass", cond.corp)
+  } else if (cond.corp) {
+    print("corp: %j pass", cond.corp)
   }
   if (cond.needUnlock && c.hasUnlock(cond.needUnlock)) {
     return false
-  // } else if (cond.needUnlock) {
-    // ns.printf("needUnlock: %j pass", cond.needUnlock)
+  } else if (cond.needUnlock) {
+    print("needUnlock: %j pass", cond.needUnlock)
   }
   if (cond.needDiv && c.getCorporation().divisions.includes(cond.needDiv)) {
       return false 
-  // } else if (cond.needDiv) {
-    // ns.printf("needDiv: %j pass", cond.needDiv)
+  } else if (cond.needDiv) {
+    print("needDiv: %j pass", cond.needDiv)
   }
   if (cond.every && lastRun.has(n) &&
       now-lastRun.get(n) < parseTime(cond.every)) {
       return false 
-  // } else if (cond.every) {
-    // ns.printf("every: %j pass", cond.every)
+  } else if (cond.every) {
+    print("every: %j pass", cond.every)
   }
   if (cond.noRND && isResearching(c, cond.noRND)) {
     return false
-  // } else if (cond.noRND) {
-    // ns.printf("noRND: %j pass", cond.noRND)
+  } else if (cond.noRND) {
+    print("noRND: %j pass", cond.noRND)
   }
   if (cond.income && c.getCorporation().revenue < cond.income) {
     return false
-  // } else if (cond.income) {
-    // ns.printf("income: %j pass", cond.income)
+  } else if (cond.income) {
+    print("income: %j pass", cond.income)
   }
   if (cond.ratio && !ratio(ns, cond, divName, city)) {
     return false
-  // } else if (cond.ratio) {
-    // ns.printf("ratio: %j pass", cond.cost)
+  } else if (cond.ratio) {
+    print("ratio: %j pass", cond.cost)
   }
   if (cond.canResearch &&
     (c.getDivision(divName).researchPoints <
@@ -216,6 +220,12 @@ function ratio(ns, cond, div, city) {
     case "upgrade":
       cost = c.getUpgradeLevelCost(cond.upgradeName)
       break
+  }
+
+  if (cond.debug) {
+    ns.printf("ratio %s: %d*%d < %d", costType, cost, ratio, funds)
+    ns.printf("    ==>   %d < %d", cost*ratio, funds)
+    ns.printf("    ==>   %s < %s", ns.formatNumber(cost*ratio), ns.formatNumber(funds))
   }
 
   return cost * ratio < funds
