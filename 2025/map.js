@@ -80,7 +80,7 @@ export async function main(ns) {
           if (!ns.fileExists("data/wd.txt")) {
             var msg = "w0r1d_d43m0n is hackable"
             ns.toast(msg, "warning", null)
-            critical(ns, msg)
+            await critical(ns, msg)
             ns.write("data/wd.txt", "", "w")
           }
         } else {

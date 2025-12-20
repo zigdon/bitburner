@@ -1,0 +1,78 @@
+{
+  "actions": [
+    {"triggers": [{"player": "0", "hasCorp": false}],
+      "run": "create", "args": ["NotAVamp"]},
+    {"triggers": [{"needUnlock": "Smart Supply"}],
+      "run": "unlock", "args": ["Smart Supply"]},
+    {"triggers": [
+      {"corp": "100b", "needDiv": "AgriVamp"}
+    ], "run": "createDiv", "args": [ "AgriVamp", "Agriculture", "Food", "Plants"]},
+    {"triggers": [
+      {"corp": "200b", "needDiv": "PharmaVamp"}
+    ], "run": "createDiv", "args": [
+      "PharmaVamp", "Pharmaceutical", "Drugs"]},
+    {"triggers": [
+      {"every": "5m", "noRND": "PharmaVamp"}
+    ], "title": "Research Drugs", "run": "products",
+    "args": ["PharmaVamp", "WonderDrug"]},
+    {"triggers": [{"income": "1m", "isPublic": false}],
+      "title": "Go Public", "run": "ipo", "args":["1000000"]},
+    {"triggers": [{"income": "2m", "dividendBelow": 10}],
+      "run": "dividends", "args": ["10"]},
+
+    {"triggers": [{"ratio": "100", "cost": "ad"}], "repeat": true,
+      "run": "ads", "args": ["DIV"], "perDiv": true},
+    {"triggers": [{"ratio": "50", "cost": "office"}],
+      "perCity": true, "perDiv": true, "repeat": true,
+      "run": "office", "args": ["DIV", "CITY"]},
+    {"triggers": [{"ratio": "1k", "cost": "warehouse"}],
+      "perDiv": true, "perCity": true, "repeat": true,
+      "run": "warehouse", "args": ["DIV", "CITY"]},
+
+    {"triggers": [{"canResearch": "Hi-Tech R&D Laboratory"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args": ["DIV", "Hi-Tech R&D Laboratory"]},
+    {"triggers": [{"canResearch": "Overclock"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Overclock"]},
+    {"triggers": [{"canResearch": "Self-Correcting Assemblers"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Self-Correcting Assemblers"]},
+    {"triggers": [{"canResearch": "Drones"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Drones"]},
+    {"triggers": [{"canResearch": "Drones - Assembly"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Drones - Assembly"]},
+    {"triggers": [{"canResearch": "Drones - Transport"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Drones - Transport"]},
+
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "Smart Factories"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["Smart Factories"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "Wilson Analytics"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["Wilson Analytics"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "Project Insight"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["Project Insight"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "FocusWires"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["FocusWires"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "DreamSense"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["DreamSense"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "ABC SalesBots"
+    }], "title": "Buy Upgrades", "repeat": true,
+    "run": "buyUpgrade", "args": ["ABC SalesBots"]}
+  ],
+  "disabled": false,
+  "valid": true
+}

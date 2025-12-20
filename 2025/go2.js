@@ -1,6 +1,6 @@
 import { dns } from "@/hosts.js"
 import { table } from "@/table.js"
-import { critical, warning, info, debug } from "@/log.js"
+import { warning, info, debug } from "@/log.js"
 import { colors } from "@/colors.js"
 
 var buffer = 300
@@ -88,7 +88,7 @@ export async function main(ns) {
       var wt = Math.min(weakenThreads, capacity)
       debug(ns, "Need %d/%d threads to weaken from %d to %d",
         weakenThreads, capacity, ns.getServerSecurityLevel(tName), ns.getServerMinSecurityLevel(tName))
-      spread(ns, "bin/weaken.js", wt, tName, 0)
+      await spread(ns, "bin/weaken.js", wt, tName, 0)
       capacity -= wt
       delay = ns.getWeakenTime(tName) + 25
     }
@@ -99,7 +99,7 @@ export async function main(ns) {
       var gt = Math.min(capacity, growThreads)
       debug(ns, "Need %d/%d threads to grow from %s to %s",
         growThreads, capacity, ns.formatNumber(ns.getServerMoneyAvailable(tName)), ns.formatNumber(ns.getServerMaxMoney(tName)))
-      spread(ns, "bin/grow.js", gt, tName, delay)
+      await spread(ns, "bin/grow.js", gt, tName, delay)
       capacity -= gt
       delay = ns.getGrowTime(tName) + 25
     }
@@ -107,7 +107,7 @@ export async function main(ns) {
     if (delay == 0) {
       // start HWGW batch
       var plan = findPlan(ns, tName, capacity)
-      delay = batch(ns, tName, plan)
+      delay = await batch(ns, tName, plan)
     }
   
     started.set(tName, true)
@@ -204,7 +204,7 @@ function findPlan(ns, tName, capacity) {
  * @param {Object} plan
  * @return Number
  */
-function batch(ns, tName, plan) {
+async function batch(ns, tName, plan) {
   var total = plan.h + plan.wh + plan.g + plan.wg
   var ts = Math.max(
     ns.getWeakenTime(tName),
@@ -213,10 +213,10 @@ function batch(ns, tName, plan) {
   )
   debug(ns, "[%s] Starting batch with %d threads (%d)", tName, total, ts / 1000)
   // HWGW
-  spread(ns, "bin/hack.js", plan.h, tName, ts-100)
-  spread(ns, "bin/weaken.js", plan.wh, tName, ts-75)
-  spread(ns, "bin/grow.js", plan.g, tName, ts-50)
-  spread(ns, "bin/weaken.js", plan.wg, tName, ts-25)
+  await spread(ns, "bin/hack.js", plan.h, tName, ts-100)
+  await spread(ns, "bin/weaken.js", plan.wh, tName, ts-75)
+  await spread(ns, "bin/grow.js", plan.g, tName, ts-50)
+  await spread(ns, "bin/weaken.js", plan.wg, tName, ts-25)
 
   return ts
 }
@@ -228,7 +228,7 @@ function batch(ns, tName, plan) {
  * @param {String} target
  * @param {Number} ts
  */
-function spread(ns, tool, threads, target, ts) {
+async function spread(ns, tool, threads, target, ts) {
   // Get the list of all the servers, sorted by free ram, but use 'home' last
   var hosts = Array.from(dns(ns).values()).
     filter((h) => h.name != 'home' && h.root).
@@ -246,7 +246,7 @@ function spread(ns, tool, threads, target, ts) {
     }
     // log(ns, "[%s] Starting %d threads of %s on %s", target, t, tool, h)
     if (!ns.exec(tool, h, t, target, ts)) {
-      warning(ns, "[%s] %sFailed to run %s on %s%s", target, colors["red"], tool, h, colors["reset"]) 
+      await warning(ns, "[%s] %sFailed to run %s on %s%s", target, colors["red"], tool, h, colors["reset"]) 
       continue
     }
     threads -= t

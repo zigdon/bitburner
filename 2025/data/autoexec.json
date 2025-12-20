@@ -7,10 +7,11 @@
   "run": [
     {"name": "console.js", "title": "Console"},
     {"name": "syslog.js", "title": "Syslog"},
+    {"name": "gm.js", "title": "General Manager"},
     {"name": "g/tor.js", "oneTime": true},
     {"name": "map.js", "args": ["--silent"], "oneTime": true},
     {"name": "go2.js", "title": "Hack Controller"},
-    {"name": "ipvgo.js", "title": "IPvGO Player"},
+    {"name": "ipvgo.js", "args": ["--op", 5], "title": "IPvGO Player"},
     {"name": "g/upgrade.js"},
     {"name": "g/program.js"},
     {"name": "g/factions.js"}

@@ -67,13 +67,13 @@ async function setupDiv(ns, name, ind, ...mats) {
   research(ns, name, "Drones - Assembly")
   research(ns, name, "Drones - Transport")
   for (var c of cities) {
-    upgradeWarehouse(ns, name, c, 2)
+    await upgradeWarehouse(ns, name, c, 2)
     await buyWarehouseFactors(ns, name, c, ind)
   }
   return true
 }
 
-function research(ns, name, topic) {
+async function research(ns, name, topic) {
   let c = ns.corporation
   if (c.hasResearched(name, topic)) {
     return
@@ -83,14 +83,14 @@ function research(ns, name, topic) {
     return
   }
 
-  info(ns, "Researching %s for %s", topic, name)
+  await info(ns, "Researching %s for %s", topic, name)
   c.research(name, topic)
 }
 
 async function buyUpgrades(ns, name, upgrades) {
   let c = ns.corporation
   for (let [up, n] of upgrades) {
-    info(ns, "Upgrading %s to %d", up, n)
+    await info(ns, "Upgrading %s to %d", up, n)
     while (c.getUpgradeLevel(up) < n) {
       c.levelUpgrade(up)
       await ns.asleep(1000)
@@ -99,7 +99,7 @@ async function buyUpgrades(ns, name, upgrades) {
 }
 
 async function advert(ns, name, count) {
-  info(ns, "Hiring ads for %s: %d", name, count)
+  await info(ns, "Hiring ads for %s: %d", name, count)
   while (ns.corporation.getHireAdVertCount(name) < count) {
     ns.corporation.hireAdVert(name)
     await ns.asleep(10)
@@ -107,7 +107,7 @@ async function advert(ns, name, count) {
 }
 
 async function createCorp(ns, name) {
-  info(ns, "Creating corp %s", name)
+  await info(ns, "Creating corp %s", name)
   await run(ns, "lib/corp/create.js", name)
   return ns.corporation.hasCorporation()
 }
@@ -117,7 +117,7 @@ async function createDiv(ns, ind, name) {
     ns.printf("%s division %s already exists", ind, name)
     return true
   }
-  info(ns, "Creating %s division %s", ind, name)
+  await info(ns, "Creating %s division %s", ind, name)
   await run(ns, "lib/corp/createDiv.js", ind, name)
   return ns.corporation.getCorporation().divisions.includes(name)
 }
@@ -127,7 +127,7 @@ async function unlock(ns, upgrade) {
     ns.printf("Already have %s unlocked", upgrade)
     return true
   }
-  info(ns, "Unlocking %s", upgrade)
+  await info(ns, "Unlocking %s", upgrade)
   await run(ns, "lib/corp/unlock.js", upgrade)
   return ns.corporation.hasUnlock(upgrade)
 }
@@ -169,10 +169,10 @@ async function assign(ns, name, city, assignments) {
   return true
 }
 
-function upgradeWarehouse(ns, name, city, amt) {
+async function upgradeWarehouse(ns, name, city, amt) {
   let c = ns.corporation
   if (c.getWarehouse(name, city).level >= amt) { return true }
-  info(ns, "Upgrading warehouse for %s@%s to %d", name, city, amt)
+  await info(ns, "Upgrading warehouse for %s@%s to %d", name, city, amt)
   c.upgradeWarehouse(name, city, amt)
   return true
 }
@@ -205,7 +205,7 @@ async function buyWarehouseFactors(ns, name, city, industry) {
     hardware: data.hardwareFactor * amt,
     re: data.realEstateFactor * amt,
   }
-  info(ns, "Buying the right mix for %s in %s x %d", industry, city, amt)
+  await info(ns, "Buying the right mix for %s in %s x %d", industry, city, amt)
   let cont = true
   while (cont) {
     cont = false
@@ -289,16 +289,16 @@ async function expand(ns, ind, name, ...mats) {
         ns.printf("Not enough funds to expand %s to %s, skipping", name, c)
         continue
       }
-      info(ns, "Expanding %s to %s", name, c)
+      await info(ns, "Expanding %s to %s", name, c)
       ns.corporation.expandCity(name, c)
     }
     if (!await assign(ns, name, c, {ops: 1, eng: 1, mgt: 1})) { return }
     if (!ns.corporation.hasWarehouse(name, c)) {
-      info(ns, "Buying warehouse in %s", c)
+      await info(ns, "Buying warehouse in %s", c)
       ns.corporation.purchaseWarehouse(name, c)
     }
     if (ns.corporation.getWarehouse(name, c).size == 0) {
-      upgradeWarehouse(ns, name, c, 1)
+      await upgradeWarehouse(ns, name, c, 1)
     }
     for (let m of mats) {
       await setSmartSupply(ns, name, c, m)

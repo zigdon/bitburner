@@ -1,6 +1,7 @@
 import { dns } from "@/hosts.js"
 import { types } from "@/contracts.js"
-import { info, toast } from "@/log.js"
+import { critical, info, toast } from "@/log.js"
+import { loadCfg } from "@/lib/config.js"
 
 const config = "data/autoexec.json"
 var cfg = {valid:false}
@@ -17,16 +18,16 @@ export async function main(ns) {
   ).forEach(
     (f) => ns.mv("home", f, "/bak/"+f)
   )
-  cfg = loadCfg(ns, config)
+  cfg = await loadCfg(ns, config, null)
   if (!cfg?.valid) {
-    ns.tprintf("Failed to load config at startup")
+    await critical(ns, "Failed to load config at startup")
     return
   }
   for (var p of cfg.run) {
     if (p.oneTime) {
       ns.run(p.name, 1, ...(p.args ?? []))
     } else {
-      check(ns, p)
+      await check(ns, p)
     }
   }
 
@@ -35,7 +36,7 @@ export async function main(ns) {
   }
   while(true) {
     // Update config
-    var next = loadCfg(ns, config)
+    var next = await loadCfg(ns, config, cfg)
     if (next.valid) {
       if (JSON.stringify(next) != JSON.stringify(cfg)) {
         ns.printf("New config: %j", next)
@@ -48,14 +49,14 @@ export async function main(ns) {
       if (p.oneTime) {
         continue
       }
-      check(ns, p)
+      await check(ns, p)
       await ns.asleep(100)
     }
 
     // Handle pserv.
     if (cfg.loop.pserv) { pserv(ns) }
     // Find contracts.
-    if (cfg.loop.contracts) { findContracts(ns) }
+    if (cfg.loop.contracts) { await findContracts(ns) }
     await ns.asleep(100)
 
     ns.printf("Loop done: %s", Date())
@@ -64,22 +65,10 @@ export async function main(ns) {
 
 }
 
-function loadCfg(ns, name) {
-  if (!ns.fileExists(name)) {
-    ns.toast(ns.sprintf("%s not found", name), "error")
-    return
-  }
-  var next = JSON.parse(ns.read(name))
-  if (next?.valid) {
-    return next
-  }
-  ns.toast(ns.sprintf("Error parsing %s", name), "error")
-}
-
 /**
  * @param {NS} ns
  */
-function findContracts(ns) {
+async function findContracts(ns) {
   var hosts = dns(ns)
   var count = 0
   for (var h of hosts.keys()) {
@@ -88,20 +77,20 @@ function findContracts(ns) {
     }
     var cs = ns.ls(h).filter((f) => f.endsWith(".cct"))
     for (var c of cs) {
-      info(ns, "Found contract %s on %s", c, h)
+      await info(ns, "Found contract %s on %s", c, h)
       ns.run("contracts.js", 1, h, c, "--toast")
       count++
     }
   }
   if (count > 0) {
-    toast(ns, "%d contracts found", count)
+    await toast(ns, "%d contracts found", count)
   }
 }
 
 /**
  * @param {NS} ns
  */
-function pserv(ns) {
+async function pserv(ns) {
   if (cfg.pserv.disabled) {
     ns.printf("Buying servers disabled")
     return
@@ -120,7 +109,7 @@ function pserv(ns) {
     }
     var name = ns.purchaseServer("pserv", size)
     if (name != "") {
-      toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
+      await toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
     }
     return
   }
@@ -136,7 +125,7 @@ function pserv(ns) {
       continue
     }
     if (ns.upgradePurchasedServer(s, size)) {
-      toast(ns, "Upgraded server from %s to %s", ns.formatRam(orig), ns.formatRam(size))
+      await toast(ns, "Upgraded server from %s to %s", ns.formatRam(orig), ns.formatRam(size))
       break
     } else {
       ns.printf("Failed to upgrade %s to %s", s, ns.formatRam(size))
@@ -149,7 +138,7 @@ function pserv(ns) {
  * @param {String} fn
  * @param {String} name
  */
-function check(ns, def) {
+async function check(ns, def) {
   ns.print(def)
   if (def.disabled) {
     ns.printf("%s disabled in loop config", def.name)
@@ -157,7 +146,7 @@ function check(ns, def) {
   }
   if (ns.ps("home").filter((p) => p.filename == def.name).length == 0) {
     if (def.title) {
-      toast(ns, "Starting %s", def.title)
+      await toast(ns, "Starting %s", def.title)
     }
     ns.run(def.name, 1, ...(def.args ?? []))
   }

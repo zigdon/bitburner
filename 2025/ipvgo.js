@@ -8,7 +8,6 @@ var ops = [
   // ???? hacking level
 ]
 
-import { info } from "@/log.js";
 import { table } from "@/table.js";
 
 /** @param {NS} ns */

@@ -136,7 +136,7 @@ export async function main(ns) {
     ns.print("Skipping blocked contract: "+ c.type)
     if (!fs["toast"]) {
       ns.toast("Skipping blocked contract: "+ c.type, "warning")
-      info(ns, "Skipping blocked contract: %s", c.type)
+      await info(ns, "Skipping blocked contract: %s", c.type)
     }
   }
   return
@@ -193,17 +193,17 @@ export function blocked(ns, type) {
   return data.includes(type)
 }
 
-export function block(ns, type) {
+export async function block(ns, type) {
   var data = state(ns)
   if (!data.includes(type)) {
     data.push(type)
     ns.toast(ns.sprintf("Blocking contract type %s", type), "warning")
-    warning(ns, "Blocking contract type %s", type)
+    await warning(ns, "Blocking contract type %s", type)
     save(ns, data)
   }
 }
 
-export function unblock(ns, type) {
+export async function unblock(ns, type) {
   var data = state(ns)
   var updated = data.filter((t) => t != type)
   ns.printf("%j", data)
@@ -211,7 +211,7 @@ export function unblock(ns, type) {
     ns.printf("%j", updated)
     ns.printf("Unblocking %s, %d still blocked", type, updated.length)
     ns.toast(ns.sprintf("Unblocking %s, %d still blocked", type, updated.length))
-    info(ns, "Unblocking %s, %d still blocked", type, updated.length)
+    await info(ns, "Unblocking %s, %d still blocked", type, updated.length)
     save(ns, updated)
   }
 }
@@ -292,15 +292,15 @@ export async function init(ns, types, testfn, nosubmit) {
     ns.printf("Result: %j", res)
     ns.print(msg)
     ns.toast(msg)
-    info(ns, msg)
+    await info(ns, msg)
   } else {
     ns.tprintf("Input data:\n%j", data)
     ns.tprintf("Result: %j", res)
     ns.tprint(msg)
-    info(ns, msg)
+    await info(ns, msg)
   }
 
-  info(ns, "Attempted to solve contract %s: %s", c.type, msg)
+  await info(ns, "Attempted to solve contract %s: %s", c.type, msg)
 }
 
 async function listContracts(ns, flags) {

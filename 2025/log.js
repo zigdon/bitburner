@@ -16,7 +16,11 @@ var loglevels = [ "CRITICAL", "WARNING", "INFO", "DEBUG" ]
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function logn(ns, level, tmpl, ...args) {
+export async function logn(ns, level, tmpl, ...args) {
+  while (ns.getPortHandle(11).full()) {
+    ns.tprintf("Waiting for port from %s: %j", ns.getScriptName(), ns.getPortHandle(11).peek())
+    await ns.asleep(1)
+  }
   ns.writePort(11, [
     ns.getScriptName(),
     loglevels.indexOf(level.toUpperCase()),
@@ -29,9 +33,9 @@ export function logn(ns, level, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function toast(ns, tmpl, ...args) {
-  info(ns, tmpl, ...args)
+export async function toast(ns, tmpl, ...args) {
   ns.toast(ns.sprintf(tmpl, ...args), "info")
+  await info(ns, tmpl, ...args)
 }
 
 /**
@@ -39,8 +43,8 @@ export function toast(ns, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function debug(ns, tmpl, ...args) {
-  logn(ns, "DEBUG", tmpl, ...args)
+export async function debug(ns, tmpl, ...args) {
+  await logn(ns, "DEBUG", tmpl, ...args)
 }
 
 /**
@@ -48,8 +52,8 @@ export function debug(ns, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function info(ns, tmpl, ...args) {
-  logn(ns, "INFO", tmpl, ...args)
+export async function info(ns, tmpl, ...args) {
+  await logn(ns, "INFO", tmpl, ...args)
 }
 
 /**
@@ -57,8 +61,8 @@ export function info(ns, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function warning(ns, tmpl, ...args) {
-  logn(ns, "WARNING", tmpl, ...args)
+export async function warning(ns, tmpl, ...args) {
+  await logn(ns, "WARNING", tmpl, ...args)
 }
 
 /**
@@ -66,6 +70,6 @@ export function warning(ns, tmpl, ...args) {
  * @param {String} tmpl
  * @param {any} ...args
  * */
-export function critical(ns, tmpl, ...args) {
-  logn(ns, "CRITICAL", tmpl, ...args)
+export async function critical(ns, tmpl, ...args) {
+  await logn(ns, "CRITICAL", tmpl, ...args)
 }
