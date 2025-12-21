@@ -5,8 +5,8 @@ export async function loadCfg(ns, name, old) {
   if (next?.valid) {
     let d = await diff(ns, old, next)
     if (d.length > 0) {
-      info(ns, "New config loaded from %s, %d differences", name, d.length)
-      d.forEach((l) => info(ns, l))
+      await info(ns, "New config loaded from %s, %d differences", name, d.length)
+      d.forEach((l) => await info(ns, l))
     }
     return next
   } else {

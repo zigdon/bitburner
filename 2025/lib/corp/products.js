@@ -24,9 +24,10 @@ async function researchProduct(ns, name, city, pName) {
     await info(ns, "Retiring %s to start development of %s", ps[0], pName)
     c.discontinueProduct(name, ps[0])
   }
-  await info(ns, "Starting development of %s at %s...", pName, name)
   let design = 1000000000 * (gen+1)
   let adv = 1000000000 * (gen+1)
+  await info(ns, "Starting development of %s at %s with a budget of %s...",
+    pName, name, "$"+ns.formatNumber(adv))
   c.makeProduct(name, city, pName, design, adv)
 }
 

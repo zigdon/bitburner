@@ -88,6 +88,7 @@ function isResearching(c, name) {
 }
 
 async function run(ns, script, args, fork) {
+  ns.printf("Launching %s %j (fork=%j)", script, args, fork)
   let pid = ns.run(script, 1, ...args)
   if (fork) {
     await info(ns, "Launched %j", [script, ...args])
@@ -159,6 +160,16 @@ function check(ns, n, cond, divName, city) {
     return false
   } else if (cond.needUnlock) {
     print("needUnlock: %j pass", cond.needUnlock)
+  }
+  if (cond.hasUnlock && !c.hasUnlock(cond.hasUnlock)) {
+    return false
+  } else if (cond.hasUnlock) {
+    print("hasUnlock: %j pass", cond.hasUnlock)
+  }
+  if (cond.hasDiv && !c.getCorporation().divisions.includes(cond.hasDiv)) {
+      return false 
+  } else if (cond.hasDiv) {
+    print("hasDiv: %j pass", cond.hasDiv)
   }
   if (cond.needDiv && c.getCorporation().divisions.includes(cond.needDiv)) {
       return false 

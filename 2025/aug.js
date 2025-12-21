@@ -14,6 +14,7 @@ export async function main(ns) {
     ["all", false],
     ["augs", ""],
     ["factions", ""],
+    ["sort", ""],
   ])
   var cmd = fs._[0]
   if (cmds.has(cmd)) {
@@ -85,6 +86,10 @@ function list(ns, flags) {
   var joined = getFactions(ns, {all: false})
   var data = []
   var missing = []
+  if (flags["sort"] == "price") {
+    augs = augs.sort((a,b) =>
+      ns.singularity.getAugmentationPrice(a) - ns.singularity.getAugmentationPrice(b))
+  }
   for (var a of augs) {
     if (owned.includes(a)) {
       continue

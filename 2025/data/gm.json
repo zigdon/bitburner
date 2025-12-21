@@ -4,21 +4,28 @@
       "run": "create", "args": ["NotAVamp"]},
     {"triggers": [{"needUnlock": "Smart Supply"}],
       "run": "unlock", "args": ["Smart Supply"]},
+    {"triggers": [{"needUnlock": "Export", "hasDiv": "FisherVamp"}],
+      "run": "unlock", "args": ["Export"]},
     {"triggers": [
       {"corp": "100b", "needDiv": "AgriVamp"}
     ], "run": "createDiv", "args": [ "AgriVamp", "Agriculture", "Food", "Plants"]},
     {"triggers": [
-      {"corp": "200b", "needDiv": "PharmaVamp"}
+      {"corp": "200b", "needDiv": "PharmaVamp", "hasDiv": "AgriVamp"}
     ], "run": "createDiv", "args": [
       "PharmaVamp", "Pharmaceutical", "Drugs"]},
     {"triggers": [
-      {"corp": "500b", "needDiv": "FisherVamp"}
+      {"corp": "500b", "needDiv": "FisherVamp", "hasDiv": "PharmaVamp"}
     ], "run": "createDiv", "args": [
       "FisherVamp", "Fishing", "Food"]},
     {"triggers": [
-      {"corp": "100b", "needDiv": "RestVamp"}
+      {"corp": "100b", "needDiv": "RestVamp", "hasDiv": "FisherVamp"}
     ], "run": "createDiv", "args": [
       "RestVamp", "Restaurant"]},
+    {"triggers": [
+      {"corp": "200b", "needDiv": "WaterVamp", "hasDiv": "RestVamp"}
+    ], "run": "createDiv", "args": [
+      "WaterVamp", "Water Utilities", "Hardware"]},
+
     {"triggers": [
       {"every": "5m", "noRND": "PharmaVamp"}
     ], "title": "Research Drugs", "run": "products",
@@ -31,13 +38,19 @@
       "title": "Go Public", "run": "ipo", "args":["1000000"]},
     {"triggers": [{"income": "2m", "dividendBelow": 10}],
       "run": "dividends", "args": ["10"]},
+    {"triggers": [{"hasUnlock": "Export", "hasDiv": "FisherVamp"}],
+      "run": "export", "args": ["FisherVamp", "RestVamp", "Food", "MAX"]},
+    {"triggers": [{"hasUnlock": "Export", "hasDiv": "WaterVamp"}],
+      "run": "export", "args": ["WaterVamp", "RestVamp", "Water", "EPROD/20"]},
+    {"triggers": [{"hasUnlock": "Export", "hasDiv": "WaterVamp"}],
+      "run": "export", "args": ["WaterVamp", "AgriVamp", "Water", "EPROD/20"]},
 
     {"triggers": [{"ratio": "100", "cost": "ad"}], "repeat": true,
       "run": "ads", "args": ["DIV"], "perDiv": true},
     {"triggers": [{"ratio": "50", "cost": "office"}],
       "perCity": true, "perDiv": true, "repeat": true,
       "run": "office", "args": ["DIV", "CITY"]},
-    {"triggers": [{"ratio": "1k", "cost": "warehouse"}],
+    {"triggers": [{"ratio": "100", "cost": "warehouse"}],
       "perDiv": true, "perCity": true, "repeat": true,
       "run": "warehouse", "args": ["DIV", "CITY"]},
 

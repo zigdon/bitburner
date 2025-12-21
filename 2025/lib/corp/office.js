@@ -1,7 +1,26 @@
 import {info} from "@/log.js"
+const cities = [
+  "Sector-12",
+  "Aevum",
+  "Volhaven",
+  "Chongqing",
+  "New Tokyo",
+  "Ishima",
+]
 /** @param {NS} ns */
 export async function main(ns) {
-  let [div, city] = ns.args
+  let div = ns.args[0]
+  let targets = ns.args.slice(1)
+  if (targets.length == 0) {
+    targets = cities
+  }
+
+  for (let city of targets) {
+    await upgradeCity(ns, div, city)
+  }
+}
+  
+async function upgradeCity(ns, div, city) {
   let c = ns.corporation
   c.upgradeOfficeSize(div, city, 5)
   let office = c.getOffice(div, city)
