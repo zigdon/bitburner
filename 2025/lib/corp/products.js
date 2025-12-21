@@ -19,13 +19,17 @@ async function researchProduct(ns, name, city, pName) {
   }
   let gen = Math.max(...ps.map((n) => Number(n.slice(n.indexOf(" ")+1)))) ?? 0
   pName = ns.sprintf("%s %d", pName, gen+1)
+  let design = 1000000000 * (gen+1)
+  let adv = 1000000000 * (gen+1)
+  if (c.getCorporation().funds < design+adv) {
+    await info(ns, "Not enough funds to start development of %s, need %s", pName, "$"+ns.formatNumber(design+adv))
+    return
+  }
   // Check if we can develop more products, otherwise retire the first
   if (ps.length >= c.getDivision(name).maxProducts) {
     await info(ns, "Retiring %s to start development of %s", ps[0], pName)
     c.discontinueProduct(name, ps[0])
   }
-  let design = 1000000000 * (gen+1)
-  let adv = 1000000000 * (gen+1)
   await info(ns, "Starting development of %s at %s with a budget of %s...",
     pName, name, "$"+ns.formatNumber(adv))
   c.makeProduct(name, city, pName, design, adv)

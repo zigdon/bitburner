@@ -72,6 +72,12 @@
     {"triggers": [{"canResearch": "Drones - Transport"}],
       "title": "Buy Research", "perDiv": true,
       "run": "buyResearch", "args":["DIV", "Drones - Transport"]},
+    {"triggers": [{"canResearch": "AutoBrew"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "AutoBrew"]},
+    {"triggers": [{"canResearch": "AutoPartyManager"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "AutoPartyManager"]},
 
     {"triggers": [{
       "ratio": "100", "cost": "upgrade", "upgradeName": "Smart Factories"

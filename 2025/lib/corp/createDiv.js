@@ -17,6 +17,7 @@ const jobs = {
 }
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.disableLog("asleep")
   let name = ns.args[0]
   let ind = ns.args[1]
   let mats = ns.args.slice(2)
@@ -27,7 +28,6 @@ export async function main(ns) {
   }
 
   for (let city of cities) {
-    ns.printf("Expanding %s into %s", name, city)
     if (!c.getDivision(name).cities.includes(city)) {
       if (c.getCorporation().funds < 5000000000) {
         await warning(ns, "Not enough funds to expand %s to %s, skipping", name, city)
@@ -44,6 +44,10 @@ export async function main(ns) {
     if (!c.hasWarehouse(name, city)) {
       await info(ns, "Buying warehouse in %s", city)
       c.purchaseWarehouse(name, city)
+    }
+    if (!c.hasWarehouse(name, city)) {
+      await info(ns, "Failed to buy warehouse in %s, skipping", city)
+      return
     }
     if (c.getWarehouse(name, city).size == 0) {
       await upgradeWarehouse(ns, name, city, 1)

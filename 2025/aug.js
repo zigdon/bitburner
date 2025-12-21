@@ -86,6 +86,7 @@ function list(ns, flags) {
   var joined = getFactions(ns, {all: false})
   var data = []
   var missing = []
+  var money = ns.getPlayer().money
   if (flags["sort"] == "price") {
     augs = augs.sort((a,b) =>
       ns.singularity.getAugmentationPrice(a) - ns.singularity.getAugmentationPrice(b))
@@ -97,12 +98,13 @@ function list(ns, flags) {
     var fs = ns.singularity.getAugmentationFactions(a).filter(
       (f) => joined.includes(f)
     )
+    var price = ns.singularity.getAugmentationPrice(a)
     fs.forEach((f) => !missing.includes(f) && missing.push(f))
     data.push([
       a,
       [
-        "$"+ns.formatNumber(ns.singularity.getAugmentationPrice(a)),
-        owned.includes(a) ? "black" : "green"
+        "$"+ns.formatNumber(price),
+        owned.includes(a) ? "black" : price > money ? "red" : "green"
       ],
       [ns.formatNumber(ns.singularity.getAugmentationRepReq(a)),
         ns.singularity.getAugmentationFactions(a).filter(

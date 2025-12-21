@@ -15,7 +15,11 @@ export async function main(ns) {
 
   await info(ns, "Exporting %s (%s) from %s->%s", mat, amt, src, dst)
   for (let city of cities) {
-    c.exportMaterial(src, city, dst, city, mat, amt)
+    let cur = c.getMaterial(src, city, mat)
+    if (!cur.exports.some((e) => e.city == city && e.division == dst)) {
+      c.exportMaterial(src, city, dst, city, mat, amt)
+    }
+    c.sellMaterial(src, city, mat, "MAX", "MP")
     c.setSmartSupplyOption(dst, city, mat, "imports")
   }
 }

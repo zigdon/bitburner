@@ -223,9 +223,18 @@ function ratio(ns, cond, div, city) {
       cost = c.getHireAdVertCost(div)
       break
     case "office":
+      if (!c.getDivision(div).cities.includes(city)) {
+        return false
+      }
       cost = c.getOfficeSizeUpgradeCost(div, city, 5)
       break
     case "warehouse":
+      if (!c.getDivision(div).cities.includes(city)) {
+        return false
+      }
+      if (!c.hasWarehouse(div, city)) {
+        return false
+      }
       cost = c.getUpgradeWarehouseCost(div, city)
       break
     case "upgrade":
