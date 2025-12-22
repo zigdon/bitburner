@@ -9,6 +9,7 @@ var cfg = {valid:false}
 export async function main(ns) {
   [
     "getServerMaxRam",
+    "asleep",
   ].forEach((i) => ns.disableLog(i))
   ns.clearLog()
   ns.rm("data/wd.txt", "home")

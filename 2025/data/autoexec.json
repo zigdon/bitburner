@@ -9,12 +9,14 @@
     {"name": "syslog.js", "title": "Syslog"},
     {"name": "gm.js", "title": "General Manager"},
     {"name": "g/tor.js", "oneTime": true},
-    {"name": "map.js", "args": ["--silent"], "oneTime": true},
+    {"name": "g/gym.js", "args": ["50"], "oneTime": true},
+    {"name": "map.js", "args": ["--silent"]},
     {"name": "go2.js", "title": "Hack Controller"},
     {"name": "ipvgo.js", "args": ["--op", 5], "title": "IPvGO Player"},
     {"name": "g/upgrade.js"},
     {"name": "g/program.js"},
-    {"name": "g/factions.js"}
+    {"name": "g/factions.js"},
+    {"name": "g/saveBonus.js"}
   ],
   "loop": {
     "pserv": false,

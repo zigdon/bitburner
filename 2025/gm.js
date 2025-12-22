@@ -21,9 +21,11 @@ export async function main(ns) {
   ns.disableLog("asleep")
 
   await info(ns, "Starting loop")
+  let st = []
   while (true) {
     await ns.asleep(5000)
-    ns.printf("=== %s", Date().toString())
+    ns.printf("=== %s (%s)", Date().toString(), st.map((st) => st ?? "?").join(""))
+    st = []
     cfg = await loadCfg(ns, config, cfg)
 
     if (cfg.disabled) {
@@ -44,10 +46,11 @@ export async function main(ns) {
         for (let c of cs) {
           n += 1
 
-          if (done[n] && !a.repeat) { continue }
+          if (done[n] && !a.repeat) { st[n]="v"; continue }
           let title = ns.sprintf("#%d(%s): %j", n, a.title ?? a.run ?? "N/A", a)
           if (a.disabled) {
             await info(ns, "Skipping disabled action %s", title)
+            st[n]="d"
             continue
           }
           let ready = false
@@ -60,15 +63,17 @@ export async function main(ns) {
             }
             ready = true
           }
-          if (!ready) { continue }
+          if (!ready) { st[n]="-"; continue }
           await info(ns, "%s is ready", title)
 
           let script = ns.sprintf("lib/corp/%s.js", a.run)
           if (!ns.fileExists(script)) {
+            st[n]="!"
             await critical(ns, "%s not found", script)
             continue
           }
           let args = a.args.map((a) => a == "DIV" ? d : a == "CITY" ? c : a)
+          st[n]="r"
           await run(ns, script, args ?? [], a.fork)
 
           done[n] = true

@@ -20,8 +20,11 @@ export async function main(ns) {
   ns.disableLog("asleep")
   let name = ns.args[0]
   let ind = ns.args[1]
-  let mats = ns.args.slice(2)
   let c = ns.corporation
+
+  let id = c.getIndustryData(ind)
+  let sells = id.producedMaterials
+  let buys = Object.keys(id.requiredMaterials)
   if (!c.getCorporation().divisions.includes(name)) {
     await info(ns, "Creating a new %s division: %s", ind, name)
     c.expandIndustry(ind, name)
@@ -52,11 +55,11 @@ export async function main(ns) {
     if (c.getWarehouse(name, city).size == 0) {
       await upgradeWarehouse(ns, name, city, 1)
     }
-    for (let m of mats) {
-      let pid = ns.run("lib/corp/smartSupply.js", 1, name, city, m)
-      while (ns.isRunning(pid)) {
-        await ns.asleep(10)
-      }
+    for (let m of buys) {
+      c.setSmartSupply(name, city, true)
+      c.setSmartSupplyOption(name, city, m, "leftovers")
+    }
+    for (let m of sells) {
       c.sellMaterial(name, city, m, "MAX", "MP")
     }
     let pid = ns.run("lib/corp/warehouseFactors.js", 1, name, city)

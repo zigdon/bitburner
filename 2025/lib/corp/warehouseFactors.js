@@ -32,11 +32,18 @@ async function buyWarehouseFactors(ns, name, city, industry) {
   await info(ns, "Buying warehouse factors for %s@%s (%s)", name, city, industry)
   let c = ns.corporation
   let size = c.getWarehouse(name, city).size
+  ns.printf("Size: %j", size)
   let data = c.getIndustryData(industry)
+  data.aiCoreFactor ??= 0
+  data.robotFactor ??= 0
+  data.hardwareFactor ??= 0
+  data.realEstateFactor ??= 0
+  ns.printf("Data: %j", data)
   let pkgSize = data.aiCoreFactor * sizes.ai +
                 data.robotFactor * sizes.robot +
                 data.hardwareFactor * sizes.hardware +
                 data.realEstateFactor * sizes.re;
+  ns.printf("pkgSize: %j", pkgSize)
 
   let amt = (size*0.8)/pkgSize;
   let target = {
@@ -45,7 +52,14 @@ async function buyWarehouseFactors(ns, name, city, industry) {
     hardware: data.hardwareFactor * amt,
     re: data.realEstateFactor * amt,
   }
-  await info(ns, "Buying the right mix for %s in %s x %d", industry, city, amt)
+  let totSize = target.ai * sizes.ai +
+    target.robot * sizes.robot +
+    target.hardware * sizes.hardware +
+    target.re * sizes.re
+  ns.printf("target: %j", target)
+
+  await info(ns, "Buying the right mix for %s in %s x %d (%d/%d)",
+    industry, city, amt, totSize, size)
   let cont = true
   while (cont) {
     cont = false

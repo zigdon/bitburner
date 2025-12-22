@@ -7,7 +7,8 @@ export async function main(ns) {
   ns.ui.openTail()
   var ws = ns.ui.windowSize()
   ns.ui.resizeTail(ws[0]/3, ws[1]/8)
-  ns.ui.moveTail(1.75*ws[0]/3, 0)
+  ns.ui.moveTail(1.70*ws[0]/3, 0)
+  ns.ui.setTailFontSize(8)
   var last = new Map()
   while (true) {
     var data = String(ns.readPort(11))
@@ -69,7 +70,9 @@ export async function main(ns) {
     if (level == "DEBUG") {
       continue
     }
+    
     ns.printf("%s %s[%8s]%s %s", now.toLocaleTimeString(), c, level, colors["reset"], msg)
+    ns.write("/logs/syslog.txt", ns.sprintf("%s [%8s] %s\n", now.toLocaleTimeString(), level, msg), "a")
 
     await ns.asleep(1)
   }

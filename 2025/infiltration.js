@@ -9,14 +9,16 @@ var sortFn = new Map([
   ["start", (a,b) => Number(a[4]) - Number(b[4])],
   ["trade", (a,b) => Number(a[5]) - Number(b[5])],
   ["sell", (a,b) => Number(a[6]) - Number(b[6])],
-  ["soa", (a,b) => Number(a[7]) - Number(b[7])],
-  ["per", (a,b) => Number(a[8]) - Number(b[8])],
+  ["perc", (a,b) => Number(a[7]) - Number(b[7])],
+  ["soa", (a,b) => Number(a[8]) - Number(b[8])],
+  ["perr", (a,b) => Number(a[9]) - Number(b[9])],
 ])
 
 /** @param {NS} ns */
 export async function main(ns) {
   var flags = ns.flags([
     ["sort", ""],
+    ["all", false],
   ])
   var targets = ns.infiltration.getPossibleLocations().sort(
     (a,b) => a.name < b.name ? -1 : a.name == b.name ? 0 : 1)
@@ -24,14 +26,18 @@ export async function main(ns) {
   var data = []
   for (var target of targets) {
     var t = ns.infiltration.getInfiltration(target.name)
+    if (t.difficulty == 3 && !flags["all"]) {
+      continue
+    }
     data.push([
       target.name,
       [target.city, target.city == loc ? "white" : "green"],
-      ns.sprintf("%.2f", t.difficulty),
+      [ns.sprintf("%.2f", t.difficulty), t.difficulty < 3 ? "green" : "red"],
       t.maxClearanceLevel,
       t.startingSecurityLevel,
       t.reward.tradeRep,
       t.reward.sellCash,
+      t.reward.sellCash/t.maxClearanceLevel,
       t.reward.SoARep,
       t.reward.SoARep/t.maxClearanceLevel,
     ])
@@ -49,13 +55,14 @@ export async function main(ns) {
   data.forEach((l, i) => {
     l[5] = ns.formatNumber(l[5])
     l[6] = "$"+ns.formatNumber(l[6])
-    l[7] = ns.formatNumber(l[7])
+    l[7] = "$"+ns.formatNumber(l[7])
     l[8] = ns.formatNumber(l[8])
+    l[9] = ns.formatNumber(l[9])
   })
 
   ns.tprintf(table(ns, [
     "Name", "City", "Difficulty", "Max Level", "Starting Level",
-    "Trade", "Sell", "SoA Rep", "SoA Rep/Level"
+    "Trade", "Sell", "Cash/Level", "SoA Rep", "SoA Rep/Level"
   ], data))
 }
 
