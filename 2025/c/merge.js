@@ -16,7 +16,7 @@
   interval, the first number will always be smaller than the second.
 */
 
-import {err, init} from "/contracts.js"
+import {init} from "@/contracts.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -24,6 +24,7 @@ export async function main(ns) {
     ["Merge Overlapping Intervals", solve],
   ])
   return await init(ns, types, undefined, false)
+}
 
 /**
  * @param {NS} ns

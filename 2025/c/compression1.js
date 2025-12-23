@@ -23,29 +23,13 @@
   not use "", '', or ``.
 */
 
-import {err, flags} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  if (c.type != "Compression I: RLE Compression") {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  var data = c.data
-  var res = await solve(ns, data)
-  var msg = c.submit(res)
-  if (f["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  var types = new Map([
+    [  "Compression I: RLE Compression", solve ],
+  ])
+  return init(ns, types, undefined, false)
 }
 
 async function solve(ns, data) {

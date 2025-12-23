@@ -59,10 +59,18 @@ export async function main(ns) {
       c.setSmartSupply(name, city, true)
       c.setSmartSupplyOption(name, city, m, "leftovers")
     }
+    let pid = ns.run("lib/corp/warehouseFactors.js", 1, name, city)
+    while (ns.isRunning(pid)) {
+      await ns.asleep(10)
+    }
     for (let m of sells) {
       c.sellMaterial(name, city, m, "MAX", "MP")
     }
-    let pid = ns.run("lib/corp/warehouseFactors.js", 1, name, city)
+  }
+
+  let div = c.getDivision(name)
+  if (div.products.length < div.maxProducts) {
+    let pid = ns.run("lib/corp/products.js", 1, name, "Idea")
     while (ns.isRunning(pid)) {
       await ns.asleep(10)
     }

@@ -34,14 +34,14 @@
         aaaaaaaaaaaaaa  ->  1a91041
 */
 
-import {err, init} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var types = new Map([
     ["Compression II: LZ Decompression", decompress],
     ["Compression III: LZ Compression", compress],
   ])
-  await init(ns, types, test)
+  await init(ns, types, test, false)
 }
 
 async function decompress(ns, data) {
@@ -74,7 +74,20 @@ async function decompress(ns, data) {
 }
 
 async function compress(ns, data) {
-  var res = ""
+  let c = await doCompress(ns, data, 2)
+  for (let m=3; m<=4; m++) {
+    let cm = await doCompress(ns, data, m)
+    if (cm.length < c.length) {
+      ns.printf("== m=%d is shorter!", m)
+      ns.printf("== %s", cm)
+      ns.printf("== %s", c)
+      c=cm
+    }
+  }
+  return c
+}
+
+async function doCompress(ns, data, minblock=2) {
   var blocks = []
   // From the end, look for substrings up to 9 characters back
   //   If not found, add to literal block (up to 9)
@@ -86,7 +99,7 @@ async function compress(ns, data) {
   var block1 = ""
   while (data.length > 0) {
     await ns.asleep(10)
-    var l = 2  // length
+    var l = minblock  // length
     var x = 0  // offset
     while (l < 10 && l < data.length-1) {
       await ns.asleep(10)
@@ -143,7 +156,7 @@ async function compress(ns, data) {
       }
 
       ns.printf("Block 2: l=%d, x=%d, enc=%s", l, x, data.slice(data.length-l))
-      blocks.push([false, [l, x].join("")])
+      blocks.push([false, [l, x].join(""), ns.sprintf("%d%s", l, data.slice(data.length-l))])
       data = data.slice(0, data.length-l)
     } else {  // No block 2, just add the constant
       ns.printf("Adding to block 1: l=%d, enc=%s", l, data.slice(data.length-l))
@@ -165,21 +178,7 @@ async function compress(ns, data) {
     blocks.push(...extra)
   }
   ns.printf("%j", blocks)
-  var want = true
-  // connect the blocks alternating types. If the next block is the wrong type, just add a '0' block.
-  while (blocks.length > 0) {
-    await ns.asleep(10)
-    var b = blocks.pop()
-    if (b[0] != want) {
-      res += "0"
-    } else {
-      want = !want
-    }
-    res += b[1]
-    ns.printf("+%15s => %s", b, res)
-  }
-
-  return res
+  return connect(ns, blocks)
 }
 
 async function test(ns, testdata) {
@@ -203,6 +202,10 @@ async function test(ns, testdata) {
     [
       "p7Igl2IgWyj6tr0fH5Qo6o66o66oopQp6yTrG7yTrG7yTRrTrG7y7y7y7y7yy7y7y77iYTNpppppppppppp",
       "6p7Igl2249Wyj6tr0fH065Qo6o6539opQp6yTrG017752Rr5808206787iYTNppp91",
+    ],
+    [
+      "uL7uhTmvXXXXXXXXXXjvYxbvbvbv6EcUN3EcUN3UN3UN3UfQ0gfffV6LVsWK6N42",
+      "9uL7uhTmvX916jvYxbv4266EcUN3550739fQ0gfffV609LVsWK6N42",
     ],
   ]
   if (testdata.length > 0) {
@@ -234,4 +237,24 @@ async function test(ns, testdata) {
   }
 
   return
+}
+
+async function connect(ns, blocks) {
+  // connect the blocks alternating types. If the next block is the wrong type,
+  // just add a '0' block.
+  var want = true
+  let res = ""
+  while (blocks.length > 0) {
+    await ns.asleep(10)
+    var b = blocks.pop()
+    if (b[0] != want) {
+      res += "0"
+    } else {
+      want = !want
+    }
+    res += b[1]
+    ns.printf("+%15s => %s", b, res)
+  }
+
+  return res
 }

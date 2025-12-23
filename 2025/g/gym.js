@@ -51,6 +51,7 @@ export async function main(ns) {
 
 var univ = new Map([
   ["Sector-12", "Rothman University"],
+  ["Volhaven", "ZB Institute of Technology"],
 ])
 
 async function course(ns, focus, target) {

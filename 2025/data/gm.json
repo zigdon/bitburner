@@ -28,24 +28,19 @@
       {"corp": "100b", "needDiv": "SoftVamp", "hasDiv": "WaterVamp"}
     ], "run": "createDiv", "args": ["SoftVamp", "Software", "AI Cores"]},
 
-    {"triggers": [
-      {"every": "5m", "noRND": "PharmaVamp"}
-    ], "title": "Research Drugs", "run": "products",
+    {"triggers": [{"every": "5m", "noRND": "PharmaVamp"}],
+      "title": "Research New Drugs", "run": "products",
     "args": ["PharmaVamp", "WonderDrug"]},
-    {"triggers": [
-      {"every": "5m", "noRND": "RestVamp"}
-    ], "title": "Research Dishes", "run": "products",
+    {"triggers": [{"every": "5m", "noRND": "RestVamp"}],
+      "title": "Design New Dishes", "run": "products",
     "args": ["RestVamp", "WonderDish"]},
+    {"triggers": [{"every": "5m", "noRND": "SoftVamp"}],
+      "title": "Develop Software", "run": "products",
+    "args": ["SoftVamp", "WonderGame"]},
     {"triggers": [{"income": "1m", "isPublic": false}],
       "title": "Go Public", "run": "ipo", "args":["1000000"]},
     {"triggers": [{"income": "2m", "dividendBelow": 10}],
       "run": "dividends", "args": ["10"]},
-    {"triggers": [{"hasUnlock": "Export", "hasDiv": "FisherVamp"}],
-      "run": "export", "args": ["FisherVamp", "RestVamp", "Food", "MAX"]},
-    {"triggers": [{"hasUnlock": "Export", "hasDiv": "WaterVamp"}],
-      "run": "export", "args": ["WaterVamp", "RestVamp", "Water", "EINV/2"]},
-    {"triggers": [{"hasUnlock": "Export", "hasDiv": "WaterVamp"}],
-      "run": "export", "args": ["WaterVamp", "AgriVamp", "Water", "EINV/2"]},
 
     {"triggers": [{"ratio": "100", "cost": "ad"}], "repeat": true,
       "run": "ads", "args": ["DIV"], "perDiv": true},
@@ -104,7 +99,19 @@
     {"triggers": [{
       "ratio": "100", "cost": "upgrade", "upgradeName": "ABC SalesBots"
     }], "title": "Buy Upgrades", "repeat": true,
-    "run": "buyUpgrade", "args": ["ABC SalesBots"]}
+    "run": "buyUpgrade", "args": ["ABC SalesBots"]},
+    {"triggers": [{
+      "ratio": "200", "cost": "upgrade", "upgradeName": "Neural Accelerators"
+    }], "title": "Neural Accelerators", "repeat": true,
+    "run": "buyUpgrade", "args": ["Neural Accelerators"]},
+    {"triggers": [{
+      "ratio": "200", "cost": "upgrade", "upgradeName": "Nuoptimal Nootropic Injector Implants"
+    }], "title": "Nuoptimal Nootropic Injector Implants", "repeat": true,
+    "run": "buyUpgrade", "args": ["Nuoptimal Nootropic Injector Implants"]},
+    {"triggers": [{
+      "ratio": "200", "cost": "upgrade", "upgradeName": "Speech Processor Implants"
+    }], "title": "Speech Processor Implants", "repeat": true,
+    "run": "buyUpgrade", "args": ["Speech Processor Implants"]}
   ],
   "disabled": false,
   "valid": true

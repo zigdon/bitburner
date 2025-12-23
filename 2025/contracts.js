@@ -185,6 +185,7 @@ export function flags(ns) {
     ["debug", false],
     ["check", false],
     ["autotest", ""],
+    ["limit", 100],
   ])
 }
 
@@ -245,13 +246,28 @@ export async function init(ns, types, testfn, nosubmit) {
     ns.tprint("Running tests")
     return await testfn(ns, fs._)
   }
-  var host = fs._[0]
-  var file = fs._[1]
-
   if (fs["autotest"] != "") {
-    return await autotest(ns, types, fs["autotest"])
+    return await autotest(ns, types, fs["autotest"], fs["limit"])
   }
 
+  var host = fs._[0]
+  var file = fs._[1]
+  if (file == undefined) {
+    let cs = ns.ls(host, "contract-").filter(
+      (c) => Array.from(types.keys()).includes(
+        ns.codingcontract.getContract(c, host).type)
+    )
+    if (cs.length == 1) {
+      file = cs[0]
+    } else if (cs.length == 0) {
+      ns.tprintf("No valid contracts found.")
+      return
+    } else {
+      ns.tprintf("%d contracts found:", cs.length)
+      cs.forEach((c) => ns.tprintf("  %s", c))
+      return
+    }
+  }
   var c = ns.codingcontract.getContract(file, host)
   if (!c) {
     err(ns, "Can't get contract %s@%s", file, host)
@@ -291,7 +307,7 @@ export async function init(ns, types, testfn, nosubmit) {
     ns.printf("Input data:\n%j", data)
     ns.printf("Result: %j", res)
     ns.print(msg)
-    ns.toast(msg)
+    ns.toast(msg, msg.includes("failed") ? "warning" : "success")
     await info(ns, msg)
   } else {
     ns.tprintf("Input data:\n%j", data)
@@ -368,7 +384,7 @@ async function listContracts(ns, flags) {
   return
 }
 
-async function autotest(ns, types, type) {
+async function autotest(ns, types, type, limit=100) {
   var allTypes = Array.from(types.keys())
   if (allTypes.length == 1) {
     type = allTypes[0]
@@ -381,7 +397,10 @@ async function autotest(ns, types, type) {
     }
     type = type[0]
   }
-  while(true) {
+  var good = []
+  var bad = []
+  await info(ns, "Running %d autotest for %s", limit, type)
+  for (let n=0; n<limit; n++) {
     var file = ns.codingcontract.createDummyContract(type)
     ns.printf("Created contract: %s", file)
     var c = ns.codingcontract.getContract(file, "home")
@@ -389,12 +408,22 @@ async function autotest(ns, types, type) {
     var res = await types.get(type)(ns, c.data)
     ns.printf("res=%j", res)
     if (c.submit(res)) {
-      ns.tprintf("Test success!")
+      ns.printf("Test success!")
+      good.push(c.data)
     } else {
-      ns.tprintf("Test failed:\ndata=%j\nres=%j\nfile=%s", c.data, res, file)
-      return
+      ns.printf("Test failed:\ndata=%j\nres=%j\nfile=%s", c.data, res, file)
+      bad.push(c.data)
     }
-    ns.tprintf("Test done, restarting in 5s...")
-    await ns.asleep(5000)
+    await ns.asleep(100)
+  }
+  if (bad.length == 0) {
+    await info(ns, "%s %d%% success (+%d, -%d)",
+      type, (good.length/limit)*100, good.length, bad.length)
+  } else {
+    await warning(ns, "%s %d%% success (+%d, -%d) -> logs/autotest.txt",
+      type, (good.length/limit)*100, good.length, bad.length)
+    let out = [...good.map((l) => ns.sprintf("g: %j", l)),
+      ...bad.map((l) => ns.sprintf("b: %j", l))].join("\n")
+    ns.write("logs/autotest.txt", out, "w")
   }
 }

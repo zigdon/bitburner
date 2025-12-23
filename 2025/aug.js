@@ -18,7 +18,7 @@ export async function main(ns) {
   ])
   var cmd = fs._[0]
   if (cmds.has(cmd)) {
-    cmds.get(cmd)(ns, fs)
+    await cmds.get(cmd)(ns, fs)
   } else {
     ns.tprintf("Commands: %s", Array.from(cmds.keys()).join(", "))
   }
@@ -139,23 +139,33 @@ function findFactionForAug(ns, a) {
   return fs[0]
 }
 
-function buy(ns, flags) {
+async function buy(ns, flags) {
   var owned = ns.singularity.getOwnedAugmentations(true)
+  var cash = ns.getPlayer().money
   var augs = getAllAugs(ns, flags).filter(
     (a) => !owned.includes(a) && a.includes(flags["augs"])
   ).map((a) => [a, findFactionForAug(ns, a)]
   ).filter(
     (a) => a[1]?.length > 0
+  ).filter(
+    (a) => ns.singularity.getAugmentationPrice(a[0]) < cash
   ).sort(
     (a,b) => ns.singularity.getAugmentationPrice(b[0]) -
              ns.singularity.getAugmentationPrice(a[0])
   )
 
   ns.tprintf("Buying %d augs", augs.length)
-  while (augs.length > 0 && 
-    ns.getPlayer().money >= ns.singularity.getAugmentationPrice(augs[0][0])) {
-    if (!buyAug(ns, augs.shift())) {
-      break
+  while (augs.length > 0) {
+    await ns.asleep(10)
+    let price = ns.singularity.getAugmentationPrice(augs[0][0])
+    if (ns.getPlayer().money >= price) {
+      ns.tprintf("Trying to buy %s for $%s", augs[0][0], ns.formatNumber(price))
+      if (!buyAug(ns, augs.shift())) {
+        break
+      }
+    } else {
+      ns.tprintf("Can't afford %s for $%s", augs.shift()[0], ns.formatNumber(price))
+      continue
     }
   }
 }

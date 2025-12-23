@@ -18,6 +18,7 @@ export async function main(ns) {
     }
     var script, level, msg
     [script, level, msg] = data.split(",", 3)
+    msg = data.slice(data.indexOf(",", data.indexOf(",")+1)+1)
     level = loglevels[level]
     var c = colors["reset"]
     switch (level) {

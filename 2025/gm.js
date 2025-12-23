@@ -20,6 +20,7 @@ var lastRun = new Map()
 export async function main(ns) {
   ns.disableLog("asleep")
 
+  cfg = await loadCfg(ns, config, cfg)
   await info(ns, "Starting loop")
   let st = []
   while (true) {
