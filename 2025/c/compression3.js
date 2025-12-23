@@ -75,15 +75,17 @@ async function decompress(ns, data) {
 
 async function compress(ns, data) {
   let c = await doCompress(ns, data, 2)
-  for (let m=3; m<=4; m++) {
-    let cm = await doCompress(ns, data, m)
-    if (cm.length < c.length) {
-      ns.printf("== m=%d is shorter!", m)
-      ns.printf("== %s", cm)
-      ns.printf("== %s", c)
-      c=cm
+  /*
+    for (let m=3; m<=4; m++) {
+      let cm = await doCompress(ns, data, m)
+      if (cm.length < c.length) {
+        ns.printf("== m=%d is shorter!", m)
+        ns.printf("== %s", cm)
+        ns.printf("== %s", c)
+        c=cm
+      }
     }
-  }
+  */
   return c
 }
 
@@ -143,7 +145,8 @@ async function doCompress(ns, data, minblock=2) {
         var prev = blocks[blocks.length-1]
         if (!prev[0]) { // Are we following another block2?
           b2l++
-        } else if (l+Number(prev[1][0]) >= 9) { // If we're following a block1, can we just add the data there?
+        } else if (l+Number(prev[1][0]) >= 9) {
+          // If we're following a block1, can we just add the data there?
           b1l++
         }
         if (b2l > b1l) {
@@ -177,8 +180,98 @@ async function doCompress(ns, data, minblock=2) {
     extra.reverse()
     blocks.push(...extra)
   }
-  ns.printf("%j", blocks)
-  return connect(ns, blocks)
+  ns.printf("found: %j", blocks)
+
+  // For each of the B2s, see what happens if we just put the raw B1 instead.
+  let b2ids = blocks.map((b, i) => b[0] ? -1 : i).filter((id) => id>=0)
+  ns.printf("B2 IDs: %j", b2ids)
+  let balanced = await rebalance(ns, blocks)
+  // ns.printf("rebalanced: %j", balanced)
+  let best = await connect(ns, balanced)
+  for (let bid of b2ids.reverse()) {
+    ns.printf("Swapping out #%d: %s -> %s", bid, blocks[bid][1], blocks[bid][2])
+    let nb = await rebalance(ns, [
+      ...blocks.slice(0,bid),
+      [true, blocks[bid][2]], // Pretend this Block2 is a Block1 actually.
+      ...blocks.slice(bid+1)])
+    // ns.printf("newbalance: %j", nb)
+    let res = await connect(ns, nb)
+    if (res.length < best.length) {
+      ns.printf("%d < %d!", res.length, best.length)
+      best = res
+      blocks = nb
+    } else {
+      ns.printf("%d >= %d, keeping previous best", res.length, best.length)
+    }
+  }
+
+  return best
+}
+
+// Try to merge consecutive B1s
+async function rebalance(ns, blocks) {
+  ns.printf("entering rebalancing: %j", blocks)
+  let res = []
+  let b1s = []
+  for (let i=0; i<blocks.length; i++) {
+    await ns.asleep(10)
+    // ns.printf("rebalancing %j", blocks[i])
+    if (blocks[i][0] == true) { // B1
+      b1s.push(blocks[i])
+    } else { // B2
+      if (b1s.length > 0) {
+        let b1blocks = []
+        // ns.printf("b1s (mid): %j", b1s)
+        let str = b1s.reverse().map((b) => b[1].slice(1)).join("")
+        // ns.printf("b1 text: %j", str)
+        b1s = []
+        while (str.length > 9) {
+          b1blocks.unshift([true, ns.sprintf("9%s", str.slice(0,9))])
+          str = str.slice(9)
+        }
+        b1blocks.unshift([true, ns.sprintf("%d%s", str.length, str)])
+        res.push(...b1blocks)
+      }
+      res.push(blocks[i])
+    }
+  }
+
+  if (b1s.length > 0) {
+    let b1blocks = []
+    // ns.printf("b1s (end): %j", b1s)
+    let str = b1s.reverse().map((b) => b[1].slice(1)).join("")
+    // ns.printf("b1 text: %j", str)
+    while (str.length > 9) {
+      b1blocks.unshift([true, ns.sprintf("9%s", str.slice(0,9))])
+      str = str.slice(9)
+    }
+    b1blocks.unshift([true, ns.sprintf("%d%s", str.length, str)])
+    res.push(...b1blocks)
+  }
+
+  ns.printf("exiting rebalancing: %j", res)
+  return res
+}
+
+async function connect(ns, blocks) {
+  // connect the blocks alternating types. If the next block is the wrong type,
+  // just add a '0' block.
+  //
+  var want = true
+  let res = ""
+  for (let bid=blocks.length-1; bid >= 0; bid--) {
+    await ns.asleep(10)
+    var b = blocks[bid]
+    if (b[0] != want) {
+      res += "0"
+    } else {
+      want = !want
+    }
+    res += b[1]
+    ns.printf("+%15s => %s", b, res)
+  }
+
+  return res
 }
 
 async function test(ns, testdata) {
@@ -219,42 +312,26 @@ async function test(ns, testdata) {
     ns.tprintf("=== => %j", got)
     if (got != t[0]) {
       ns.tprintf("======= FAILED:\n+%s\n-%s", got, t[0])
+      return
     }
     ns.tprintf("=== Encoding %s", t[0])
     got = await compress(ns, t[0])
     ns.tprintf("=== => %j", got)
     if (got != t[1]) {
       ns.tprintf("======= FAILED decompress:\n+%s\n-%s", got, t[1])
+      return
     }
     var want = await decompress(ns, got)
     if (want != t[0]) {
       ns.tprintf("======= FAILED decompress:\n+%s\n-%s", want, t[0])
+      return
     }
     if (got.length > t[1].length) {
       ns.tprintf("======= FAILED length:\n+%s\n-%s", got, t[1])
+      return
     }
     ns.tprintf("======= PASSED")
   }
 
   return
-}
-
-async function connect(ns, blocks) {
-  // connect the blocks alternating types. If the next block is the wrong type,
-  // just add a '0' block.
-  var want = true
-  let res = ""
-  while (blocks.length > 0) {
-    await ns.asleep(10)
-    var b = blocks.pop()
-    if (b[0] != want) {
-      res += "0"
-    } else {
-      want = !want
-    }
-    res += b[1]
-    ns.printf("+%15s => %s", b, res)
-  }
-
-  return res
 }
