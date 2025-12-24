@@ -13,7 +13,7 @@ export async function main(ns) {
   while (ns.isRunning(pid)) {
     await ns.asleep(10)
   }
-  let pid = ns.run("lib/corp/smartSupply.js")
+  pid = ns.run("lib/corp/smartSupply.js")
   while (ns.isRunning(pid)) {
     await ns.asleep(10)
   }

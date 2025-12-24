@@ -35,3 +35,31 @@ export function diff(ns, a, b) {
   }
   return ""
 }
+
+export function parseNumber(num) {
+  if (num == Number(num)) { return Number(num) }
+  let suf = num[num.length-1]
+  let prefix = Number(num.slice(0, num.length-1))
+  switch (suf) {
+    case "k": return prefix*1000
+    case "m": return prefix*1000*1000
+    case "b": return prefix*1000*1000*1000
+    case "t": return prefix*1000*1000*1000*1000
+  }
+  return num
+}
+
+export function parseTime(str) {
+  if (str == Number(str)) { return Number(str) }
+  let suf = str[str.length-1]
+  let prefix = Number(str.slice(0, str.length-1))
+  switch (suf) {
+    case "m": return prefix*60
+    case "h": return prefix*60*60
+  }
+  return str
+}
+
+export function singleInstance(ns) {
+  return ns.ps().filter((p) => p.filename == ns.getScriptName()).length == 0
+}

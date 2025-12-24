@@ -47,6 +47,8 @@ export async function main(ns) {
       await train(ns, gym, s, flags["focus"], target)
     }
   }
+
+  ns.toast("Done training at the gym", "success", null)
 }
 
 var univ = new Map([

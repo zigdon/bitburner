@@ -63,8 +63,10 @@ export async function main(ns) {
     while (ns.isRunning(pid)) {
       await ns.asleep(10)
     }
-    for (let m of sells) {
-      c.sellMaterial(name, city, m, "MAX", "MP")
+    if (sells?.length > 0) {
+      for (let m of sells) {
+        c.sellMaterial(name, city, m, "MAX", "MP")
+      }
     }
   }
 

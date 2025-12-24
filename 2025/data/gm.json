@@ -27,6 +27,28 @@
     {"triggers": [
       {"corp": "100b", "needDiv": "SoftVamp", "hasDiv": "WaterVamp"}
     ], "run": "createDiv", "args": ["SoftVamp", "Software", "AI Cores"]},
+    {"triggers": [
+      {"corp": "900b", "needDiv": "HealthVamp"}
+    ], "run": "createDiv", "args": [ "HealthVamp", "Healthcare"]},
+
+    {"triggers": [
+      {"corp": "<500b", "needDiv": "HealthVamp", "sharePrice": "1500"}
+    ], "run": "issueShares", "args": ["1t"]},
+    {"comment": "Drive down price to buy back shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": true}
+    ], "run": "dividends", "args": ["100"], "repeat": true, "debug": true},
+    {"comment": "Buy back shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": true,
+        "sharePrice": "<200", "player": "2b"}
+    ], "run": "buyBack", "repeat": true, "debug": true},
+    {"comment": "Drive price up to sell shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
+        "sharePrice": "<1500"}
+    ], "run": "dividends", "args": ["50"], "repeat": true, "debug": true},
+    {"comment": "Profit!", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
+        "canSellShares": true, "sharePrice": "1500"}
+    ], "run": "sellShares", "args": ["20"], "repeat": true, "debug": true},
 
     {"triggers": [{"every": "5m", "noRND": "PharmaVamp"}],
       "title": "Research New Drugs", "run": "products",
@@ -37,6 +59,10 @@
     {"triggers": [{"every": "5m", "noRND": "SoftVamp"}],
       "title": "Develop Software", "run": "products",
     "args": ["SoftVamp", "WonderGame"]},
+    {"triggers": [{"every": "5m", "noRND": "HealthVamp"}],
+      "title": "Develop Health Product", "run": "products",
+    "args": ["HealthVamp", "WonderClinic"]},
+
     {"triggers": [{"income": "1m", "isPublic": false}],
       "title": "Go Public", "run": "ipo", "args":["1000000"]},
     {"triggers": [{"income": "2m", "dividendBelow": 10}],
@@ -75,6 +101,12 @@
     {"triggers": [{"canResearch": "AutoPartyManager"}],
       "title": "Buy Research", "perDiv": true,
       "run": "buyResearch", "args":["DIV", "AutoPartyManager"]},
+    {"triggers": [{"canResearch": "Market-TA.I"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Market-TA.I"]},
+    {"triggers": [{"canResearch": "Market-TA.II"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Market-TA.II"]},
 
     {"triggers": [{
       "ratio": "100", "cost": "upgrade", "upgradeName": "Smart Factories"

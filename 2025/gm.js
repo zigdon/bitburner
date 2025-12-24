@@ -1,5 +1,6 @@
 import { debug, info, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
+import { parseNumber, parseTime } from "@/lib/util.js"
 
 const config = "data/gm.json"
 var cfg = {valid: false}
@@ -59,7 +60,7 @@ export async function main(ns) {
             if (a.debug) {
               cond.debug = true
             }
-            if (!check(ns, n, cond, d, c)) {
+            if (!await check(ns, n, cond, d, c)) {
               continue
             }
             ready = true
@@ -106,102 +107,106 @@ async function run(ns, script, args, fork) {
   }
 }
 
-function parseNumber(num) {
-  if (num == Number(num)) { return Number(num) }
-  let suf = num[num.length-1]
-  let prefix = Number(num.slice(0, num.length-1))
-  switch (suf) {
-    case "k": return prefix*1000
-    case "m": return prefix*1000*1000
-    case "b": return prefix*1000*1000*1000
-    case "t": return prefix*1000*1000*1000*1000
-  }
-  return num
-}
-
-function parseTime(str) {
-  if (str == Number(str)) { return Number(str) }
-  let suf = str[str.length-1]
-  let prefix = Number(str.slice(0, str.length-1))
-  switch (suf) {
-    case "m": return prefix*60
-    case "h": return prefix*60*60
-  }
-  return str
-}
-
-function check(ns, n, cond, divName, city) {
+async function check(ns, n, cond, divName, city) {
   let c = ns.corporation
   let m = ns.getPlayer().money
-  const print = (tmpl, ...args) => cond?.debug ? ns.printf(tmpl, ...args) : ""
-  print("Checking %j (%s@%s)", cond, divName, city)
+  const print = async (tmpl, ...args) => cond?.debug ? await info(ns, tmpl, ...args) : ""
+  await print("Checking %j (%s@%s)", cond, divName, city)
 
   if (cond.isPublic != undefined && c.getCorporation().public != cond.isPublic) {
     return false
   } else if (cond.isPublic != undefined) {
-    print("isPublic: %j pass", cond.isPublic)
+    await print("isPublic: %j pass", cond.isPublic)
   }
   if (cond.hasCorp != undefined && c.hasCorporation() != cond.hasCorp) {
     return false
   } else if (cond.hasCorp != undefined) {
-    print("hasCorp: %j pass", cond.hasCorp)
+    await print("hasCorp: %j pass", cond.hasCorp)
   }
   if (cond.dividendBelow &&
     cond.dividendBelow <= c.getCorporation().dividendRate*100) {
     return false
   } else if (cond.dividendBelow) {
-    print("dividendBelow: %j pass", cond.dividendBelow)
+    await print("dividendBelow: %j pass", cond.dividendBelow)
   }
   if (cond.player && cond.player < m) {
     return false
   } else if (cond.player) {
-    print("player: %j pass", cond.player)
+    await print("player: %j pass", cond.player)
   }
-  if (cond.corp && cond.corp < c.getCorporation().funds) {
+  if (cond.corp) {
+    if (cond.corp[0] == "<" && c.getCorporation().funds > cond.corp.slice(1)) {
+      return false
+    } else if (cond.corp < c.getCorporation().funds) {
+      return false
+    }
+    await print("corp: %j pass", cond.corp)
+  }
+  if (cond.canSellShares != undefined
+    && cond.canSellShares != (c.getCorporation().shareSellCooldown > 0)) {
     return false
-  } else if (cond.corp) {
-    print("corp: %j pass", cond.corp)
+  } else if (cond.canSellShares != undefined) {
+    await print("canSellShares: %j pass", cond.canSellShares)
+  }
+  if (cond.hasOutstandingShares != undefined
+    && cond.hasOutstandingShares != (c.getCorporation().issuedShares > 0)) {
+    return false
+  } else if (cond.hasOutstandingShares != undefined) {
+    await print("hasOutstandingShares: %j pass", cond.hasOutstandingShares)
+  }
+  if (cond.sharePrice) {
+    if (c.getCorporation().issueNewSharesCooldown > 0) {
+      return false
+    }
+    if (cond.sharePrice[0] == "<" && 
+      c.getCorporation().sharePrice >= cond.sharePrice.slice(1)) {
+      return false
+    }
+    if (c.getCorporation().sharePrice < cond.sharePrice) {
+      return false
+    }
+    await print("sharePrice: %j pass", cond.sharePrice)
   }
   if (cond.needUnlock && c.hasUnlock(cond.needUnlock)) {
     return false
   } else if (cond.needUnlock) {
-    print("needUnlock: %j pass", cond.needUnlock)
+    await print("needUnlock: %j pass", cond.needUnlock)
   }
   if (cond.hasUnlock && !c.hasUnlock(cond.hasUnlock)) {
     return false
   } else if (cond.hasUnlock) {
-    print("hasUnlock: %j pass", cond.hasUnlock)
+    await print("hasUnlock: %j pass", cond.hasUnlock)
   }
   if (cond.hasDiv && !c.getCorporation().divisions.includes(cond.hasDiv)) {
       return false 
   } else if (cond.hasDiv) {
-    print("hasDiv: %j pass", cond.hasDiv)
+    await print("hasDiv: %j pass", cond.hasDiv)
   }
   if (cond.needDiv && c.getCorporation().divisions.includes(cond.needDiv)) {
       return false 
   } else if (cond.needDiv) {
-    print("needDiv: %j pass", cond.needDiv)
+    await print("needDiv: %j pass", cond.needDiv)
   }
   if (cond.every && lastRun.has(n) &&
       now-lastRun.get(n) < parseTime(cond.every)) {
       return false 
   } else if (cond.every) {
-    print("every: %j pass", cond.every)
+    await print("every: %j pass", cond.every)
   }
   if (cond.noRND && isResearching(c, cond.noRND)) {
     return false
   } else if (cond.noRND) {
-    print("noRND: %j pass", cond.noRND)
+    await print("noRND: %j pass", cond.noRND)
   }
   if (cond.income && c.getCorporation().revenue < cond.income) {
     return false
   } else if (cond.income) {
-    print("income: %j pass", cond.income)
+    await print("income: %j pass", cond.income)
   }
   if (cond.ratio && !ratio(ns, cond, divName, city)) {
     return false
   } else if (cond.ratio) {
-    print("ratio: %j pass", cond.cost)
+    await print("ratio: %j pass", cond.cost)
   }
   if (cond.canResearch &&
     (c.getDivision(divName).researchPoints <

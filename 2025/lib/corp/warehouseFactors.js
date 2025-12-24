@@ -60,6 +60,16 @@ async function buyWarehouseFactors(ns, name, city, industry) {
 
   await info(ns, "Buying the right mix for %s in %s x %d (%d/%d)",
     industry, city, amt, totSize, size)
+  // Disable smart supply while we muck with things
+  c.setSmartSupply(name, city, false)
+  // Disable all the imports from other divs in the city
+  for (let d of c.getCorporation().divisions) {
+    if (!c.hasWarehouse(d, city)) { continue }
+    for (let mat of ["AI Cores", "Robots", "Hardware", "Real Estate"]) {
+      c.cancelExportMaterial(d, city, name, city, mat)
+    }
+  }
+
   c.buyMaterial(name, city, "AI Cores", 0)
   c.sellMaterial(name, city, "AI Cores", 0, "MP")
   c.buyMaterial(name, city, "Robots", 0)
@@ -81,21 +91,10 @@ async function buyWarehouseFactors(ns, name, city, industry) {
     re: target.re-stock.re,
   }
   await info(ns, "AI: %d -> %d (%d)", stock.ai, target.ai, missing.ai)
-  if (missing.ai > 0) {
-    c.bulkPurchase(name, city, "AI Cores", missing.ai)
-  }
   await info(ns, "Robots: %d -> %d (%d)", stock.robot, target.robot, missing.robot)
-  if (missing.robot > 0) {
-    c.bulkPurchase(name, city, "Robots", missing.robot)
-  }
   await info(ns, "Hardware: %d -> %d (%d)", stock.hardware, target.hardware, missing.hardware)
-  if (missing.hardware > 0) {
-    c.bulkPurchase(name, city, "Hardware", missing.hardware)
-  }
   await info(ns, "Real Estate: %d -> %d (%d)", stock.re, target.re, missing.re)
-  if (missing.re > 0) {
-    c.bulkPurchase(name, city, "Real Estate", missing.re)
-  }
+
 
   let cont = true
   while (cont) {
@@ -111,34 +110,66 @@ async function buyWarehouseFactors(ns, name, city, industry) {
     if (stock.ai > target.ai) {
       cont = true
       selling.push("AI")
-      c.sellMaterial(name, city, "AI Cores", missing.ai/10, "MP")
+      c.sellMaterial(name, city, "AI Cores", -missing.ai/10, "MP")
     } else {
       c.sellMaterial(name, city, "AI Cores", 0, "MP")
     }
     if (stock.robot > target.robot) {
       cont = true
       selling.push("robots")
-      c.sellMaterial(name, city, "Robots", missing.robot/10, "MP")
+      c.sellMaterial(name, city, "Robots", -missing.robot/10, "MP")
     } else {
       c.sellMaterial(name, city, "Robots", 0, "MP")
     }
     if (stock.hardware > target.hardware) {
       cont = true
       selling.push("hardware")
-      c.sellMaterial(name, city, "Hardware", missing.hardware/10, "MP")
+      c.sellMaterial(name, city, "Hardware", -missing.hardware/10, "MP")
     } else {
       c.sellMaterial(name, city, "Hardware", 0, "MP")
     }
     if (stock.re > target.re) {
       cont = true
       selling.push("real estate")
-      c.sellMaterial(name, city, "Real Estate", missing.re/10, "MP")
+      c.sellMaterial(name, city, "Real Estate", -missing.re/10, "MP")
     } else {
       c.sellMaterial(name, city, "Real Estate", 0, "MP")
     }
     if (cont) {
       ns.printf("Still waiting for %s", selling.join(", "))
     }
+    await ns.asleep(500)
+  }
+
+  if (missing.ai > 0) {
+    let amt = Math.min(
+      missing.ai,
+      (size-c.getWarehouse(name, city).sizeUsed) / sizes.ai)
+    c.bulkPurchase(name, city, "AI Cores", amt)
+  }
+  if (missing.robot > 0) {
+    let amt = Math.min(
+      missing.robot,
+      (size-c.getWarehouse(name, city).sizeUsed) / sizes.robot)
+    c.bulkPurchase(name, city, "Robots", amt)
+  }
+  if (missing.hardware > 0) {
+    let amt = Math.min(
+      missing.hardware,
+      (size-c.getWarehouse(name, city).sizeUsed) / sizes.hardware)
+    c.bulkPurchase(name, city, "Hardware", amt)
+  }
+  if (missing.re > 0) {
+    let amt = Math.min(
+      missing.re,
+      (size-c.getWarehouse(name, city).sizeUsed) / sizes.re)
+    c.bulkPurchase(name, city, "Real Estate", amt)
+  }
+
+  // Reenable smart supply
+  c.setSmartSupply(name, city, true)
+  let pid = ns.run("/lib/corp/smartSupply.js")
+  while (ns.isRunning(pid)) {
     await ns.asleep(500)
   }
 }

@@ -63,6 +63,7 @@ export async function info(ns, tmpl, ...args) {
  * */
 export async function warning(ns, tmpl, ...args) {
   await logn(ns, "WARNING", tmpl, ...args)
+  ns.toast(ns.sprintf(tmpl, ...args), "warning")
 }
 
 /**
@@ -72,4 +73,5 @@ export async function warning(ns, tmpl, ...args) {
  * */
 export async function critical(ns, tmpl, ...args) {
   await logn(ns, "CRITICAL", tmpl, ...args)
+  ns.toast(ns.sprintf(tmpl, ...args), "error")
 }

@@ -1,5 +1,8 @@
+import {singleInstance} from "@/lib.util.js"
+
 /** @param {NS} ns */
 export async function main(ns) {
+  if (!singleInstance(ns)) { return }
   ns.clearLog()
   let c = ns.corporation
 
