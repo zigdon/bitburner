@@ -165,7 +165,7 @@ async function buy(ns, flags) {
       }
     } else {
       ns.tprintf("Can't afford %s for $%s", augs.shift()[0], ns.formatNumber(price))
-      continue
+      break
     }
   }
 }

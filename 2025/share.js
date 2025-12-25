@@ -1,7 +1,8 @@
 import { dns } from "@/hosts.js"
+import { parseNumber } from "@/lib/util.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var reserve = 50
+  var reserve = ns.args[0] ? parseNumber(ns.args[0]) : 50
   var hosts = dns(ns)
   do {
     var total = 0

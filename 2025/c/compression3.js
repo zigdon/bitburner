@@ -268,7 +268,7 @@ async function connect(ns, blocks) {
       want = !want
     }
     res += b[1]
-    ns.printf("+%15s => %s", b, res)
+    // ns.printf("+%15s => %s", b, res)
   }
 
   return res

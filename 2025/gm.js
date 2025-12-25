@@ -1,6 +1,6 @@
 import { debug, info, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
-import { parseNumber, parseTime } from "@/lib/util.js"
+import { singleInstance, parseNumber, parseTime } from "@/lib/util.js"
 
 const config = "data/gm.json"
 var cfg = {valid: false}
@@ -19,6 +19,7 @@ var lastRun = new Map()
 
 /** @param {NS} ns */
 export async function main(ns) {
+  if (!singleInstance(ns)) { return }
   ns.disableLog("asleep")
 
   cfg = await loadCfg(ns, config, cfg)
@@ -74,7 +75,7 @@ export async function main(ns) {
             await critical(ns, "%s not found", script)
             continue
           }
-          let args = a.args.map((a) => a == "DIV" ? d : a == "CITY" ? c : a)
+          let args = a.args?.map((a) => a == "DIV" ? d : a == "CITY" ? c : a)
           st[n]="r"
           await run(ns, script, args ?? [], a.fork)
 
@@ -123,16 +124,19 @@ async function check(ns, n, cond, divName, city) {
   } else if (cond.hasCorp != undefined) {
     await print("hasCorp: %j pass", cond.hasCorp)
   }
-  if (cond.dividendBelow &&
-    cond.dividendBelow <= c.getCorporation().dividendRate*100) {
-    return false
-  } else if (cond.dividendBelow) {
-    await print("dividendBelow: %j pass", cond.dividendBelow)
-  }
-  if (cond.player && cond.player < m) {
+  if (cond.player && parseNumber(cond.player) > m) {
     return false
   } else if (cond.player) {
-    await print("player: %j pass", cond.player)
+    await print("player: %s < %s pass", ns.formatNumber(parseNumber(cond.player)), ns.formatNumber(m))
+  }
+  if (cond.dividends) {
+    let cur = c.getCorporation().dividendRate * 100
+    if (cond.dividends[0] == "<" && cur >= cond.dividends.slice(1)) {
+      return false
+    } else if (cond.dividends >= cur) {
+      return false
+    }
+    await print("dividends: %j pass", cond.dividends)
   }
   if (cond.corp) {
     if (cond.corp[0] == "<" && c.getCorporation().funds > cond.corp.slice(1)) {
@@ -154,10 +158,13 @@ async function check(ns, n, cond, divName, city) {
   } else if (cond.hasOutstandingShares != undefined) {
     await print("hasOutstandingShares: %j pass", cond.hasOutstandingShares)
   }
+  if (cond.canIssueShares != undefined &&
+    c.getCorporation().issueNewSharesCooldown > 0) {
+    return false
+  } else if (cond.canIssueShares != undefined) {
+    await print("canIssueShares: %j pass", cond.canIssueShares)
+  }
   if (cond.sharePrice) {
-    if (c.getCorporation().issueNewSharesCooldown > 0) {
-      return false
-    }
     if (cond.sharePrice[0] == "<" && 
       c.getCorporation().sharePrice >= cond.sharePrice.slice(1)) {
       return false

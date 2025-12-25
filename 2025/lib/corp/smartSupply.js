@@ -1,4 +1,4 @@
-import {singleInstance} from "@/lib.util.js"
+import {singleInstance} from "@/lib/util.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -33,7 +33,7 @@ export async function main(ns) {
   ns.print(needs)
 
   // - Set smart supply in every div
-  // - In every city, use imports, then buy the rest
+  // - In every city, use leftovers, then buy the rest
   // - Every thing we make, export to all the divs in the city that need it,
   // then sell the rest.
   for (let d of divisions) {
@@ -43,9 +43,15 @@ export async function main(ns) {
     for (let city of div.cities) {
       c.setSmartSupply(d, city, true)
       for (let m of Object.keys(id.requiredMaterials)) {
-        c.setSmartSupplyOption(d, city, m, "imports")
+        // If it's a production booster, use imports to keep the static amount
+        // otherwise, use leftovers.
+        if (["Hardware", "Robots", "AI Cores", "Real Estate"].includes(m)) {
+          c.setSmartSupplyOption(d, city, m, "imports")
+        } else {
+          c.setSmartSupplyOption(d, city, m, "leftovers")
+        }
 
-        // Whatever we don't use, sell at a markup
+        // Whatever we don't use, sell
         c.sellMaterial(d, city, m, "MAX-10", "MP")
       }
       if (!id.makesMaterials) { continue }
@@ -62,7 +68,9 @@ export async function main(ns) {
           let amt = ns.sprintf("EINV/%d", needs.get(m).length)
           // Set up an export to all who need in the city
           for (let dstDiv of needs.get(m)) {
-            c.exportMaterial(d, city, dstDiv, city, m, amt)
+            if (c.hasWarehouse(dstDiv, city)) {
+              c.exportMaterial(d, city, dstDiv, city, m, amt)
+            }
           }
         }
         c.sellMaterial(d, city, m, "MAX", "MP")

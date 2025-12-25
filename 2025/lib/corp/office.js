@@ -30,13 +30,21 @@ async function upgradeCity(ns, div, city) {
   }
   office = c.getOffice(div, city)
   let jobs = office.employeeJobs
-  let pos = ["Operations","Engineer","Business","Management","Research & Development"]
+  let interns = 1+Math.floor(office.size/10)
+  let pos = ["Operations","Engineer","Research & Development","Business","Management"]
   while (jobs.Unassigned > 0) {
     await ns.asleep(1)
+    if (jobs["Intern"] < interns) {
+      jobs["Intern"]++
+      jobs.Unassigned--
+      continue
+    }
     jobs[pos[0]]++
     jobs.Unassigned--
     pos.unshift(pos.pop())
   }
+  pos.push("Intern")
+
   for (let p of pos) {
     if (c.setAutoJobAssignment(div, city, p, jobs[p])) {
       ns.printf("Set %s@%s %s to %d", div, city, p, jobs[p])

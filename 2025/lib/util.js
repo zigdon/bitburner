@@ -61,5 +61,9 @@ export function parseTime(str) {
 }
 
 export function singleInstance(ns) {
-  return ns.ps().filter((p) => p.filename == ns.getScriptName()).length == 0
+  if (ns.ps().filter((p) => p.filename == ns.getScriptName()).length == 1) {
+    return true
+  }
+  ns.tprintf("Can't launched another instance of %s", ns.getScriptName())
+  return false
 }

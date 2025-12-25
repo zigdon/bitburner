@@ -85,7 +85,7 @@ export async function main(ns) {
     return
   }
 
-  ns.tprint("Unimplemented")
+  ns.tprint("Valid commands: cat, buy, upgrade, list")
 
   /*
     ns.getPurchasedServerLimit()

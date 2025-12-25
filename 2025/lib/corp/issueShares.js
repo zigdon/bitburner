@@ -8,7 +8,7 @@ export async function main(ns) {
 
   let c = ns.corporation
   let target = parseNumber(ns.args[0])
-  let num = Math.round(c.totalShares * 0.2)
+  let num = Math.round(c.getCorporation().totalShares * 0.2)
   num -= num % 1e6
 
   await info(ns, "Waiting to issue %s shares to make $%s",

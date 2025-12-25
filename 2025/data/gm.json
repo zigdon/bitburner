@@ -11,13 +11,13 @@
 
     {"triggers": [
       {"corp": "100b", "needDiv": "AgriVamp"}
-    ], "run": "createDiv", "args": [ "AgriVamp", "Agriculture", "Food", "Plants"]},
+    ], "run": "createDiv", "args": [ "AgriVamp", "Agriculture"]},
     {"triggers": [
       {"corp": "200b", "needDiv": "PharmaVamp", "hasDiv": "AgriVamp"}
-    ], "run": "createDiv", "args": ["PharmaVamp", "Pharmaceutical", "Drugs"]},
+    ], "run": "createDiv", "args": ["PharmaVamp", "Pharmaceutical"]},
     {"triggers": [
       {"corp": "500b", "needDiv": "FisherVamp", "hasDiv": "PharmaVamp"}
-    ], "run": "createDiv", "args": ["FisherVamp", "Fishing", "Food"]},
+    ], "run": "createDiv", "args": ["FisherVamp", "Fishing"]},
     {"triggers": [
       {"corp": "100b", "needDiv": "RestVamp", "hasDiv": "FisherVamp"}
     ], "run": "createDiv", "args": ["RestVamp", "Restaurant"]},
@@ -25,30 +25,35 @@
       {"corp": "200b", "needDiv": "WaterVamp", "hasDiv": "RestVamp"}
     ], "run": "createDiv", "args": ["WaterVamp", "Water Utilities"]},
     {"triggers": [
+      {"corp": "200b", "needDiv": "SpringVamp", "hasDiv": "WaterVamp"}
+    ], "run": "createDiv", "args": ["SpringVamp", "Spring Water"]},
+    {"triggers": [
       {"corp": "100b", "needDiv": "SoftVamp", "hasDiv": "WaterVamp"}
-    ], "run": "createDiv", "args": ["SoftVamp", "Software", "AI Cores"]},
+    ], "run": "createDiv", "args": ["SoftVamp", "Software"]},
     {"triggers": [
       {"corp": "900b", "needDiv": "HealthVamp"}
     ], "run": "createDiv", "args": [ "HealthVamp", "Healthcare"]},
-
     {"triggers": [
-      {"corp": "<500b", "needDiv": "HealthVamp", "sharePrice": "1500"}
-    ], "run": "issueShares", "args": ["1t"]},
-    {"comment": "Drive down price to buy back shares", "triggers": [
-      {"hasDiv": "HealthVamp", "hasOutstandingShares": true}
-    ], "run": "dividends", "args": ["100"], "repeat": true, "debug": true},
-    {"comment": "Buy back shares", "triggers": [
-      {"hasDiv": "HealthVamp", "hasOutstandingShares": true,
-        "sharePrice": "<200", "player": "2b"}
-    ], "run": "buyBack", "repeat": true, "debug": true},
-    {"comment": "Drive price up to sell shares", "triggers": [
-      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
-        "sharePrice": "<1500"}
-    ], "run": "dividends", "args": ["50"], "repeat": true, "debug": true},
-    {"comment": "Profit!", "triggers": [
-      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
-        "canSellShares": true, "sharePrice": "1500"}
-    ], "run": "sellShares", "args": ["20"], "repeat": true, "debug": true},
+      {"corp": "300b", "needDiv": "VapeVamp", "hasDiv": "HealthVamp"}
+    ], "run": "createDiv", "args": [ "VapeVamp", "Tobacco"]},
+    {"triggers": [
+      {"corp": "300b", "needDiv": "ReVamp", "hasDiv": "VapeVamp"}
+    ], "run": "createDiv", "args": [ "ReVamp", "Refinery"]},
+    {"triggers": [
+      {"corp": "700b", "needDiv": "MineVamp", "hasDiv": "ReVamp"}
+    ], "run": "createDiv", "args": [ "MineVamp", "Mining"]},
+    {"triggers": [
+      {"corp": "300b", "needDiv": "ChemVamp", "hasDiv": "MineVamp"}
+    ], "run": "createDiv", "args": [ "ChemVamp", "Chemical"]},
+    {"triggers": [
+      {"corp": "700b", "needDiv": "ChipVamp", "hasDiv": "ChemVamp"}
+    ], "run": "createDiv", "args": [ "ChipVamp", "Computer Hardware"]},
+    {"triggers": [
+      {"corp": "800b", "needDiv": "VistaVamp", "hasDiv": "ChipVamp"}
+    ], "run": "createDiv", "args": [ "VistaVamp", "Real Estate"]},
+    {"triggers": [
+      {"corp": "1.2t", "needDiv": "RoboVamp", "hasDiv": "VistaVamp"}
+    ], "run": "createDiv", "args": [ "RoboVamp", "Robotics"]},
 
     {"triggers": [{"every": "5m", "noRND": "PharmaVamp"}],
       "title": "Research New Drugs", "run": "products",
@@ -62,15 +67,47 @@
     {"triggers": [{"every": "5m", "noRND": "HealthVamp"}],
       "title": "Develop Health Product", "run": "products",
     "args": ["HealthVamp", "WonderClinic"]},
+    {"triggers": [{"every": "5m", "noRND": "VapeVamp"}],
+      "title": "Develop DeHealth Product", "run": "products",
+    "args": ["VapeVamp", "WonderVape"]},
+    {"triggers": [{"every": "5m", "noRND": "ChipVamp"}],
+      "title": "Develop New Chip", "run": "products",
+    "args": ["ChipVamp", "WonderChip"]},
+    {"triggers": [{"every": "5m", "noRND": "VistaVamp"}],
+      "title": "Develop New Estate", "run": "products",
+    "args": ["VistaVamp", "WonderHouse"]},
+    {"triggers": [{"every": "5m", "noRND": "RoboVamp"}],
+      "title": "Develop New Robit", "run": "products",
+    "args": ["RoboVamp", "WonderRobit"]},
+
+    {"triggers": [
+      {"corp": "<500b", "needDiv": "HealthVamp",
+        "sharePrice": "1500", "canIssueShares": true}
+    ], "run": "issueShares", "args": ["1t"]},
+    {"comment": "Drive down price to buy back shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": true, "dividends": "<100"}
+    ], "run": "dividends", "args": ["100"], "repeat": true},
+    {"comment": "Buy back shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": true,
+        "sharePrice": "<200", "player": "2b"}
+    ], "run": "buyBack", "repeat": true},
+    {"comment": "Drive price up to sell shares", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
+        "sharePrice": "<1500", "dividends": "50"}
+    ], "run": "dividends", "args": ["50"], "repeat": true},
+    {"comment": "Profit!", "triggers": [
+      {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
+        "canSellShares": true, "sharePrice": "1500"}
+    ], "run": "sellShares", "args": ["20"], "repeat": true},
 
     {"triggers": [{"income": "1m", "isPublic": false}],
       "title": "Go Public", "run": "ipo", "args":["1000000"]},
-    {"triggers": [{"income": "2m", "dividendBelow": 10}],
+    {"triggers": [{"income": "2m", "dividends": "<10"}],
       "run": "dividends", "args": ["10"]},
 
     {"triggers": [{"ratio": "100", "cost": "ad"}], "repeat": true,
       "run": "ads", "args": ["DIV"], "perDiv": true},
-    {"triggers": [{"ratio": "50", "cost": "office"}],
+    {"triggers": [{"ratio": "10", "cost": "office"}],
       "perCity": true, "perDiv": true, "repeat": true,
       "run": "office", "args": ["DIV", "CITY"]},
     {"triggers": [{"ratio": "100", "cost": "warehouse"}],
@@ -107,6 +144,15 @@
     {"triggers": [{"canResearch": "Market-TA.II"}],
       "title": "Buy Research", "perDiv": true,
       "run": "buyResearch", "args":["DIV", "Market-TA.II"]},
+    {"triggers": [{"canResearch": "Automatic Drug Administration"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Automatic Drug Administration"]},
+    {"triggers": [{"canResearch": "Go-Juice"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "Go-Juice"]},
+    {"triggers": [{"canResearch": "CPH4 Injections"}],
+      "title": "Buy Research", "perDiv": true,
+      "run": "buyResearch", "args":["DIV", "CPH4 Injections"]},
 
     {"triggers": [{
       "ratio": "100", "cost": "upgrade", "upgradeName": "Smart Factories"
