@@ -1,5 +1,11 @@
-import { warning, info, toast } from "@/log.js"
+import { warning, info } from "@/log.js"
 
+/**
+ * @param {NS} ns
+ * @param {string} name
+ * @param {any} old
+ * @return any
+ */
 export async function loadCfg(ns, name, old) {
   let next = await readCfg(ns, name)
   if (next?.valid) {
@@ -18,11 +24,12 @@ export async function loadCfg(ns, name, old) {
 
 async function readCfg(ns, name) {
   ns.printf("Reading config from %s for %s", name, ns.getScriptName())
-  if (!ns.fileExists(name)) {
+  let data = ns.read(name)
+  if (data == "") {
     await warning(ns, "%s not found", name)
     return
   }
-  let next = JSON.parse(ns.read(name))
+  let next = JSON.parse(data)
   ns.printf("Parsing config from %s for %s", name, ns.getScriptName())
   if (next?.valid) {
     ns.printf("... %s valid", name)
