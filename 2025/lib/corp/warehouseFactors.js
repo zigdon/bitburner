@@ -17,19 +17,23 @@ const sizes = {
 
 /** @param {NS} ns */
 export async function main(ns) {
-  let name = ns.args[0]
-  let cs = ns.args.slice(1)
+  let flags = ns.flags([
+    ["fill", 0.5],
+  ])
+  let name = flags._[0]
+  let cs = flags._.slice(1)
   let industry = ns.corporation.getDivision(name).type
   if (cs.length == 0) {
     cs = cities
   }
   for (let city of cs) {
-    await buyWarehouseFactors(ns, name, city, industry)
+    await buyWarehouseFactors(ns, name, city, industry, flags["fill"])
   }
 }
 
-async function buyWarehouseFactors(ns, name, city, industry) {
-  await info(ns, "Buying warehouse factors for %s@%s (%s)", name, city, industry)
+async function buyWarehouseFactors(ns, name, city, industry, fill) {
+  await info(ns, "Buying %d%% warehouse factors for %s@%s (%s)",
+    fill*100, name, city, industry)
   let c = ns.corporation
   let size = c.getWarehouse(name, city).size
   ns.printf("Size: %j", size)
@@ -45,7 +49,7 @@ async function buyWarehouseFactors(ns, name, city, industry) {
                 data.realEstateFactor * sizes.re;
   ns.printf("pkgSize: %j", pkgSize)
 
-  let amt = (size*0.8)/pkgSize;
+  let amt = (size*fill)/pkgSize;
   let target = {
     ai: data.aiCoreFactor * amt,
     robot: data.robotFactor * amt,

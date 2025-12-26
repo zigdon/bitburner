@@ -40,6 +40,24 @@ export async function main(ns) {
     let div = c.getDivision(d)
     let id = c.getIndustryData(div.type)
     ns.printf("%s(%s):", d, div.type)
+
+    // If we make products, make sure we're selling them
+    if (id.makesProducts) {
+      for (let pName of div.products) {
+        let p = c.getProduct(d, "Sector-12", pName)
+        if (p.developmentProgress < 100) {
+          continue
+        }
+        c.sellProduct(d, "Sector-12", pName, "MAX", "MP", true)
+        if (c.hasResearched(d, "Market-TA.I")) {
+          c.setProductMarketTA1(d, pName, true)
+        }
+        if (c.hasResearched(d, "Market-TA.II")) {
+          c.setProductMarketTA2(d, pName, true)
+        }
+      }
+    }
+
     for (let city of div.cities) {
       c.setSmartSupply(d, city, true)
       for (let m of Object.keys(id.requiredMaterials)) {
@@ -51,6 +69,7 @@ export async function main(ns) {
           c.setSmartSupplyOption(d, city, m, "leftovers")
         }
       }
+
       if (!id.makesMaterials) { continue }
       for (let m of id.producedMaterials) {
         if (needs.has(m)) {
@@ -75,6 +94,12 @@ export async function main(ns) {
           c.sellMaterial(d, city, m, "PROD", "MP")
         } else {
           c.sellMaterial(d, city, m, "MAX", "MP")
+        }
+        if (c.hasResearched(d, "Market-TA.I")) {
+          c.setMaterialMarketTA1(d, city, m, true)
+        }
+        if (c.hasResearched(d, "Market-TA.II")) {
+          c.setMaterialMarketTA2(d, city, m, true)
         }
       }
     }
