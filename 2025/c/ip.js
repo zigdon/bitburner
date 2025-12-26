@@ -53,15 +53,17 @@ function ip(ns, data, octets) {
 
   ns.printf("Adding %s * ip(%s, %d)", data[0], data.slice(1), octets-1)
   res.push(...mult(data[0], ip(ns, data.slice(1), octets-1)))
-  // Leading 0 can only be a "0"
-  if (data[0] != "0") {
-    ns.printf("Adding %s * ip(%s, %d)", data.slice(0,2), data.slice(2), octets-1)
-    res.push(...mult(data.slice(0, 2), ip(ns, data.slice(2), octets-1)))
-    if (Number(data.slice(0,3)) < 256) {
-      ns.printf("Adding %s * ip(%s, %d)", data.slice(0,3), data.slice(3), octets-1)
-      res.push(...mult(data.slice(0, 3), ip(ns, data.slice(3), octets-1)))
-    }
+  ns.printf("Adding %s * ip(%s, %d)", data.slice(0,2), data.slice(2), octets-1)
+  res.push(...mult(data.slice(0, 2), ip(ns, data.slice(2), octets-1)))
+  if (Number(data.slice(0,3)) < 256) {
+    ns.printf("Adding %s * ip(%s, %d)", data.slice(0,3), data.slice(3), octets-1)
+    res.push(...mult(data.slice(0, 3), ip(ns, data.slice(3), octets-1)))
   }
+
+  // Filter out all leading 0x, 0xx
+  res = res.filter(
+    (r) => r.split('.').every((o) => o == "0" || o[0] != "0")
+  )
 
   ns.printf("input=[%j,%d], res=%j", data, octets, res)
 
