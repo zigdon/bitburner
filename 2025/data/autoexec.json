@@ -16,7 +16,8 @@
     {"name": "g/upgrade.js"},
     {"name": "g/program.js"},
     {"name": "g/factions.js"},
-    {"name": "g/saveBonus.js"}
+    {"name": "g/saveBonus.js"},
+    {"name": "g/idle.js"}
   ],
   "loop": {
     "pserv": false,

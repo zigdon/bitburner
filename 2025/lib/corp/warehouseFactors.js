@@ -97,6 +97,7 @@ async function buyWarehouseFactors(ns, name, city, industry) {
 
 
   let cont = true
+  let start = Date.now()
   while (cont) {
     cont = false
     stock = {
@@ -136,7 +137,14 @@ async function buyWarehouseFactors(ns, name, city, industry) {
       c.sellMaterial(name, city, "Real Estate", 0, "MP")
     }
     if (cont) {
-      ns.printf("Still waiting for %s", selling.join(", "))
+      let dur = Date.now() - start
+      ns.printf("Still waiting for %s (%s)", selling.join(", "), ns.tFormat(dur))
+      if (dur > 60000) {
+        ns.printf("Timeout")
+        break
+      }
+    } else {
+      break
     }
     await ns.asleep(500)
   }

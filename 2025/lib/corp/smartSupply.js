@@ -50,9 +50,6 @@ export async function main(ns) {
         } else {
           c.setSmartSupplyOption(d, city, m, "leftovers")
         }
-
-        // Whatever we don't use, sell
-        c.sellMaterial(d, city, m, "MAX-10", "MP")
       }
       if (!id.makesMaterials) { continue }
       for (let m of id.producedMaterials) {
@@ -73,7 +70,12 @@ export async function main(ns) {
             }
           }
         }
-        c.sellMaterial(d, city, m, "MAX", "MP")
+        if (["Hardware", "Robots", "AI Cores", "Real Estate"].includes(m)) {
+          // For warehouse factors, only sell what we produced
+          c.sellMaterial(d, city, m, "PROD", "MP")
+        } else {
+          c.sellMaterial(d, city, m, "MAX", "MP")
+        }
       }
     }
   }

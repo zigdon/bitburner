@@ -6,7 +6,7 @@ import {colors, stripColors} from "@/colors.js"
  * @return Array
  * */
 export function table(ns, headers, data) {
-  var sizes = headers.map((h, i) => Math.max(h.length, ...data.map((l) => getSize(ns, getText(l[i])[0]))))
+  var sizes = headers.map((h, i) => Math.max(h.length, ...data.map((l) => getSize(getText(l[i])[0]))))
   var fmt = sizes.map((i) => "%s%-" + i + "s%s").join(" │ ")
   var sep = sizes.map((i) => "═".repeat(i)).join("═╪═")
   var rowText = data.map((l) => ns.sprintf(fmt, ...Array.from(l.map((i) => {
@@ -37,11 +37,10 @@ function getText(i) {
 }
 
 /**
- * @param {NS} ns
  * @param {Any} t
  * @return Number
  */
-function getSize(ns, t) {
+function getSize(t) {
   return stripColors(t).length
 }
 

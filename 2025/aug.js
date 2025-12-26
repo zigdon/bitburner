@@ -179,6 +179,10 @@ function buyAug(ns, a) {
 
   for (var pre of ns.singularity.getAugmentationPrereq(a[0])) {
     var seller = findFactionForAug(ns, pre)
+    if (!seller) {
+      ns.tprintf("Can't find seller for %s, needed for %s. Aborting", pre, a[0])
+      return false
+    }
     ns.printf("Buying prereq %s from %s", pre)
     if (!buyAug(ns, [pre, seller])) {
       ns.printf("Buying failed!")

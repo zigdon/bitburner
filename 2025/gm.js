@@ -1,3 +1,5 @@
+/// <reference path="../NetscriptDefinitions.d.ts" />
+
 import { debug, info, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 import { singleInstance, parseNumber, parseTime } from "@/lib/util.js"
@@ -21,12 +23,14 @@ var lastRun = new Map()
 export async function main(ns) {
   if (!singleInstance(ns)) { return }
   ns.disableLog("asleep")
+  ns.disableLog("run")
 
   cfg = await loadCfg(ns, config, cfg)
+  let loopDelay = cfg.loopDelay ?? 30000
   await info(ns, "Starting loop")
   let st = []
   while (true) {
-    await ns.asleep(5000)
+    await ns.asleep(loopDelay)
     ns.printf("=== %s (%s)", Date().toString(), st.map((st) => st ?? "?").join(""))
     st = []
     cfg = await loadCfg(ns, config, cfg)
@@ -37,7 +41,6 @@ export async function main(ns) {
       continue
     }
 
-    let now = Date.now()
     let n = 0
     for (let i=0; i< cfg.actions?.length; i++) {
       let a = cfg.actions[i]
@@ -62,11 +65,17 @@ export async function main(ns) {
               cond.debug = true
             }
             if (!await check(ns, n, cond, d, c)) {
+              if (a.debug) {
+                await info(ns, "%j is NOT ready", cond)
+              }
               continue
             }
             ready = true
           }
-          if (!ready) { st[n]="-"; continue }
+          if (!ready) {
+            st[n]="-"
+            continue
+          }
           await info(ns, "%s is ready", title)
 
           let script = ns.sprintf("lib/corp/%s.js", a.run)
@@ -98,10 +107,7 @@ function isResearching(c, name) {
 async function run(ns, script, args, fork) {
   ns.printf("Launching %s %j (fork=%j)", script, args, fork)
   let pid = ns.run(script, 1, ...args)
-  if (fork) {
-    await info(ns, "Launched %j", [script, ...args])
-  } else {
-    await info(ns, "Running %j...", [script, ...args])
+  if (!fork) {
     while (ns.isRunning(pid)) {
       await ns.asleep(100)
     }
@@ -139,21 +145,26 @@ async function check(ns, n, cond, divName, city) {
     await print("dividends: %j pass", cond.dividends)
   }
   if (cond.corp) {
-    if (cond.corp[0] == "<" && c.getCorporation().funds > cond.corp.slice(1)) {
+    if (cond.corp[0] == "<" &&
+      c.getCorporation().funds > parseNumber(cond.corp.slice(1))) {
       return false
-    } else if (cond.corp < c.getCorporation().funds) {
+    } else if (parseNumber(cond.corp) < c.getCorporation().funds) {
       return false
     }
     await print("corp: %j pass", cond.corp)
   }
   if (cond.canSellShares != undefined
-    && cond.canSellShares != (c.getCorporation().shareSellCooldown > 0)) {
+    && cond.canSellShares != (c.getCorporation().shareSaleCooldown == 0)) {
+    await print("canSellShares: %j blocked (cooldown=%j)",
+      cond.canSellShares, c.getCorporation().shareSaleCooldown)
     return false
   } else if (cond.canSellShares != undefined) {
     await print("canSellShares: %j pass", cond.canSellShares)
   }
   if (cond.hasOutstandingShares != undefined
     && cond.hasOutstandingShares != (c.getCorporation().issuedShares > 0)) {
+    await print("hasOutstandingShares: %j blocked (issued=%d)",
+      cond.hasOutstandingShares, c.getCorporation().issuedShares)
     return false
   } else if (cond.hasOutstandingShares != undefined) {
     await print("hasOutstandingShares: %j pass", cond.hasOutstandingShares)
@@ -167,9 +178,13 @@ async function check(ns, n, cond, divName, city) {
   if (cond.sharePrice) {
     if (cond.sharePrice[0] == "<" && 
       c.getCorporation().sharePrice >= cond.sharePrice.slice(1)) {
+      await print("sharePrice: %j fail (price=%d)",
+        cond.sharePrice, c.getCorporation().sharePrice)
       return false
     }
     if (c.getCorporation().sharePrice < cond.sharePrice) {
+      await print("sharePrice: %j fail (price=%d)",
+        cond.sharePrice, c.getCorporation().sharePrice)
       return false
     }
     await print("sharePrice: %j pass", cond.sharePrice)
@@ -185,12 +200,14 @@ async function check(ns, n, cond, divName, city) {
     await print("hasUnlock: %j pass", cond.hasUnlock)
   }
   if (cond.hasDiv && !c.getCorporation().divisions.includes(cond.hasDiv)) {
-      return false 
+    await print("hasDiv: %j blocked", cond.hasDiv)
+    return false 
   } else if (cond.hasDiv) {
     await print("hasDiv: %j pass", cond.hasDiv)
   }
   if (cond.needDiv && c.getCorporation().divisions.includes(cond.needDiv)) {
-      return false 
+    await print("needDiv: %j blocked", cond.needDiv)
+    return false 
   } else if (cond.needDiv) {
     await print("needDiv: %j pass", cond.needDiv)
   }
@@ -200,7 +217,7 @@ async function check(ns, n, cond, divName, city) {
   } else if (cond.every) {
     await print("every: %j pass", cond.every)
   }
-  if (cond.noRND && isResearching(c, cond.noRND)) {
+  if (cond.noRND && (!c.getCorporation().divisions.includes(cond.noRND) || isResearching(c, cond.noRND))) {
     return false
   } else if (cond.noRND) {
     await print("noRND: %j pass", cond.noRND)

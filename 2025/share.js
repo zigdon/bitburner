@@ -3,9 +3,9 @@ import { parseNumber } from "@/lib/util.js"
 /** @param {NS} ns */
 export async function main(ns) {
   var reserve = ns.args[0] ? parseNumber(ns.args[0]) : 50
-  var hosts = dns(ns)
   do {
     var total = 0
+    var hosts = dns(ns)
     for (var h of hosts.keys()) {
       ns.scp("bin/share.js", h)
       var avail = ns.getServerMaxRam(h) - ns.getServerUsedRam(h)

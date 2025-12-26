@@ -14,7 +14,7 @@ export async function main(ns) {
 
   ns.disableLog("asleep")
   let flags = ns.flags([
-    ["work", "hacking"],
+    ["work", ""],
     ["limit", 0],
     ["favor", false],
     ["then", ""],
@@ -83,6 +83,9 @@ export async function main(ns) {
     await info(ns, "Grinding rep with %s", fac)
   }
 
+  if (flags["work"] == "") {
+    flags["work"] = s.getFactionWorkTypes(fac)[0]
+  }
   while (true) {
     await ns.asleep(1000)
 
