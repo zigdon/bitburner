@@ -33,36 +33,13 @@
     Answer: [1, 2, 3, 4, 8, 12, 11, 10, 9, 5, 6, 7]
  */
 
-import {err, flags} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  if (f["toast"]) {
-    ns.toast("spiral disabled")
-    return
-  }
-  if (c.type != "Spiralize Matrix") {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  // ns.tprint(c.description)
-  var data = c.data
-  var res = solve(ns, data)
-  if (!res) {
-    ns.tprintf("Failed to solve %s@%s", file, host)
-    return
-  }
-  if (f["toast"]) {
-    ns.toast(c.submit(res))
-  } else {
-    ns.tprint(data)
-    ns.tprint(res)
-    ns.tprint(c.submit(res))
-  }
+  var types = new Map([
+    [ "Spiralize Matrix", solve ],
+  ])
+  return init(ns, types, undefined, false)
 }
 
 function solve(ns, data) {

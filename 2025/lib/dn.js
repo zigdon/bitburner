@@ -44,17 +44,23 @@ export class dn {
   _namespace
 
   _nsSupport = [
-    'corporation'
+    'corporation',
+    'singularity'
   ]
 
   _notLogged = [
     "asleep",
+    "formatNumber",
+    "formatRam",
     "getPlayer",
     "getPortHandle",
     "getScriptName",
+    "print",
     "printf",
     "read",
     "sprintf",
+    "tprint",
+    "tprintf",
     "writePort",
   ]
 
@@ -65,6 +71,7 @@ export class dn {
    **/
   constructor(ns, namespace) {
     ns.print("init ", namespace)
+    ns.disableLog("asleep")
     this._ns = ns;
     this._namespace = namespace ?? ""
 
@@ -82,7 +89,7 @@ export class dn {
 
         // If the property exists in our class (like our custom methods), use it
         if (prop in target) {
-          maybeLog("Overriding %s", prop)
+          maybeLog(prop, "Overriding %s", prop)
           return target[prop];
         }
 
@@ -93,21 +100,21 @@ export class dn {
 
         // If we have it in our config, create a handler for it
         if (target._namespace == "" && target._ports.has(prop)) {
-          maybeLog("Handling %s", prop)
+          maybeLog(prop, "Handling %s", prop)
           return target._mkMethod(prop)
         } else if (target._ports.has(target._namespace+"_"+prop)) {
-          maybeLog("Handling %s in %s", prop, target._namespace)
+          maybeLog(prop, "Handling %s in %s", prop, target._namespace)
           return target._mkMethod(target._namespace+"_"+prop)
         } else {
-          maybeLog("Not handled: %s", target._namespace+"_"+prop)
+          maybeLog(prop, "Not handled: %s", target._namespace+"_"+prop)
         }
 
         // Otherwise, redirect the call to the game's 'ns' object
         let val = target._ns[prop];
         if (target._namespace == "") {
-          maybeLog("Passing through %s", prop)
+          maybeLog(prop, "Passing through %s", prop)
         } else {
-          maybeLog("Passing through %s in %s", prop, target._namespace)
+          maybeLog(prop, "Passing through %s in %s", prop, target._namespace)
           val = target._ns[target._namespace][prop];
         }
         if (typeof val === 'function') return val.bind(target._ns);

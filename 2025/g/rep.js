@@ -5,7 +5,7 @@
 // - Select what to do once reached, otherwise, raise a notification
 
 import {info, warning} from "@/log.js"
-import {factions} from "@/factions.js"
+import {factionList} from "@/lib/constants.js"
 import {singleInstance} from "@/lib/util.js"
 
 /** @param {NS} ns */
@@ -24,8 +24,8 @@ export async function main(ns) {
 
   let s = ns.singularity
   let fac = flags._[0]
-  if (!factions.includes(fac)) {
-    let opts = factions.map(
+  if (!factionList.includes(fac)) {
+    let opts = factionList.map(
       (f) => [f, f.toLowerCase()]
     ).filter(
       (f) => f[1].includes(fac.toLowerCase())
@@ -44,8 +44,8 @@ export async function main(ns) {
   let then = ""
   if (flags["then"] != "") {
     then = flags["then"]
-    if (!factions.includes(then)) {
-      let opts = factions.map(
+    if (!factionList.includes(then)) {
+      let opts = factionList.map(
         (f) => [f, f.toLowerCase()]
       ).filter(
         (f) => f[1].includes(then.toLowerCase())

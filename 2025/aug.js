@@ -1,6 +1,7 @@
 import { colors } from "@/colors.js"
 import { table } from "@/table.js"
-import { getFactions, factions } from "@/factions.js"
+import { factionList } from "@/lib/constants.js"
+import { dn } from "@/lib/dn.js"
 
 var cmds = new Map([
   ["list", list],
@@ -8,19 +9,58 @@ var cmds = new Map([
   ["buy", buy],
 ])
 
+var augData = new Map()
+var factionData = new Map()
+
 /** @param {NS} ns */
-export async function main(ns) {
+export async function main(ons) {
+  ons.ramOverride(5.1)
+  augData.clear()
+  factionData.clear()
+  let ns = new dn(ons)
   var fs = ns.flags([
     ["all", false],
     ["augs", ""],
     ["factions", ""],
     ["sort", ""],
   ])
+  await loadData(ns, fs)
   var cmd = fs._[0]
   if (cmds.has(cmd)) {
     await cmds.get(cmd)(ns, fs)
   } else {
     ns.tprintf("Commands: %s", Array.from(cmds.keys()).join(", "))
+  }
+}
+
+/** @param {NS} ns */
+export async function loadData(ns, flags) {
+  let s = ns.singularity
+  let joined = ns.getPlayer().factions
+  let owned = await s.getOwnedAugmentations(true)
+  for (let f of factionList) {
+    if (!flags["all"] && !joined.includes(f)) continue
+    let augs = await s.getAugmentationsFromFaction(f)
+    factionData.set(f, {
+      name: f,
+      joined: joined.includes(f),
+      rep: await s.getFactionRep(f),
+      augs: augs,
+    })
+    for (let a of augs) {
+      if (!augData.has(a)) {
+        augData.set(a, {
+          name: a,
+          factions: [],
+          price: await s.getAugmentationPrice(a),
+          rep: await s.getAugmentationRepReq(a),
+          reqs: await s.getAugmentationPrereq(a),
+          stats: await s.getAugmentationStats(a),
+          owned: owned.includes(a),
+        })
+      }
+      augData.get(a).factions.push(f)
+    }
   }
 }
 
@@ -30,19 +70,19 @@ export async function main(ns) {
  * @returns {string[]} - the array of possible autocomplete options
  */
 export function autocomplete(data, args) {
-  return [...Array.from(cmds.keys()), ...factions]
+  return [...Array.from(cmds.keys()), ...factionList]
 }
 
 /**
  * @param {NS} ns
  * @param {String} name
  * */
-function show(ns, flags) {
+async function show(ns, flags) {
   var name = flags._[1]
-  var augs = getAllAugs(ns, flags).filter(
+  var augs = Array.from(augData.keys()).filter(
     (a) => a.toLowerCase() == name.toLowerCase())
   if (augs.length == 0) {
-    augs = getAllAugs(ns, flags).filter(
+    augs = Array.from(augData.keys()).filter(
       (a) => a.toLowerCase().includes(name.toLowerCase()))
   }
   if (augs.length == 0) {
@@ -54,71 +94,52 @@ function show(ns, flags) {
     return
   }
 
-  var a = augs[0]
+  var a = augData.get(augs[0])
   var data = [
-    ["Cost", "$"+ns.formatNumber(ns.singularity.getAugmentationPrice(a))],
-    ["Rep Required", ns.formatNumber(ns.singularity.getAugmentationRepReq(a))],
-    ["Factions", ns.singularity.getAugmentationFactions(a).join(", ")],
+    ["Cost", "$"+ns.formatNumber(a.price)],
+    ["Rep Required", ns.formatNumber(a.rep)],
+    ["Factions", a.factions.join(", ")],
   ]
-  var s = ns.singularity.getAugmentationStats(a)
-  for (var p in s) {
-    if (s[p] != 1) {
-      data.push(["  "+p, ns.formatNumber(s[p])])
+  for (var p in a.stats) {
+    if (a.stats[p] != 1) {
+      data.push(["  "+p, ns.formatNumber(a.stats[p])])
     }
   }
   ns.tprint(table(ns, ["Name", augs[0]], data))
 }
 
-function getAllAugs(ns, flags) {
-  var augs = []
-  for (var f of getFactions(ns, flags)) {
-    augs.push(...ns.singularity.getAugmentationsFromFaction(f))
-  }
-  augs = augs.sort().filter((a, i) => i==0 || a!=augs[i-1])
-
-  return augs
-}
-  
 /** @param {NS} ns */
-function list(ns, flags) {
-  var augs = getAllAugs(ns, flags).filter((a) => a.includes(flags["augs"]))
-  var owned = ns.singularity.getOwnedAugmentations(true)
-  var joined = getFactions(ns, {all: false})
+async function list(ns, flags) {
   var data = []
   var missing = []
   var money = ns.getPlayer().money
+  var augs = Array.from(augData.keys())
   if (flags["sort"] == "price") {
-    augs = augs.sort((a,b) =>
-      ns.singularity.getAugmentationPrice(a) - ns.singularity.getAugmentationPrice(b))
+    augs = augs.sort((a,b) => augData.get(a).price - augData.get(b).price)
   }
   for (var a of augs) {
-    if (owned.includes(a)) {
-      continue
-    }
-    var fs = ns.singularity.getAugmentationFactions(a).filter(
-      (f) => joined.includes(f)
-    )
-    var price = ns.singularity.getAugmentationPrice(a)
-    fs.forEach((f) => !missing.includes(f) && missing.push(f))
+    let aug = augData.get(a)
+    if (aug.owned) continue
+    var fs = aug.factions.filter((f) => factionData.get(f).joined)
+    missing.push(...fs.filter((f) => !missing.includes(f)))
     data.push([
       a,
       [
-        "$"+ns.formatNumber(price),
-        owned.includes(a) ? "black" : price > money ? "red" : "green"
+        "$"+ns.formatNumber(aug.price),
+        aug.owned ? "black" : aug.price > money ? "red" : "green"
       ],
-      [ns.formatNumber(ns.singularity.getAugmentationRepReq(a)),
-        ns.singularity.getAugmentationFactions(a).filter(
-          (f) => joined.includes(f) &&
-                 ns.singularity.getFactionRep(f) >=
-                   ns.singularity.getAugmentationRepReq(a)
+      [
+        ns.formatNumber(aug.rep),
+        fs.filter(
+          (f) => factionData.get(f).rep >= aug.rep
         ).length > 0 ? "green" : "red"
       ],
       [
-        fs.length > 0
-        ? fs.join(", ")
-        : ns.singularity.getAugmentationFactions(a).length > 1
-        ? ns.singularity.getAugmentationFactions(a).length
-        : ns.sprintf("(%s)", ns.singularity.getAugmentationFactions(a))
+        fs.length > 0 ?
+          fs.join(", ")
+        : aug.factions.length > 1 ?
+            aug.factions.length
+          : ns.sprintf("(%s)", aug.factions)
       ],
     ])
   }
@@ -126,75 +147,58 @@ function list(ns, flags) {
   ns.tprintf(table(ns, ["Name", "Price", "RepReq", "Factions"], data))
   missing.sort().forEach(
     (f) => ns.tprintf("%s: %s%s%s", f, colors["white"],
-      ns.formatNumber(ns.singularity.getFactionRep(f)),
+      ns.formatNumber(factionData.get(f).rep),
       colors["reset"],
     ))
 }
 
-function findFactionForAug(ns, a) {
-  var fs = ns.singularity.getAugmentationFactions(a).filter(
-    (f) => ns.singularity.getFactionRep(f) >=
-             ns.singularity.getAugmentationRepReq(a))
-  ns.tprintf("%s can be bought from %j", a, fs)
-  return fs[0]
-}
-
 async function buy(ns, flags) {
-  var owned = ns.singularity.getOwnedAugmentations(true)
   var cash = ns.getPlayer().money
-  var augs = getAllAugs(ns, flags).filter(
-    (a) => !owned.includes(a) && a.includes(flags["augs"])
-  ).map((a) => [a, findFactionForAug(ns, a)]
-  ).filter(
-    (a) => a[1]?.length > 0
-  ).filter(
-    (a) => ns.singularity.getAugmentationPrice(a[0]) < cash
-  ).sort(
-    (a,b) => ns.singularity.getAugmentationPrice(b[0]) -
-             ns.singularity.getAugmentationPrice(a[0])
-  )
+  var augs = Array.from(augData.values()).filter(
+    (a) => !a.owned &&
+      a.includes(flags["augs"]) &&
+      a.factions.length > 0 &&
+      a.price < cash
+  ).sort((a,b) => b.price - a.price)
 
   ns.tprintf("Buying %d augs", augs.length)
   while (augs.length > 0) {
     await ns.asleep(10)
-    let price = ns.singularity.getAugmentationPrice(augs[0][0])
-    if (ns.getPlayer().money >= price) {
-      ns.tprintf("Trying to buy %s for $%s", augs[0][0], ns.formatNumber(price))
-      if (!buyAug(ns, augs.shift())) {
-        break
-      }
+    let aug = augs.shift()
+    if (ns.getPlayer().money >= aug.price) {
+      ns.tprintf("Trying to buy %s for $%s", aug.name, ns.formatNumber(aug.price))
+      if (!buyAug(ns, aug)) break
     } else {
-      ns.tprintf("Can't afford %s for $%s", augs.shift()[0], ns.formatNumber(price))
+      ns.tprintf("Can't afford %s for $%s", aug.name, ns.formatNumber(aug.price))
       break
     }
   }
 }
 
-function buyAug(ns, a) {
-  ns.printf("Buying %s from %s", a[0], a[1])
-  var owned = ns.singularity.getOwnedAugmentations(true)
-  if (owned.includes(a[0])) {
-    return true
-  }
+async function buyAug(ns, a) {
+  let fac = a.factions.filter((f) => f.joined)[0]
+  ns.printf("Buying %s from %s", a.name, fac)
+  if (a.owned) return true
 
-  for (var pre of ns.singularity.getAugmentationPrereq(a[0])) {
-    var seller = findFactionForAug(ns, pre)
+  for (var pre of a.reqs) {
+    let req = augData.get(pre)
+    var seller = req.factions.filter((f) => f.joined)[0]
     if (!seller) {
-      ns.tprintf("Can't find seller for %s, needed for %s. Aborting", pre, a[0])
+      ns.tprintf("Can't find seller for %s, needed for %s. Aborting", pre, a.name)
       return false
     }
-    ns.printf("Buying prereq %s from %s", pre)
-    if (!buyAug(ns, [pre, seller])) {
+    ns.printf("Buying prereq %s from %s", pre, seller)
+    if (!buyAug(ns, req)) {
       ns.printf("Buying failed!")
       return false
     }
   }
 
-  if (ns.singularity.purchaseAugmentation(a[1], a[0])) {
-    ns.tprintf("Bought %s from %s", a[0], a[1])
+  if (await ns.singularity.purchaseAugmentation(fac, a.name)) {
+    ns.tprintf("Bought %s from %s", a.name, fac)
     return true
   } else{
-    ns.tprintf("Couldn't buy %s from %s", a[0], a[1])
+    ns.tprintf("Couldn't buy %s from %s", a.name, fac)
     return false
   }
 }

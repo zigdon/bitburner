@@ -1,43 +1,5 @@
-import { colors } from "./colors.js"
 import { table } from "./table.js"
-
-export var factions = [
-  // From NetscriptDefinitions.d.ts
-  "Aevum",
-  "Bachman & Associates",
-  "BitRunners",
-  "Blade Industries",
-  "Bladeburners",
-  "Chongqing",
-  "Church of the Machine God",
-  "Clarke Incorporated",
-  "CyberSec",
-  "Daedalus",
-  "ECorp",
-  "Four Sigma",
-  "Fulcrum Secret Technologies",
-  "Illuminati",
-  "Ishima",
-  "KuaiGong International",
-  "MegaCorp",
-  "NWO",
-  "Netburners",
-  "New Tokyo",
-  "NiteSec",
-  "OmniTek Incorporated",
-  "Sector-12",
-  "Shadows of Anarchy",
-  "Silhouette",
-  "Slum Snakes",
-  "Speakers for the Dead",
-  "Tetrads",
-  "The Black Hand",
-  "The Covenant",
-  "The Dark Army",
-  "The Syndicate",
-  "Tian Di Hui",
-  "Volhaven",
-]
+import { factionList } from "@/lib/constants.js"
 
 var cmds = new Map([
   ["list", listFactions],
@@ -135,9 +97,9 @@ function showFaction(ns, f) {
 
 export function getFactions(ns, flags) {
   if (flags["all"]) {
-    return factions
+    return factionList
   }
-  return factions.filter(
+  return factionList.filter(
     (f) => ns.singularity.getFactionRep(f) > 0
   ).filter(
     (f) => f.includes(flags["factions"] || "")
