@@ -8,10 +8,11 @@ var sortFn = new Map([
   ["lvl", (a,b) => Number(a[3]) - Number(b[3])],
   ["start", (a,b) => Number(a[4]) - Number(b[4])],
   ["trade", (a,b) => Number(a[5]) - Number(b[5])],
-  ["sell", (a,b) => Number(a[6]) - Number(b[6])],
-  ["perc", (a,b) => Number(a[7]) - Number(b[7])],
-  ["soa", (a,b) => Number(a[8]) - Number(b[8])],
-  ["perr", (a,b) => Number(a[9]) - Number(b[9])],
+  ["pert", (a,b) => Number(a[6]) - Number(b[6])],
+  ["sell", (a,b) => Number(a[7]) - Number(b[7])],
+  ["perc", (a,b) => Number(a[8]) - Number(b[8])],
+  ["soa", (a,b) => Number(a[9]) - Number(b[9])],
+  ["perr", (a,b) => Number(a[10]) - Number(b[10])],
 ])
 
 /** @param {NS} ns */
@@ -36,6 +37,7 @@ export async function main(ns) {
       t.maxClearanceLevel,
       t.startingSecurityLevel,
       t.reward.tradeRep,
+      t.reward.tradeRep/t.maxClearanceLevel,
       t.reward.sellCash,
       t.reward.sellCash/t.maxClearanceLevel,
       t.reward.SoARep,
@@ -54,15 +56,16 @@ export async function main(ns) {
 
   data.forEach((l, i) => {
     l[5] = ns.formatNumber(l[5])
-    l[6] = "$"+ns.formatNumber(l[6])
+    l[6] = ns.formatNumber(l[6])
     l[7] = "$"+ns.formatNumber(l[7])
-    l[8] = ns.formatNumber(l[8])
+    l[8] = "$"+ns.formatNumber(l[8])
     l[9] = ns.formatNumber(l[9])
+    l[10] = ns.formatNumber(l[10])
   })
 
   ns.tprintf(table(ns, [
     "Name", "City", "Difficulty", "Max Level", "Starting Level",
-    "Trade", "Sell", "Cash/Level", "SoA Rep", "SoA Rep/Level"
+    "Trade", "Trade/Level", "Sell", "Cash/Level", "SoA Rep", "SoA Rep/Level"
   ], data))
 }
 

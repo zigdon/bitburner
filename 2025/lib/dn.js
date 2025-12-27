@@ -11,8 +11,34 @@ export class dn {
   _ns
   /** @type {Map<string, int} */
   _ports = new Map([
-    ["corporation_getCorporation", this._offset+1]
-  ])
+    "bladeburner_getRank",
+    "corporation_getCorporation",
+    "corporation_getDivision",
+    "corporation_getHireAdVertCost",
+    "corporation_getOfficeSizeUpgradeCost",
+    "corporation_getProduct",
+    "corporation_getResearchCost",
+    "corporation_getUpgradeLevelCost",
+    "corporation_getUpgradeWarehouseCost",
+    "corporation_hasCorporation",
+    "corporation_hasResearched",
+    "corporation_hasUnlock",
+    "corporation_hasWarehouse",
+    "singularity_getAugmentationFactions",
+    "singularity_getAugmentationPrereq",
+    "singularity_getAugmentationPrice",
+    "singularity_getAugmentationRepReq",
+    "singularity_getAugmentationStats",
+    "singularity_getAugmentationsFromFaction",
+    "singularity_getFactionEnemies",
+    "singularity_getFactionFavor",
+    "singularity_getFactionInviteRequirements",
+    "singularity_getFactionRep",
+    "singularity_getFactionWorkTypes",
+    "singularity_getOwnedAugmentations",
+    "singularity_getOwnedSourceFiles",
+    "singularity_purchaseAugmentation",
+  ].map((m, i) => [m, this._offset+i]))
 
   // Function namespace, look up ports with "$namespace_" prefix
   _namespace
@@ -21,14 +47,34 @@ export class dn {
     'corporation'
   ]
 
-  /** @param {NS} ns */
+  _notLogged = [
+    "asleep",
+    "getPlayer",
+    "getPortHandle",
+    "getScriptName",
+    "printf",
+    "read",
+    "sprintf",
+    "writePort",
+  ]
+
+  /**
+   * @param {NS} ns
+   * @param {string} namespace
+   * @returns NS
+   **/
   constructor(ns, namespace) {
     ns.print("init ", namespace)
     this._ns = ns;
     this._namespace = namespace ?? ""
 
+
     return new Proxy(this, {
       get(target, prop) {
+        const maybeLog = (prop, tmpl, ...args) => {
+          if (!target._notLogged.includes(prop)) target._log(target._ns.sprintf(tmpl, ...args))
+        }
+
         // Anything starting with _ is never handled by ns
         if (prop[0] == "_") {
           return target[prop]
@@ -36,7 +82,7 @@ export class dn {
 
         // If the property exists in our class (like our custom methods), use it
         if (prop in target) {
-          target._log("Overriding %s", prop)
+          maybeLog("Overriding %s", prop)
           return target[prop];
         }
 
@@ -47,21 +93,21 @@ export class dn {
 
         // If we have it in our config, create a handler for it
         if (target._namespace == "" && target._ports.has(prop)) {
-          target._log("Handling %s", prop)
+          maybeLog("Handling %s", prop)
           return target._mkMethod(prop)
         } else if (target._ports.has(target._namespace+"_"+prop)) {
-          target._log("Handling %s in %s", prop, target._namespace)
+          maybeLog("Handling %s in %s", prop, target._namespace)
           return target._mkMethod(target._namespace+"_"+prop)
         } else {
-          target._log("Not handled: %s", target._namespace+"_"+prop)
+          maybeLog("Not handled: %s", target._namespace+"_"+prop)
         }
 
         // Otherwise, redirect the call to the game's 'ns' object
         let val = target._ns[prop];
         if (target._namespace == "") {
-          target._log("Passing through %s", prop)
+          maybeLog("Passing through %s", prop)
         } else {
-          target._log("Passing through %s in %s", prop, target._namespace)
+          maybeLog("Passing through %s in %s", prop, target._namespace)
           val = target._ns[target._namespace][prop];
         }
         if (typeof val === 'function') return val.bind(target._ns);
@@ -101,7 +147,7 @@ export class dn {
         continue
       }
 
-      let res = await callback(this._ns, ...args)
+      let res = await callback(...args)
       let resPN = this._offset+pid
       let resPort = this._ns.getPortHandle(resPN)
       while (!resPort.tryWrite([pid, c, method, res])) {
@@ -155,7 +201,7 @@ export class dn {
 
       let data = ph.peek()
       if (data != last) {
-        this._log("<%d: %j", pn, data)
+        // this._log("<%d: %j", pn, data)
         last = data
       }
       if (data == "NULL PORT DATA") {
@@ -173,7 +219,7 @@ export class dn {
         continue
       }
 
-      this._log("Got reply on %d: %j", pn, data[3])
+      // this._log("Got reply on %d: %j", pn, data[3])
       ph.read()
       return data[3]
     }

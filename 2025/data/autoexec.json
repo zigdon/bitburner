@@ -11,6 +11,7 @@
     {"name": "g/tor.js", "oneTime": true},
     {"name": "g/gym.js", "args": ["50"], "oneTime": true},
     {"name": "map.js", "args": ["--silent"]},
+    {"name": "startRPC.js"},
     {"name": "go2.js", "title": "Hack Controller"},
     {"name": "ipvgo.js", "args": ["--op", 5], "title": "IPvGO Player"},
     {"name": "g/upgrade.js"},

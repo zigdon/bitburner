@@ -1,7 +1,8 @@
 import { dns } from "@/hosts.js"
-import { parseNumber } from "@/lib/util.js"
+import { singleInstance, parseNumber } from "@/lib/util.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  if (!singleInstance(ns)) return
   var reserve = ns.args[0] ? parseNumber(ns.args[0]) : 50
   do {
     var total = 0
@@ -9,12 +10,8 @@ export async function main(ns) {
     for (var h of hosts.keys()) {
       ns.scp("bin/share.js", h)
       var avail = ns.getServerMaxRam(h) - ns.getServerUsedRam(h)
-      if (h == "home") {
-        avail -= reserve
-      }
-      if (avail < 4) {
-        continue
-      }
+      if (h == "home") avail -= reserve
+      if (avail < 4) continue
       total += Math.floor(avail/4)*4
       ns.exec("bin/share.js", h, Math.floor(avail/4))
     }

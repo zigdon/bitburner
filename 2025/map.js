@@ -1,6 +1,4 @@
-import { colors } from "@/colors.js"
 import { table } from "@/table.js"
-import { ssh } from "@/ssh.js"
 import { critical } from "@/log.js"
 
 var playerHack = 0
@@ -61,7 +59,7 @@ export async function main(ns) {
     var headers = ["Name", "Root", "RAM", "Security", "Money", "Hack", "Backdoor", "From", "Files"]
     var data = []
     var notice = []
-    var bd = false
+    var bd = 0
     for (var h of hosts) {
       if (!flags.noroot && !h.root) {
         continue
@@ -75,7 +73,7 @@ export async function main(ns) {
       if (story.includes(h.name) && !h.backdoor && h.hack > playerHack) {
         notice.push(h.name)
       }
-      if (!h.backdoor && !bd && h.root && h.hack <= playerHack && !h.purchased ) {
+      if (!h.backdoor && h.root && h.hack <= playerHack && !h.purchased ) {
         if (h.name == "w0r1d_d43m0n") {
           if (!ns.fileExists("data/wd.txt")) {
             var msg = "w0r1d_d43m0n is hackable"
@@ -84,10 +82,7 @@ export async function main(ns) {
             ns.write("data/wd.txt", "", "w")
           }
         } else {
-          bd = true
-          ns.toast(ns.sprintf("Backdooring %s", h.name), "info")
-          ns.run("g/backdoor.js", 1, h.name)
-          ns.run("ssh.js", 1, "home")
+          bd++
         }
       }
       data.push([
@@ -100,6 +95,10 @@ export async function main(ns) {
         h.name == "home" ? "N/A" : [h.from, h.from == "home" || seen.get(h.from).backdoor ? "" : "yellow"],
         h.name != "home" ? h.files.join(",") : "",
       ])
+    }
+    if (bd > 0) {
+      ns.toast(ns.sprintf("Backdooring %d hosts", bd), "info")
+      ns.run("g/backdoor.js", 1)
     }
     if (notice.size > 0) {
       ns.notice(ns.sprintf("Story hosts available: %s", notice.join(", ")))

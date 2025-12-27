@@ -5,5 +5,5 @@ export async function main(ons) {
   /** @type {NS} ns */
   let ns = new dn(ons)
 
-  await ns.listen("corporation_getCorporation", ons.corporation.getCorporation)
+  await ns.listen("corporation_getDivision", ons.corporation.getDivision)
 }

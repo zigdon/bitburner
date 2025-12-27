@@ -17,10 +17,10 @@ async function researchProduct(ns, name, city, pName) {
     }
     c.sellProduct(name, city, p, "MAX", "MP", true)
     if (c.hasResearched(name, "Market-TA.I")) {
-      c.setMaterialMarketTA1(name, city, p, true)
+      c.setProductMarketTA1(name, p, true)
     }
     if (c.hasResearched(name, "Market-TA.II")) {
-      c.setMaterialMarketTA2(name, city, p, true)
+      c.setProductMarketTA2(name, p, true)
     }
   }
   let gen = Math.max(

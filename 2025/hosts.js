@@ -24,9 +24,9 @@ export async function main(ns) {
 }
 
 /** 
- * { name, root, ram, used, cur, max, hack, ports, from }
+ * 
  * @param {NS} ns
- * @returns Map
+ * @returns Map<string, { name, root, ram, used, cur, max, hack, ports, from }>
  * */
 export function dns(ns) {
   var _hosts = new Map()

@@ -1,5 +1,6 @@
 /// <reference path="../NetscriptDefinitions.d.ts" />
 
+import { dn } from "@/lib/dn.js"
 import { debug, info, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 import { singleInstance, parseNumber, parseTime } from "@/lib/util.js"
@@ -19,11 +20,14 @@ const cities = [
 var done = []
 var lastRun = new Map()
 
-/** @param {NS} ns */
-export async function main(ns) {
-  if (!singleInstance(ns)) { return }
-  ns.disableLog("asleep")
-  ns.disableLog("run")
+/** @param {NS} ons */
+export async function main(ons) {
+  ons.ramOverride(3.5)
+  if (!singleInstance(ons)) { return }
+  ons.disableLog("asleep")
+  ons.disableLog("run")
+  /** @type {NS} */
+  let ns = new dn(ons)
 
   cfg = await loadCfg(ns, config, cfg)
   let loopDelay = cfg.loopDelay ?? 30000
@@ -43,11 +47,10 @@ export async function main(ns) {
 
     let n = 0
     for (let i=0; i< cfg.actions?.length; i++) {
+      let corp = await ns.corporation.getCorporation()
       let a = cfg.actions[i]
       let cs = a.perCity ? cities : [cities[0]]
-      let divs = a.perDiv ?
-        ns.corporation.getCorporation().divisions :
-        [ns.corporation.getCorporation().divisions[0]]
+      let divs = a.perDiv ?  corp.divisions : [corp.divisions[0]]
       for (let d of divs) {
         for (let c of cs) {
           n += 1
@@ -95,10 +98,11 @@ export async function main(ns) {
   }
 }
 
-function isResearching(c, name) {
-  let products = c.getDivision(name).products
-  return products.map(
-    (p) => c.getProduct(name, "Sector-12", p)
+async function isResearching(c, name) {
+  let div = await c.getDivision(name)
+  let products = div.products
+  return await products.map(
+    async (p) => await c.getProduct(name, "Sector-12", p)
   ).some(
     (p) => p.developmentProgress < 100
   )
@@ -116,16 +120,18 @@ async function run(ns, script, args, fork) {
 
 async function check(ns, n, cond, divName, city) {
   let c = ns.corporation
+  let corp = await ns.corporation.getCorporation()
+  let div = await ns.corporation.getDivision(divName)
   let m = ns.getPlayer().money
   const print = async (tmpl, ...args) => cond?.debug ? await info(ns, tmpl, ...args) : ""
   await print("Checking %j (%s@%s)", cond, divName, city)
 
-  if (cond.isPublic != undefined && c.getCorporation().public != cond.isPublic) {
+  if (cond.isPublic != undefined && corp.public != cond.isPublic) {
     return false
   } else if (cond.isPublic != undefined) {
     await print("isPublic: %j pass", cond.isPublic)
   }
-  if (cond.hasCorp != undefined && c.hasCorporation() != cond.hasCorp) {
+  if (cond.hasCorp != undefined && await c.hasCorporation() != cond.hasCorp) {
     return false
   } else if (cond.hasCorp != undefined) {
     await print("hasCorp: %j pass", cond.hasCorp)
@@ -136,7 +142,7 @@ async function check(ns, n, cond, divName, city) {
     await print("player: %s < %s pass", ns.formatNumber(parseNumber(cond.player)), ns.formatNumber(m))
   }
   if (cond.dividends) {
-    let cur = c.getCorporation().dividendRate * 100
+    let cur = corp.dividendRate * 100
     if (cond.dividends[0] == "<" && cur >= cond.dividends.slice(1)) {
       return false
     } else if (cond.dividends >= cur) {
@@ -146,66 +152,66 @@ async function check(ns, n, cond, divName, city) {
   }
   if (cond.corp) {
     if (cond.corp[0] == "<" &&
-      c.getCorporation().funds > parseNumber(cond.corp.slice(1))) {
+      corp.funds > parseNumber(cond.corp.slice(1))) {
       return false
-    } else if (parseNumber(cond.corp) < c.getCorporation().funds) {
+    } else if (parseNumber(cond.corp) < corp.funds) {
       return false
     }
     await print("corp: %j pass", cond.corp)
   }
   if (cond.canSellShares != undefined
-    && cond.canSellShares != (c.getCorporation().shareSaleCooldown == 0)) {
+    && cond.canSellShares != (corp.shareSaleCooldown == 0)) {
     await print("canSellShares: %j blocked (cooldown=%j)",
-      cond.canSellShares, c.getCorporation().shareSaleCooldown)
+      cond.canSellShares, corp.shareSaleCooldown)
     return false
   } else if (cond.canSellShares != undefined) {
     await print("canSellShares: %j pass", cond.canSellShares)
   }
   if (cond.hasOutstandingShares != undefined
-    && cond.hasOutstandingShares != (c.getCorporation().issuedShares > 0)) {
+    && cond.hasOutstandingShares != (corp.issuedShares > 0)) {
     await print("hasOutstandingShares: %j blocked (issued=%d)",
-      cond.hasOutstandingShares, c.getCorporation().issuedShares)
+      cond.hasOutstandingShares, corp.issuedShares)
     return false
   } else if (cond.hasOutstandingShares != undefined) {
     await print("hasOutstandingShares: %j pass", cond.hasOutstandingShares)
   }
   if (cond.canIssueShares != undefined &&
-    c.getCorporation().issueNewSharesCooldown > 0) {
+    corp.issueNewSharesCooldown > 0) {
     return false
   } else if (cond.canIssueShares != undefined) {
     await print("canIssueShares: %j pass", cond.canIssueShares)
   }
   if (cond.sharePrice) {
     if (cond.sharePrice[0] == "<" && 
-      c.getCorporation().sharePrice >= cond.sharePrice.slice(1)) {
+      corp.sharePrice >= cond.sharePrice.slice(1)) {
       await print("sharePrice: %j fail (price=%d)",
-        cond.sharePrice, c.getCorporation().sharePrice)
+        cond.sharePrice, corp.sharePrice)
       return false
     }
-    if (c.getCorporation().sharePrice < cond.sharePrice) {
+    if (corp.sharePrice < cond.sharePrice) {
       await print("sharePrice: %j fail (price=%d)",
-        cond.sharePrice, c.getCorporation().sharePrice)
+        cond.sharePrice, corp.sharePrice)
       return false
     }
     await print("sharePrice: %j pass", cond.sharePrice)
   }
-  if (cond.needUnlock && c.hasUnlock(cond.needUnlock)) {
+  if (cond.needUnlock && await c.hasUnlock(cond.needUnlock)) {
     return false
   } else if (cond.needUnlock) {
     await print("needUnlock: %j pass", cond.needUnlock)
   }
-  if (cond.hasUnlock && !c.hasUnlock(cond.hasUnlock)) {
+  if (cond.hasUnlock && !await c.hasUnlock(cond.hasUnlock)) {
     return false
   } else if (cond.hasUnlock) {
     await print("hasUnlock: %j pass", cond.hasUnlock)
   }
-  if (cond.hasDiv && !c.getCorporation().divisions.includes(cond.hasDiv)) {
+  if (cond.hasDiv && !corp.divisions.includes(cond.hasDiv)) {
     await print("hasDiv: %j blocked", cond.hasDiv)
     return false 
   } else if (cond.hasDiv) {
     await print("hasDiv: %j pass", cond.hasDiv)
   }
-  if (cond.needDiv && c.getCorporation().divisions.includes(cond.needDiv)) {
+  if (cond.needDiv && corp.divisions.includes(cond.needDiv)) {
     await print("needDiv: %j blocked", cond.needDiv)
     return false 
   } else if (cond.needDiv) {
@@ -217,25 +223,25 @@ async function check(ns, n, cond, divName, city) {
   } else if (cond.every) {
     await print("every: %j pass", cond.every)
   }
-  if (cond.noRND && (!c.getCorporation().divisions.includes(cond.noRND) || isResearching(c, cond.noRND))) {
+  if (cond.noRND && (!corp.divisions.includes(cond.noRND) || await isResearching(c, cond.noRND))) {
     return false
   } else if (cond.noRND) {
     await print("noRND: %j pass", cond.noRND)
   }
-  if (cond.income && c.getCorporation().revenue < cond.income) {
+  if (cond.income && corp.revenue < cond.income) {
     return false
   } else if (cond.income) {
     await print("income: %j pass", cond.income)
   }
-  if (cond.ratio && !ratio(ns, cond, divName, city)) {
+  if (cond.ratio && !await ratio(ns, cond, divName, city)) {
     return false
   } else if (cond.ratio) {
     await print("ratio: %j pass", cond.cost)
   }
   if (cond.canResearch &&
-    (c.getDivision(divName).researchPoints <
-      c.getResearchCost(divName, cond.canResearch) ||
-      c.hasResearched(divName, cond.canResearch))
+    (div.researchPoints <
+      await c.getResearchCost(divName, cond.canResearch) ||
+      await c.hasResearched(divName, cond.canResearch))
   ) {
     return false
   } else if (cond.canResearch) {
@@ -247,33 +253,34 @@ async function check(ns, n, cond, divName, city) {
 }
 
 // Returns true if the ratio of funds to cost is high enough
-function ratio(ns, cond, div, city) {
+async function ratio(ns, cond, divName, city) {
   let c = ns.corporation
+  let div = await c.getDivision(divName)
   let funds = ns.corporation.getCorporation().funds
   let ratio = parseNumber(cond.ratio)
   let costType = cond.cost
   let cost = 0
   switch (costType) {
     case "ad":
-      cost = c.getHireAdVertCost(div)
+      cost = await c.getHireAdVertCost(divName)
       break
     case "office":
-      if (!c.getDivision(div).cities.includes(city)) {
+      if (!div.cities.includes(city)) {
         return false
       }
-      cost = c.getOfficeSizeUpgradeCost(div, city, 5)
+      cost = await c.getOfficeSizeUpgradeCost(divName, city, 5)
       break
     case "warehouse":
-      if (!c.getDivision(div).cities.includes(city)) {
+      if (!div.cities.includes(city)) {
         return false
       }
-      if (!c.hasWarehouse(div, city)) {
+      if (!await c.hasWarehouse(divName, city)) {
         return false
       }
-      cost = c.getUpgradeWarehouseCost(div, city)
+      cost = await c.getUpgradeWarehouseCost(divName, city)
       break
     case "upgrade":
-      cost = c.getUpgradeLevelCost(cond.upgradeName)
+      cost = await c.getUpgradeLevelCost(cond.upgradeName)
       break
   }
 

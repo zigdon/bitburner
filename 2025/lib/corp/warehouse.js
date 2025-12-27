@@ -17,8 +17,10 @@ export async function main(ns) {
       await ns.asleep(10)
     }
   } else {
-    // Otherwise, figure out how full the warehouse gets
-    let buffer = 0.8
+    // Otherwise, figure out how full the warehouse gets. Start with however
+    // full it was before.
+    let buffer = 0.1+Math.min(0.7, c.getWarehouse(name, city).sizeUsed/pre)
+    buffer = Math.floor(buffer*10)/10
     while (buffer > 0.1) {
       let hwm = await getHighWaterMark(ns, name, city)
       if (hwm/post > 0.8) {
@@ -33,7 +35,7 @@ export async function main(ns) {
     }
   }
 
-  pid = ns.run("lib/corp/smartSupply.js")
+  let pid = ns.run("lib/corp/smartSupply.js")
   while (ns.isRunning(pid)) {
     await ns.asleep(10)
   }
@@ -41,6 +43,7 @@ export async function main(ns) {
 
 async function getHighWaterMark(ns, name, city) {
   let hwm
+  let c = ns.corporation
   while (true) {
     let state = await c.nextUpdate()
     if (state == "PRODUCTION") {

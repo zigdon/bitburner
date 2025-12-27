@@ -1,6 +1,5 @@
 import {dns} from "@/hosts.js"
 import {ssh} from "@/ssh.js"
-import {toast} from "@/log.js"
 
 var hosts;
 
@@ -17,14 +16,17 @@ export async function main(ns) {
       (h) => !h.purchased && !h.backdoor && h.root && h.hack <= ph
     ).sort(
       (a,b) => b.hack - a.hack
+    ).filter(
+      (h) => h.name != "w0r1d_d43m0n"
     )
     for (var t of targets) {
-      await backdoor(ns, t)
+      ns.run(ns.getScriptName(), 1, t.name)
     }
     return
   }
 
   await backdoor(ns, hosts.get(target))
+  ssh(ns, hosts, "home")
 }
 
 export function autocomplete(data, args) {
@@ -46,9 +48,7 @@ async function backdoor(ns, host) {
 
   if (ssh(ns, hosts, host.name)) {
     ns.printf("Starting backdoor on %s", host.name)
-    await ns.singularity.installBackdoor()
-    toast(ns, "Backdoored %s", host.name)
-    ns.singularity.connect("home")
+    return ns.singularity.installBackdoor()
   } else {
     ns.printf("Failed to ssh to %s", host.name)
   }

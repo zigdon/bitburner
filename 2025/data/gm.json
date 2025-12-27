@@ -89,15 +89,15 @@
     ], "run": "dividends", "args": ["100"], "repeat": true},
     {"comment": "Buy back shares", "triggers": [
       {"hasDiv": "HealthVamp", "hasOutstandingShares": true,
-        "sharePrice": "<200", "player": "2b"}
+        "sharePrice": "<700", "player": "2b"}
     ], "run": "buyBack", "repeat": true},
     {"comment": "Drive price up to sell shares", "triggers": [
       {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
-        "sharePrice": "<1500", "dividends": "50"}
+        "sharePrice": "<50000", "dividends": "50"}
     ], "run": "dividends", "args": ["50"], "repeat": true},
     {"comment": "Profit!", "triggers": [
       {"hasDiv": "HealthVamp", "hasOutstandingShares": false,
-        "canSellShares": true, "sharePrice": "1500"}
+        "canSellShares": true, "sharePrice": "50000"}
     ], "run": "sellShares", "args": ["20"], "repeat": true},
 
     {"triggers": [{"income": "1m", "isPublic": false}],
@@ -189,7 +189,11 @@
     {"triggers": [{
       "ratio": "200", "cost": "upgrade", "upgradeName": "Speech Processor Implants"
     }], "title": "Speech Processor Implants", "repeat": true,
-    "run": "buyUpgrade", "args": ["Speech Processor Implants"]}
+    "run": "buyUpgrade", "args": ["Speech Processor Implants"]},
+    {"triggers": [{
+      "ratio": "100", "cost": "upgrade", "upgradeName": "Smart Storage"
+    }], "title": "Smart Storage", "repeat": true,
+    "run": "buyUpgrade", "args": ["Smart Storage"]}
   ],
   "disabled": false,
   "valid": true
