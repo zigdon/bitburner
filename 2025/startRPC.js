@@ -1,7 +1,7 @@
 import {dns} from "@/hosts.js"
 import {singleInstance} from "@/lib/util.js"
 import {info} from "@/log.js"
-import {dn} from "@/lib/dn.js"
+import {nsRPC} from "@/lib/nsRPC.js"
 
 /*
  * Get all the rpc servers we have, find a server that can run them, if they
@@ -19,19 +19,19 @@ export async function main(ns) {
 }
 
 const tmpl = `
-import { dn } from "/lib/dn.js"
+import { nsRPC } from "/lib/nsRPC.js"
 
 /** @param {NS} ons */
 export async function main(ons) {
   /** @type {NS} ns */
-  let ns = new dn(ons)
+  let ns = new nsRPC(ons)
 
   await ns.listen("%s", ons.%s.%s)
 }
 `
 
 function createScripts(ns) {
-  let net = new dn(ns)
+  let net = new nsRPC(ns)
   for (let f of net._ports.keys()) {
     let namespace = ""
     let func = f
@@ -62,7 +62,7 @@ async function start(ns, name) {
       continue
     }
 
-    ns.scp([name, "/lib/dn.js"], h.name)
+    ns.scp([name, "/lib/nsRPC.js"], h.name)
     let pid = ns.exec(name, h.name, 1)
     if (pid > 0) {
       await info(ns, "Starting %s on %s (%s/%s): %d",

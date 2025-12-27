@@ -1,6 +1,6 @@
 /// <reference path="../NetscriptDefinitions.d.ts" />
 
-import { dn } from "@/lib/dn.js"
+import { nsRPC } from "@/lib/nsRPC.js"
 import { debug, info, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 import { singleInstance, parseNumber, parseTime } from "@/lib/util.js"
@@ -27,7 +27,7 @@ export async function main(ons) {
   ons.disableLog("asleep")
   ons.disableLog("run")
   /** @type {NS} */
-  let ns = new dn(ons)
+  let ns = new nsRPC(ons)
 
   cfg = await loadCfg(ns, config, cfg)
   let loopDelay = cfg.loopDelay ?? 30000

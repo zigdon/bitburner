@@ -1,7 +1,7 @@
 import { colors } from "@/colors.js"
 import { table } from "@/table.js"
 import { factionList } from "@/lib/constants.js"
-import { dn } from "@/lib/dn.js"
+import { nsRPC } from "@/lib/nsRPC.js"
 
 var cmds = new Map([
   ["list", list],
@@ -17,12 +17,13 @@ export async function main(ons) {
   ons.ramOverride(5.1)
   augData.clear()
   factionData.clear()
-  let ns = new dn(ons)
+  let ns = new nsRPC(ons)
   var fs = ns.flags([
     ["all", false],
     ["augs", ""],
     ["factions", ""],
     ["sort", ""],
+    ["stats", ""],
   ])
   await loadData(ns, fs)
   var cmd = fs._[0]
@@ -48,6 +49,10 @@ export async function loadData(ns, flags) {
       augs: augs,
     })
     for (let a of augs) {
+      let stats = await s.getAugmentationStats(a)
+      if (flags["stats"] != "" && !Object.entries(stats).some(
+        ([s, v]) => s.toLowerCase().includes(flags["stats"]) && v != 1
+      )) continue
       if (!augData.has(a)) {
         augData.set(a, {
           name: a,

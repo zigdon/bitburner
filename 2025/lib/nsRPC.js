@@ -3,7 +3,7 @@
  * over the network and return the reply. Otherwise, it'll just proxy the call
  * to ns.
  */
-export class dn {
+export class nsRPC {
   _offset = 1e10
   _counter = 0
 
@@ -95,7 +95,7 @@ export class dn {
 
         // If it's a known namespace, return a new proxy for that namespace
         if (target._nsSupport.includes(prop) && prop != target._namespace) {
-          return new dn(target._ns, prop)
+          return new nsRPC(target._ns, prop)
         }
 
         // If we have it in our config, create a handler for it
