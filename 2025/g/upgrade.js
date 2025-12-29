@@ -1,6 +1,10 @@
-import { toast } "@/log.js"
+import { toast } from "@/log.js"
+import { nsRPC } from "@/lib/nsRPC.js"
+
 /** @param {NS} ns */
-export async function main(ns) {
+export async function main(ons) {
+  ons.ramOverride(2.6)
+  let ns = new nsRPC(ons)
   var s = ns.singularity
   var p = ns.getPlayer
   var up = {cores:0, ram:0}

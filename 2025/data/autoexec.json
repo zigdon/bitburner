@@ -2,17 +2,17 @@
   "pserv": {
     "cashBuffer": 10e6,
     "min": 256,
-    "disable": true
+    "disabled": true
   },
   "run": [
     {"name": "console.js", "title": "Console"},
     {"name": "syslog.js", "title": "Syslog"},
-    {"name": "gm.js", "title": "General Manager"},
+    {"name": "gm.js", "title": "General Manager", "disabled": true},
     {"name": "g/tor.js", "oneTime": true},
     {"name": "g/gym.js", "args": ["50"], "oneTime": true},
     {"name": "map.js", "args": ["--silent"]},
-    {"name": "startRPC.js"},
-    {"name": "go2.js", "title": "Hack Controller"},
+    {"name": "startRPC.js", "disabled": false},
+    {"name": "go2.js", "title": "Hack Controller", "wait": 30},
     {"name": "ipvgo.js", "args": ["--op", 5], "title": "IPvGO Player"},
     {"name": "g/upgrade.js"},
     {"name": "g/program.js"},
@@ -21,7 +21,7 @@
     {"name": "g/idle.js"}
   ],
   "loop": {
-    "pserv": false,
+    "pserv": true,
     "contracts": true
   },
   "valid": true

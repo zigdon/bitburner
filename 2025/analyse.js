@@ -8,7 +8,9 @@ export async function main(ns) {
   var f = ns.sprintf("/logs/%s.txt", host)
   if (!ns.fileExists(f)) {
     ns.tprintf("No logs found for %s", host)
-    ns.ls("home", "/logs/").map(
+    ns.ls("home", "/logs/").filter(
+      (f) => f.indexOf("logs") == 0
+    ).map(
       (f) => f.split("/")[1].split(".")[0]
     ).forEach((f) => ns.tprintf(f))
     return

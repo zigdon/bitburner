@@ -187,7 +187,7 @@ async function doCompress(ns, data, minblock=2) {
   ns.printf("B2 IDs: %j", b2ids)
   let balanced = await rebalance(ns, blocks)
   // ns.printf("rebalanced: %j", balanced)
-  let best = await connect(ns, balanced)
+  let best = await _connect(ns, balanced)
   for (let bid of b2ids.reverse()) {
     ns.printf("Swapping out #%d: %s -> %s", bid, blocks[bid][1], blocks[bid][2])
     let nb = await rebalance(ns, [
@@ -195,7 +195,7 @@ async function doCompress(ns, data, minblock=2) {
       [true, blocks[bid][2]], // Pretend this Block2 is a Block1 actually.
       ...blocks.slice(bid+1)])
     // ns.printf("newbalance: %j", nb)
-    let res = await connect(ns, nb)
+    let res = await _connect(ns, nb)
     if (res.length < best.length) {
       ns.printf("%d < %d!", res.length, best.length)
       best = res
@@ -253,10 +253,10 @@ async function rebalance(ns, blocks) {
   return res
 }
 
-async function connect(ns, blocks) {
-  // connect the blocks alternating types. If the next block is the wrong type,
+async function _connect(ns, blocks) {
+  // _connect the blocks alternating types. If the next block is the wrong type,
   // just add a '0' block.
-  //
+  // Renamed to de-confuse the memory analyser
   var want = true
   let res = ""
   for (let bid=blocks.length-1; bid >= 0; bid--) {

@@ -1,12 +1,16 @@
 import {dns} from "@/hosts.js"
 import {ssh} from "@/ssh.js"
+import {nsRPC} from "@/lib/nsRPC.js"
 
 var hosts;
 
-/** @param {NS} ns */
-export async function main(ns) {
+/** @param {NS} ons */
+export async function main(ons) {
+  ons.ramOverride(67.45)
+  /** @type {NS} */
+  let ns = new nsRPC(ons)
   while (ns.args.length > 1) {
-    ns.run(ns.getScriptName(), 1, ns.args.pop())
+    if (ns.run(ns.getScriptName(), 1, ns.args[0]) > 0) ns.args.unshift()
   }
   var target = ns.args[0]
   hosts = dns(ns)
@@ -20,7 +24,7 @@ export async function main(ns) {
       (h) => h.name != "w0r1d_d43m0n"
     )
     for (var t of targets) {
-      ns.run(ns.getScriptName(), 1, t.name)
+      ns.run(ns.getScriptName(), 1, t.name) || await backdoor(ns, t)
     }
     return
   }

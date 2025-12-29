@@ -4,7 +4,7 @@ import { table } from "@/table.js"
 var sortFn = new Map([
   ["name", (a,b) => a[0] < b[0] ? -1 : a[0] == b[0] ? 0 : 1],
   ["city", (a,b) => a[1] < b[1] ? -1 : a[1] == b[1] ? 0 : 1],
-  ["diff", (a,b) => Number(a[2]) - Number(b[2])],
+  ["diff", (a,b) => Number(a[2][0]) - Number(b[2][0])],
   ["lvl", (a,b) => Number(a[3]) - Number(b[3])],
   ["start", (a,b) => Number(a[4]) - Number(b[4])],
   ["trade", (a,b) => Number(a[5]) - Number(b[5])],

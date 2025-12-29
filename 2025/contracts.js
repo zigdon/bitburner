@@ -1,6 +1,8 @@
 import { dns } from "@/hosts.js"
 import { table } from "@/table.js"
 import { warning, info } from "@/log.js"
+import { nsRPC } from "@/lib/nsRPC.js"
+
 export var types = new Map([
     ["Algorithmic Stock Trader I", "/c/stock1.js"],
     ["Algorithmic Stock Trader II", "/c/stock1.js"],
@@ -32,8 +34,11 @@ export var types = new Map([
     ["Unique Paths in a Grid II", "/c/grid2.js"],
   ])
 
-/** @param {NS} ns */
-export async function main(ns) {
+/** @param {NS} ons */
+export async function main(ons) {
+  ons.ramOverride(18.4)
+  /** @type {NS} ns */
+  let ns = new nsRPC(ons)
   var fs = flags(ns)
   var host = fs._[0]
   var file = fs._[1]
@@ -51,13 +56,15 @@ export async function main(ns) {
       err(ns, "No contracts found on ", host)
       return
     } else if (files.length > 1) {
+      ns.printf("59: ns.codingcontract.getContract(%j, %j)", f, host)
+      let cct = await ns.codingcontract.getContract(f, host)
       if (fs["toast"]) {
         log(ns, "Found contracts:")
-        files.forEach((f) => log(ns, "%s: %s", f, ns.codingcontract.getContract(f, host).type))
+        files.forEach((f) => log(ns, "%s: %s", f, cct.type))
         return
       } else {
         ns.tprint("Found contracts:")
-        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, ns.codingcontract.getContract(f, host).type))
+        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, cct.type))
         if (Number(file) > 0 && Number(file) <= files.length) {
           ns.tprintf("Selecting %j", file)
           file = files[Number(file)-1]
@@ -72,7 +79,8 @@ export async function main(ns) {
   }
 
   ns.printf("Reading %s@%s", file, host)
-  var c = ns.codingcontract.getContract(file, host)
+  ns.printf("82: ns.codingcontract.getContract(%j, %j)", file, host)
+  var c = await ns.codingcontract.getContract(file, host)
   if (!types.has(c.type)) {
     err(ns, "Unknown contract type %s", c.type)
     err(ns, "%s", c.description)
@@ -86,7 +94,7 @@ export async function main(ns) {
   var code = types.get(c.type)
 
   if (fs["test"]) {
-    file = ns.codingcontract.createDummyContract(c.type)
+    file = await ns.codingcontract.createDummyContract(c.type)
     host = "home"
     log(ns, "Created test contract: %s", file)
   }
@@ -229,12 +237,13 @@ function save(ns, data) {
 }
 
 /*
- * @param {NS} ns
+ * @param {NS} ons
  * @param {Map} types
  * @param {function({NS}, {Number[]})} testfn
  * @param {Boolean} nosubmit
  */
-export async function init(ns, types, testfn, nosubmit) {
+export async function init(ons, types, testfn, nosubmit) {
+  let ns = new nsRPC(ons)
   var fs = flags(ns)
   ns.clearLog()
   ns.disableLog("asleep")
@@ -253,9 +262,13 @@ export async function init(ns, types, testfn, nosubmit) {
   var host = fs._[0]
   var file = fs._[1]
   if (file == undefined) {
+    let ccts = new Map()
+    for (let cct of ns.ls(host, "contract-")) {
+      ns.printf("267: ns.codingcontract.getContract(%j, %j)", c, host)
+      ccts.set(cct, await ns.codingcontract.getContract(c, host))
+    }
     let cs = ns.ls(host, "contract-").filter(
-      (c) => Array.from(types.keys()).includes(
-        ns.codingcontract.getContract(c, host).type)
+      (c) => Array.from(types.keys()).includes(ccts.get(c).type)
     )
     if (cs.length == 1) {
       file = cs[0]
@@ -268,7 +281,8 @@ export async function init(ns, types, testfn, nosubmit) {
       return
     }
   }
-  var c = ns.codingcontract.getContract(file, host)
+  ns.printf("284: ns.codingcontract.getContract(%j, %j)", file, host)
+  var c = await ns.codingcontract.getContract(file, host)
   if (!c) {
     err(ns, "Can't get contract %s@%s", file, host)
     return
@@ -325,15 +339,19 @@ async function listContracts(ns, flags) {
   if (hosts.length > 0) {
     ns.tprintf("Hosts with contracts:")
     var data = []
-    hosts.map(
+    var ccts = hosts.map(
       (h) => h.files.filter(
         (f) => f.endsWith(".cct")
       ).filter(
         (f) => ns.fileExists(f, h.name)
-      ).forEach(
-        (f) => data.push(
-          [h.name, f, ns.codingcontract.getContract(f, h.name)?.type])
-      ))
+      ).map((f) => [h.name, f])).flat(1)
+    ns.printf("ccts=%j", ccts)
+    for (let cct of ccts) {
+      ns.printf("349: getcontract(%j, %j)", cct[1], cct[0])
+      let c = await ns.codingcontract.getContract(cct[1], cct[0])
+      data.push([cct[0], cct[1], c.type])
+    }
+
     // ns.tprint(data)
     // data.forEach((l) => ns.tprint(l))
     ns.tprint(table(ns, ["Host", "Filename", "Type"], data))
@@ -350,7 +368,8 @@ async function listContracts(ns, flags) {
         continue
       }
       ns.tprintf("Reading %s@%s", file, host)
-      var c = ns.codingcontract.getContract(file, host)
+      ns.printf("370: ns.codingcontract.getContract(%j, %j)", file, host)
+      var c = await ns.codingcontract.getContract(file, host)
       if (!types.has(c.type)) {
         ns.tprintf("Unknown contract type %s", c.type)
         ns.printf("Unknown contract type %s", c.type)
@@ -401,9 +420,9 @@ async function autotest(ns, types, type, limit=100) {
   var bad = []
   await info(ns, "Running %d autotest for %s", limit, type)
   for (let n=0; n<limit; n++) {
-    var file = ns.codingcontract.createDummyContract(type)
+    var file = await ns.codingcontract.createDummyContract(type)
     ns.printf("Created contract: %s", file)
-    var c = ns.codingcontract.getContract(file, "home")
+    var c = await ns.codingcontract.getContract(file, "home")
     ns.printf("data=%j", c.data)
     var res = await types.get(type)(ns, c.data)
     ns.printf("res=%j", res)

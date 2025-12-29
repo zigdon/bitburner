@@ -1,3 +1,5 @@
+import {warning} from "@/log.js"
+
 /*
  * Can be used instead of ns. For supported methods, it'll send the request
  * over the network and return the reply. Otherwise, it'll just proxy the call
@@ -12,6 +14,7 @@ export class nsRPC {
   /** @type {Map<string, int} */
   _ports = new Map([
     "bladeburner_getRank",
+    "codingcontract_createDummyContract",
     "corporation_getCorporation",
     "corporation_getDivision",
     "corporation_getHireAdVertCost",
@@ -37,19 +40,28 @@ export class nsRPC {
     "singularity_getFactionWorkTypes",
     "singularity_getOwnedAugmentations",
     "singularity_getOwnedSourceFiles",
+    "singularity_getUpgradeHomeCoresCost",
+    "singularity_getUpgradeHomeRamCost",
     "singularity_purchaseAugmentation",
+    "singularity_upgradeHomeCores",
+    "singularity_upgradeHomeRam",
+
   ].map((m, i) => [m, this._offset+i]))
 
   // Function namespace, look up ports with "$namespace_" prefix
   _namespace
 
   _nsSupport = [
+    'bladeburner',
+    'codingcontract',
     'corporation',
     'singularity'
   ]
 
   _notLogged = [
+    "args",
     "asleep",
+    "exec",
     "formatNumber",
     "formatRam",
     "getPlayer",
@@ -58,6 +70,7 @@ export class nsRPC {
     "print",
     "printf",
     "read",
+    "run",
     "sprintf",
     "tprint",
     "tprintf",
@@ -123,6 +136,10 @@ export class nsRPC {
     });
   }
 
+  async _error(tmpl, ...args) {
+    await warning(this._ns, tmpl, ...args)
+  }
+
   _log(tmpl, ...args) {
     this._ns.printf(tmpl, ...args)
   }
@@ -150,7 +167,7 @@ export class nsRPC {
       this._log("<%s: %j", msg)
       let [pid, c, req, args] = msg
       if (req != method) {
-        this._log("Ignoring misdirected call (got %j, want %j)", req, method)
+        this._error("Ignoring misdirected call (got %j, want %j)", req, method)
         continue
       }
 
@@ -208,7 +225,7 @@ export class nsRPC {
 
       let data = ph.peek()
       if (data != last) {
-        // this._log("<%d: %j", pn, data)
+        this._log("<%d: %j", pn, data)
         last = data
       }
       if (data == "NULL PORT DATA") {

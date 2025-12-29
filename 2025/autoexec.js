@@ -24,13 +24,8 @@ export async function main(ns) {
     await critical(ns, "Failed to load config at startup")
     return
   }
-  for (var p of cfg.run) {
-    if (p.oneTime) {
-      ns.run(p.name, 1, ...(p.args ?? []))
-    } else {
-      await check(ns, p)
-    }
-  }
+  let start = Date.now()
+  let first = true
 
   if (cfg.pserv.disabled) {
     ns.toast("Server buying disabled", "warning")
@@ -47,20 +42,23 @@ export async function main(ns) {
 
     // Restart what we expect should be running.
     for (var p of cfg.run) {
-      if (p.oneTime) {
-        continue
-      }
+      if (p.disabled) continue
+      if (p.oneTime && !first) continue
+      if (p.wait && Date.now() - start < p.wait*1000) continue
+      let s = ns.getServer()
+      if (p.ram && s.maxRam < p.ram) continue
       await check(ns, p)
       await ns.asleep(100)
     }
 
     // Handle pserv.
-    if (cfg.loop.pserv) { pserv(ns) }
+    if (cfg.loop.pserv) pserv(ns)
     // Find contracts.
-    if (cfg.loop.contracts) { await findContracts(ns) }
+    if (cfg.loop.contracts) await findContracts(ns)
     await ns.asleep(100)
 
     ns.printf("Loop done: %s", Date())
+    first = false
     await ns.asleep(60000)
   }
 

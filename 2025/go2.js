@@ -3,7 +3,7 @@ import { table } from "@/table.js"
 import { warning, info, debug } from "@/log.js"
 import { colors } from "@/colors.js"
 
-var buffer = 300
+var buffer = 100
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -14,6 +14,7 @@ export async function main(ns) {
     "getServerMinSecurityLevel",
     "getServerMoneyAvailable",
     "getServerMaxMoney",
+    "scp",
   ].forEach((m) => ns.disableLog(m))
   ns.clearLog()
   ns.clearPort(20)
@@ -72,9 +73,15 @@ export async function main(ns) {
     var data = []
     for (var n of opts) {
       var h = hosts.get(n)
-      data.push([h.name, ns.formatNumber(h.max), h.hack, fn(n)])
+      var loot = ns.sprintf("$%s/$%s",
+        ns.formatNumber(ns.getServerMoneyAvailable(h.name)),
+        ns.formatNumber(ns.getServerMaxMoney(h.name)))
+      var sec = ns.sprintf("%.2f/%.2f",
+        ns.getServerSecurityLevel(h.name),
+        ns.getServerMinSecurityLevel(h.name))
+      data.push([h.name, loot, sec, h.hack, fn(n)])
     }
-    ns.print(table(ns, ["Name", "Max", "Hack", "fn"], data))
+    ns.print(table(ns, ["Name", "Money", "Security", "Hack", "fn"], data))
   
     var target = hosts.get(opts[0])
     var tName = target.name
