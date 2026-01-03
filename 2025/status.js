@@ -26,12 +26,12 @@ export async function main(ns) {
       var base = ns.getServerBaseSecurityLevel(target)
       var sec = ns.getServerSecurityLevel(target)
       ent = {
-        host: target, w: 0, g: 0, h: 0,
+        host: target, w: [], g: [], h: [],
         mon: "$" + ns.formatNumber(ns.getServerMoneyAvailable(target)),
         sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
       }
     }
-    ent[p.filename[p.filename.indexOf("/")+1]] += p.threads
+    ent[p.filename[p.filename.indexOf("/")+1]].push(p.threads)
     summary.set(target, ent)
   }
 
@@ -41,9 +41,9 @@ export async function main(ns) {
       ["Target", "Hack", "Grow", "Weaken", "Money", "Security"],
       Array.from(summary.keys()).sort().map((h) => [
         summary.get(h).host,
-        summary.get(h).h,
-        summary.get(h).g,
-        summary.get(h).w,
+        [summary.get(h).h],
+        [summary.get(h).g],
+        [summary.get(h).w],
         summary.get(h).mon,
         summary.get(h).sec,
       ])

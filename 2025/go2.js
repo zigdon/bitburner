@@ -34,7 +34,7 @@ export async function main(ns) {
     var hosts = dns(ns)
   
     // copy scripts
-    const tools = ["bin/hack.js", "bin/weaken.js", "bin/grow.js", "colors.js"]
+    const tools = ["bin/hack.js", "bin/weaken.js", "bin/grow.js", "colors.js", "bin/send.js"]
     for (var h of hosts.keys()) {
       ns.scp(tools, h)
     }
@@ -118,8 +118,17 @@ export async function main(ns) {
     }
   
     started.set(tName, true)
-    // Schedule clearing the mark
-    ns.run("bin/send.js", 1, 20, delay, tName)
+    // Schedule clearing the mark, ideally not on home
+    let pid = 0
+    for (let h of Array.from(hosts.values()).sort((a,b) => (a.ram-a.used)-(b.ram-b.used))) {
+      pid = ns.exec("bin/send.js", h.name, 1, 20, delay, tName)
+      if (pid != 0) {
+        break
+      }
+    }
+    if (pid == 0) {
+      ns.run("bin/send.js", 1, 20, delay, tName)
+    }
   }
 }
 
