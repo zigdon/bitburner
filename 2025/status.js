@@ -27,24 +27,40 @@ export async function main(ns) {
       var sec = ns.getServerSecurityLevel(target)
       ent = {
         host: target, w: [], g: [], h: [],
-        mon: "$" + ns.formatNumber(ns.getServerMoneyAvailable(target)),
+        mon: ns.getServerMoneyAvailable(target),
         sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
+        srv: ns.getServer(target),
       }
     }
     ent[p.filename[p.filename.indexOf("/")+1]].push(p.threads)
     summary.set(target, ent)
   }
 
+  let player = ns.getPlayer()
+  const sum = (l) => l.reduce((a,i) => a + i, 0)
+  const details = (procs) => [
+    sum(procs),
+    procs.length > 0 ? Math.min(...procs) : 0,
+    procs.length > 0 ? Math.max(...procs) : 0,
+    procs.length
+  ]
+  const loot = (ent) => 
+    ns.fileExists("Formulas.exe") && ent.h.length > 0 ?
+      "$" + ns.formatNumber(
+        ns.formulas.hacking.hackPercent(ent.srv, player) * sum(ent.h) * ent.mon
+      ) : "N/A"
+
   ns.tprint(
     table(
       ns,
-      ["Target", "Hack", "Grow", "Weaken", "Money", "Security"],
+      ["Target", "Hack", "Grow", "Weaken", "Take", "Money", "Security"],
       Array.from(summary.keys()).sort().map((h) => [
         summary.get(h).host,
-        [summary.get(h).h],
-        [summary.get(h).g],
-        [summary.get(h).w],
-        summary.get(h).mon,
+        [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).h))],
+        [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).g))],
+        [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).w))],
+        loot(summary.get(h)),
+        "$" + ns.formatNumber(summary.get(h).mon),
         summary.get(h).sec,
       ])
     )

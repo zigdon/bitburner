@@ -17,6 +17,7 @@ var loglevels = [ "CRITICAL", "WARNING", "INFO", "DEBUG" ]
  * @param {any} ...args
  * */
 export async function logn(ns, level, tmpl, ...args) {
+  ns.printf(tmpl, ...args)
   while (ns.getPortHandle(11).full()) {
     ns.tprintf("Waiting for port from %s: %j", ns.getScriptName(), ns.getPortHandle(11).peek())
     await ns.asleep(1)
@@ -25,7 +26,6 @@ export async function logn(ns, level, tmpl, ...args) {
     ns.getScriptName(),
     loglevels.indexOf(level.toUpperCase()),
     ns.sprintf(tmpl, ...args)])
-  ns.printf(tmpl, ...args)
 }
 
 /**
