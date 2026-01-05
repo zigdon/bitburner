@@ -242,9 +242,13 @@ function save(ns, data) {
  * @param {function({NS}, {Number[]})} testfn
  * @param {Boolean} nosubmit
  */
-export async function init(ons, types, testfn, nosubmit) {
+export async function init(ons, types, testfn, nosubmit, noauto) {
   let ns = new nsRPC(ons)
   var fs = flags(ns)
+  if (noauto && fs["toast"]) {
+    ns.printf("Auto-run is disabled")
+    return
+  }
   ns.clearLog()
   ns.disableLog("asleep")
   if (fs["test"]) {
@@ -315,7 +319,7 @@ export async function init(ons, types, testfn, nosubmit) {
   var data = c.data
   ns.printf("data=%j", data)
   var res = await fn(ns, data)
-  var msg = nosubmit ? "Not submitted" : c.submit(res)
+  var msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
   if (fs["toast"]) {
     ns.printf("Input data:\n%j", data)

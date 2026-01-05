@@ -1,5 +1,4 @@
 import { dns } from "@/hosts.js"
-import { types } from "@/contracts.js"
 import { critical, info, toast } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 
@@ -27,9 +26,6 @@ export async function main(ns) {
   let start = Date.now()
   let first = true
 
-  if (cfg.pserv.disabled) {
-    ns.toast("Server buying disabled", "warning")
-  }
   while(true) {
     // Update config
     var next = await loadCfg(ns, config, cfg)
@@ -51,8 +47,6 @@ export async function main(ns) {
       await ns.asleep(100)
     }
 
-    // Handle pserv.
-    if (cfg.loop.pserv) pserv(ns)
     // Find contracts.
     if (cfg.loop.contracts) await findContracts(ns)
     await ns.asleep(100)
@@ -83,52 +77,6 @@ async function findContracts(ns) {
   }
   if (count > 0) {
     await toast(ns, "%d contracts found", count)
-  }
-}
-
-/**
- * @param {NS} ns
- */
-async function pserv(ns) {
-  if (cfg.pserv.disabled) {
-    ns.printf("Buying servers disabled")
-    return
-  }
-
-  var m = ns.getPlayer().money - cfg.pserv.cashBuffer
-  if (m < 0) {
-    return
-  }
-
-  // find larger pserv we can afford to buy with our budget
-  if (ns.getPurchasedServers().length < ns.getPurchasedServerLimit()) {
-    var size = cfg.pserv.min
-    while (ns.getPurchasedServerCost(size*2) < m) {
-      size *= 2
-    }
-    var name = ns.purchaseServer("pserv", size)
-    if (name != "") {
-      await toast(ns, "Bought %s (%s @ $%s)", name, ns.formatRam(size), ns.formatNumber(ns.getPurchasedServerCost(size)))
-    }
-    return
-  }
-
-  // Find server to upgrade
-  for (var s of ns.getPurchasedServers().sort((a,b) => ns.getServerMaxRam(a) - ns.getServerMaxRam(b))) {
-    var size = ns.getServerMaxRam(s)
-    var orig = size
-    while (ns.getPurchasedServerUpgradeCost(s, size*2) < m) {
-      size *=2
-    }
-    if (size == orig) {
-      continue
-    }
-    if (ns.upgradePurchasedServer(s, size)) {
-      await toast(ns, "Upgraded server from %s to %s", ns.formatRam(orig), ns.formatRam(size))
-      break
-    } else {
-      ns.printf("Failed to upgrade %s to %s", s, ns.formatRam(size))
-    }
   }
 }
 

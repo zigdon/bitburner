@@ -11,20 +11,24 @@ export async function main(ns) {
   [
     "asleep",
     "exec",
-    "getServerGrowth",
-    "getServerMaxMoney",
-    "getServerMaxRam",
-    "getServerMinSecurityLevel",
-    "getServerMoneyAvailable",
-    "getServerSecurityLevel",
-    "getServerUsedRam",
     "scp",
   ].forEach((m) => ns.disableLog(m))
   ns.clearLog()
 
+  const bonusWeaken = (srv) => {
+    if (srv.hackDifficulty <= srv.minDifficulty) return 0
+    let delta = srv.hackDifficulty - srv.minDifficulty
+    return countWT(ns, delta)
+  }
+  const bonusGrow = (srv) => {
+    if (srv.moneyAvailable >= srv.moneyMax) return 0
+    return countGT(ns, srv.hostname)
+  }
+
   var started = new Map()
   started.clear()
   var waitingForCapacity = false
+  var missingTargets = 0
   // read available servers
   // pick target
   // @ignore-infinite
@@ -79,7 +83,14 @@ export async function main(ns) {
         ns, "*** No more targets (%d in progress, next ends in %s)",
         nextTimes.length, ns.tFormat(next > 0 ? next : 0, true)
       )
-      await weakenNext(ns, capacity, started)
+
+      if (missingTargets++ > 5) {
+        missingTargets = 0
+        if (capacity > 0) 
+          capacity = await findBonus(ns, capacity, "bin/weaken.js", bonusWeaken)
+        if (capacity > 0) 
+          capacity = await findBonus(ns, capacity, "bin/grow.js", bonusGrow)
+      }
       if (next > 0) {
         await ns.asleep(next+1)
       } else {
@@ -89,7 +100,7 @@ export async function main(ns) {
     }
     var fn = function (a) {
       let h = hosts.get(a)
-      return h.max * ns.hackAnalyzeChance(a) / 1000 + ns.getServerGrowth(a) * 100
+      return h.max * ns.hackAnalyzeChance(a) / 1000 + ns.getServer(a).serverGrowth * 100
     }
     opts.sort((a, b) => fn(b) - fn(a))
   
@@ -110,16 +121,17 @@ export async function main(ns) {
   
     var target = hosts.get(opts[0])
     var tName = target.name
+    var srv = ns.getServer(tName)
     await debug(ns, "Selected %s: %d%% of %s @ %s", target.name, 100 * target.cur / target.max, ns.formatNumber(target.max), target.hack)
   
     // figure out number of threads needed to weaken
-    var deltaSec = ns.getServerSecurityLevel(tName) - ns.getServerMinSecurityLevel(tName)
+    var deltaSec = srv.hackDifficulty - srv.minDifficulty
     var delay = 0
-    if (deltaSec > ns.getServerMinSecurityLevel(tName) * 0.05) {
+    if (deltaSec > srv.minDifficulty * 0.05) {
       var weakenThreads = countWT(ns, deltaSec)
       var wt = Math.min(weakenThreads, capacity)
       await debug(ns, "Need %d/%d threads to weaken from %d to %d",
-        weakenThreads, capacity, ns.getServerSecurityLevel(tName), ns.getServerMinSecurityLevel(tName))
+        weakenThreads, capacity, srv.hackDifficulty, srv.minDifficulty)
       var launched = await spread(ns, "bin/weaken.js", wt, tName, 0)
       reportStarted(ns, launched)
       capacity -= wt
@@ -131,7 +143,7 @@ export async function main(ns) {
     if (delay == 0 && growThreads > 1 && capacity > 0) {
       var gt = Math.min(capacity, growThreads)
       await debug(ns, "Need %d/%d threads to grow from %s to %s",
-        growThreads, capacity, ns.formatNumber(ns.getServerMoneyAvailable(tName)), ns.formatNumber(ns.getServerMaxMoney(tName)))
+        growThreads, capacity, ns.formatNumber(srv.moneyAvailable), ns.formatNumber(srv.moneyMax))
       var launched = await spread(ns, "bin/grow.js", gt, tName, delay)
       reportStarted(ns, launched)
       capacity -= gt
@@ -152,29 +164,35 @@ export async function main(ns) {
 /**
  * @param {NS} ns
  * @param {Number} capacity
- * @param {Map} started
+ * @param {String} tool
+ * @param {function(NS, Server) Number} fn
  */
-async function weakenNext(ns, capacity, started) {
+async function findBonus(ns, capacity, tool, fn) {
   // Find the next server we have root on, but not hacking yet, and start
   // weakening it.
   let hosts = dns(ns)
+  let bonus = []
   for (let h of Array.from(hosts.values()).sort((a,b) => a.hack - b.hack)) {
-    if (!h.root) continue
-    if (started.has(h.name)) continue
     let srv = ns.getServer(h.name)
-    if (srv.hackDifficulty <= srv.minDifficulty) continue
-    let delta = srv.hackDifficulty - srv.minDifficulty
-    let t = Math.min(countWT(ns, delta), capacity)
+    if (h.name == "home") continue
+    if (!h.root) continue
+    if (srv.purchasedByPlayer) continue
+    let threads = fn(srv)
+    let t = Math.min(threads, capacity)
     if (t > 0) {
-      await debug(ns, "%s: Bonus weakening with %d threads", h.name, t)
-      let launched = await spread(ns, "bin/weaken.js", t, h.name, 0)
-      reportStarted(ns, launched)
+      bonus.push([h.name, t])
+      await spread(ns, tool, t, h.name, 0)
       capacity -= t
     }
 
-    if (capacity <= 0) return
+    if (capacity <= 0) break
   }
-  await debug(ns, "No more bonus targets, %d capacity unused", capacity)
+
+  if (bonus.length > 0) {
+    ns.printf("Bonus %s:%s", tool, table(ns, ["Host", "Threads"], bonus))
+  }
+
+  return capacity
 }
 
 /**
@@ -183,10 +201,12 @@ async function weakenNext(ns, capacity, started) {
  * @return Number
  */
 function countWT(ns, delta) {
+  if (delta != Number(delta)) return 0
   var w = 1
   while (ns.weakenAnalyze(w, 1) < delta) {
     w++
   }
+  ns.printf("WT: %d threads to weaken by %d", w, delta)
   return w
 }
 
@@ -205,14 +225,13 @@ function hasFormulas(ns) {
  * @return Number
  */
 function countGT(ns, target, startCash, startSec) {
-  startCash ??= ns.getServerMoneyAvailable(target)
+  var srv = ns.getServer(target)
   if (hasFormulas(ns)) {
-    var srv = ns.getServer(target)
-    srv.moneyAvailable = startCash
+    if (startCash != undefined) srv.moneyAvailable = startCash
     if (startSec != undefined) srv.hackDifficulty = startSec
     return ns.formulas.hacking.growThreads(srv, ns.getPlayer(), srv.moneyMax, 1)
   } else {
-    var ratio = Math.max(1, ns.getServerMaxMoney(target) / (1 + start))
+    var ratio = Math.max(1, srv.moneyMax / (1 + start))
     return Math.ceil(ns.growthAnalyze(target, ratio, 1))
   }
 }
@@ -229,11 +248,10 @@ function checkCapacity(ns) {
     if (!h.root) continue
     var save = 0
     if (h.name == "home") {
-      save = Math.min(buffer, ns.getServerMaxRam("home")/2)
+      save = Math.min(buffer, ns.getServer("home").maxRam/2)
     }
-    var avail = Math.floor(
-      (ns.getServerMaxRam(h.name) - ns.getServerUsedRam(h.name) - save) / 1.75
-    )
+    var srv = ns.getServer(h.name)
+    var avail = Math.floor((srv.maxRam - srv.ramUsed - save) / 1.75)
     t += avail
     if (avail > 0) found.push([h.name, avail])
   }
@@ -253,16 +271,17 @@ function checkCapacity(ns) {
  */
 async function findPlan(ns, tName, capacity) {
   // At max, we want to run however many threads we can to hack 100% of the value on each batch
-  var maxV = ns.getServerMoneyAvailable(tName)
+  var srv = ns.getServer(tName)
+  var maxV = srv.moneyAvailable
   var maxH = Math.ceil(ns.hackAnalyzeThreads(tName, maxV))
   // And weaken back to 0
   var secH = ns.hackAnalyzeSecurity(maxH, tName)
   var maxWH = countWT(ns, secH)
   // And grow back to max
-  var maxG = countGT(ns, tName, 0, ns.getServerMinSecurityLevel(tName))
+  var maxG = countGT(ns, tName, 0, srv.minDifficulty)
   var secG = ns.growthAnalyzeSecurity(maxG, tName, 1)
   // And weaken back to 0 again
-  var maxWG = countWT(ns, secG+ns.getServerMinSecurityLevel(tName))
+  var maxWG = countWT(ns, secG+srv.minDifficulty)
 
   // If we have enough capacity, just return that
   var total = maxH + maxWH + maxG + maxWG
@@ -374,7 +393,7 @@ async function spread(ns, tool, threads, target, ts) {
   var hosts = Array.from(dns(ns).values()).
     filter((h) => h.name != 'home' && h.root).
     map((h) => h.name).
-    sort((a, b) => (ns.getServerMaxRam(a) - ns.getServerUsedRam(a)) - (ns.getServerMaxRam(b) - ns.getServerUsedRam(b)))
+    sort((a, b) => (ns.getServer(a).maxRam - ns.getServer(a).ramUsed) - (ns.getServer(b).maxRam - ns.getServer(b).ramUsed))
   // Weaken and Hack don't care about splitting across many hosts, so starting
   // from the least available ram makes sense. For Grow, we want to run as many
   // threads as possible at once, so reverse the sorting.
@@ -383,11 +402,12 @@ async function spread(ns, tool, threads, target, ts) {
   // Always start threads on home last.
   hosts.push("home")
   for (var h of hosts) {
-    var max = ns.getServerMaxRam(h)
+    var srv = ns.getServer(h)
+    var max = srv.maxRam
     if (h == "home") {
       max -= Math.min(buffer, max/2)
     }
-    var t = Math.min(Math.floor((max - ns.getServerUsedRam(h)) / 1.75), threads)
+    var t = Math.min(Math.floor((max - srv.ramUsed) / 1.75), threads)
     if (t != Math.floor(t)) {
       await warning(
         ns, "[%s] Fractional threads will be rounded up: %.4f", target, t)

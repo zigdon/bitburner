@@ -1,3 +1,14 @@
+var gyms = new Map([
+  ["Sector-12", "Powerhouse Gym"],
+  ["Aevum", "Snap Fitness Gym"],
+  ["Volhaven", "Millenium Fitness Gym"],
+]);
+
+var univs = new Map([
+  ["Sector-12", "Rothman University"],
+  ["Volhaven", "ZB Institute of Technology"],
+])
+
 /** @param {NS} ns */
 export async function main(ns) {
   ns.disableLog("asleep")
@@ -7,6 +18,7 @@ export async function main(ns) {
     ["def", false],
     ["dex", false],
     ["cha", false],
+    ["hack", false],
     ["focus", false],
   ]);
   var target = flags._[0];
@@ -21,6 +33,7 @@ export async function main(ns) {
   if (flags.def) { stats.push("defense") }
   if (flags.dex) { stats.push("dexterity") }
   if (flags.cha) { stats.push("charisma") }
+  if (flags.hack) { stats.push("hacking") }
   if (stats.length == 0) {
     stats = [
       "strength",
@@ -28,18 +41,24 @@ export async function main(ns) {
       "defense",
       "dexterity",
       "charisma",
+      "hacking",
     ];
   }
   ns.tprintf("Training to %d: %j", target, stats)
 
   var sk = ns.getPlayer().skills
-  var gym = getGym(ns)
+  var gym = getFacility(ns, gyms)
+  var univ = getFacility(ns, univs)
   for (var s of stats) {
-    if (s == "charisma") {
-      if (sk["charisma"] < target) {
-        await course(ns, flags["focus"], target)
+    if (sk[s] < target) {
+      if (["charisma", "hacking"].includes(s)) {
+        if (univ == "") {
+          ns.tprintf("No uni here.")
+          return
+        }
+        await course(ns, univ, s, flags["focus"], target)
+        continue
       }
-    } else if (sk[s] < target) {
       if (gym == "") {
         ns.tprintf("No gym here.")
         return
@@ -51,23 +70,16 @@ export async function main(ns) {
   ns.toast("Done training at the gym", "success", null)
 }
 
-var univ = new Map([
-  ["Sector-12", "Rothman University"],
-  ["Volhaven", "ZB Institute of Technology"],
-])
-
-async function course(ns, focus, target) {
-  var city = ns.getPlayer().city
-  if (!univ.has(city)) {
-    ns.tprintf("No univ here.")
-    return
-  }
-
-  while (ns.getPlayer().skills["charisma"] < target) {
-    ns.singularity.universityCourse(univ.get(city), "Leadership", focus)
+async function course(ns, uni, s, focus, target) {
+  while (ns.getPlayer().skills[s] < target) {
+    if (s == "charisma") {
+      ns.singularity.universityCourse(uni, "Leadership", focus)
+    } else {
+      ns.singularity.universityCourse(uni, "Algorithms", focus)
+    }
     await ns.asleep(1000)
   }
-  ns.printf("Finished training cha: %d", ns.getPlayer().skills["charisma"])
+  ns.printf("Finished training %s: %d", s, ns.getPlayer().skills[s])
   ns.singularity.stopAction()
 }
 
@@ -80,16 +92,10 @@ async function train(ns, gym, stat, focus, target) {
   ns.singularity.stopAction()
 }
 
-var gyms = new Map([
-  ["Sector-12", "Powerhouse Gym"],
-  ["Aevum", "Snap Fitness Gym"],
-  ["Volhaven", "Millenium Fitness Gym"],
-]);
-
-function getGym(ns) {
+function getFacility(ns, yb) {
   var city = ns.getPlayer().city
-  if (gyms.has(city)) {
-    return gyms.get(city)
+  if (yb.has(city)) {
+    return yb.get(city)
   }
   return ""
 }
