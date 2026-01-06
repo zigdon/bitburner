@@ -345,14 +345,10 @@ async function batch(ns, tName, plan) {
 
   // HWGW
   var launched = []
-  launched.push(...await spread(
-    ns, "bin/hack.js", plan.h, tName, ts-ht, Date.now()))
-  launched.push(...await spread(
-    ns, "bin/weaken.js", plan.wh, tName, ts-wt1+5, Date.now()))
-  launched.push(...await spread(
-    ns, "bin/grow.js", plan.g, tName, ts-gt+10, Date.now()))
-  launched.push(...await spread(
-    ns, "bin/weaken.js", plan.wg, tName, ts-wt2+15, Date.now()))
+  launched.push(...await spread(ns, "bin/hack.js", plan.h, tName, ts-ht, ts))
+  launched.push(...await spread(ns, "bin/weaken.js", plan.wh, tName, ts-wt1+5, ts))
+  launched.push(...await spread(ns, "bin/grow.js", plan.g, tName, ts-gt+10, ts))
+  launched.push(...await spread(ns, "bin/weaken.js", plan.wg, tName, ts-wt2+15, ts))
   reportStarted(ns, launched)
   var events = [
     [0, "start", ""],
@@ -387,7 +383,7 @@ function reportStarted(ns, launched) {
  * @param {Number} ts
  * @return [[host, tool, threads]]
  */
-async function spread(ns, tool, threads, target, ts) {
+async function spread(ns, tool, threads, target, ...args) {
   // Get the list of all the servers, sorted by free ram
   var launched = []
   var hosts = Array.from(dns(ns).values()).
@@ -417,7 +413,7 @@ async function spread(ns, tool, threads, target, ts) {
       continue
     }
     // log(ns, "[%s] Starting %d threads of %s on %s", target, t, tool, h)
-    if (!ns.exec(tool, h, t, target, ts)) {
+    if (!ns.exec(tool, h, t, target, ...args)) {
       await warning(ns, "[%s] *** Failed to run %d threads of %s on %s", target, t, tool, h) 
       continue
     }
