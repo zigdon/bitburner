@@ -12,6 +12,6 @@ export async function main(ons) {
     return undefined
   }
 
-  await ns.listen("corporation_getProduct", ons.corporation.getProduct)
+  await ns.listen("corporation_getProduct", getProduct)
 }
 

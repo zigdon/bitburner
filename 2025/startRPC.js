@@ -52,8 +52,8 @@ function createScripts(ns) {
 }
 
 async function checkCorp(ns) {
-  if (!checkRunning(ns, "lib/rpc/corporation/getProduct.js")) return false
-  let net = nsRPC(ns)
+  if (!checkRunning(ns, "lib/rpc/corporation/hasCorporation.js")) return false
+  let net = new nsRPC(ns)
   return await net.corporation.hasCorporation()
 }
 

@@ -13,11 +13,13 @@ export async function main(ns) {
   }
 
   var summary = new Map()
+  var now = Date.now()
   for (var p of ps) {
     if (!["bin/grow.js", "bin/hack.js", "bin/weaken.js"].includes(p.filename)) {
       continue
     }
     var target = p.args[0]
+    var ts = p.args[2]
     var ent = {}
     if (summary.has(target)) {
       ent = summary.get(target)
@@ -30,6 +32,8 @@ export async function main(ns) {
         mon: ns.getServerMoneyAvailable(target),
         sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
         srv: ns.getServer(target),
+        hack: ns.hackAnalyze(target),
+        when: ts - now,
       }
     }
     ent[p.filename[p.filename.indexOf("/")+1]].push(p.threads)
@@ -48,7 +52,7 @@ export async function main(ns) {
     ns.fileExists("Formulas.exe") && ent.h.length > 0 ?
       "$" + ns.formatNumber(
         ns.formulas.hacking.hackPercent(ent.srv, player) * sum(ent.h) * ent.mon
-      ) : "N/A"
+      ) : ent.hack * sum(ent.h)
 
   ns.tprint(
     table(
@@ -59,7 +63,8 @@ export async function main(ns) {
         [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).h))],
         [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).g))],
         [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).w))],
-        loot(summary.get(h)),
+        ns.sprintf("%s (%s)", loot(summary.get(h)),
+          summary.get(h).h.length > 0 ? ns.tFormat(summary.get(h).when) : "-"),
         "$" + ns.formatNumber(summary.get(h).mon),
         summary.get(h).sec,
       ])

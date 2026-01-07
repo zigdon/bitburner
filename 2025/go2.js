@@ -206,7 +206,7 @@ function countWT(ns, delta) {
   while (ns.weakenAnalyze(w, 1) < delta) {
     w++
   }
-  ns.printf("WT: %d threads to weaken by %d", w, delta)
+  // ns.printf("WT: %d threads to weaken by %d", w, delta)
   return w
 }
 
@@ -345,10 +345,15 @@ async function batch(ns, tName, plan) {
 
   // HWGW
   var launched = []
-  launched.push(...await spread(ns, "bin/hack.js", plan.h, tName, ts-ht, ts))
-  launched.push(...await spread(ns, "bin/weaken.js", plan.wh, tName, ts-wt1+5, ts))
-  launched.push(...await spread(ns, "bin/grow.js", plan.g, tName, ts-gt+10, ts))
-  launched.push(...await spread(ns, "bin/weaken.js", plan.wg, tName, ts-wt2+15, ts))
+  var now = Date.now()
+  launched.push(...await spread(ns,
+    "bin/hack.js", plan.h, tName, ts-ht, ts+now))
+  launched.push(...await spread(ns,
+    "bin/weaken.js", plan.wh, tName, ts-wt1+5, ts+now))
+  launched.push(...await spread(ns,
+    "bin/grow.js", plan.g, tName, ts-gt+10, ts+now))
+  launched.push(...await spread(ns,
+    "bin/weaken.js", plan.wg, tName, ts-wt2+15, ts+now))
   reportStarted(ns, launched)
   var events = [
     [0, "start", ""],

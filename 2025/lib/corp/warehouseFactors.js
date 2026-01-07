@@ -35,8 +35,6 @@ async function buyWarehouseFactors(ns, name, city, industry, fill) {
   await info(ns, "Buying %d%% warehouse factors for %s@%s (%s)",
     fill*100, name, city, industry)
   let c = ns.corporation
-  let size = c.getWarehouse(name, city).size
-  ns.printf("Size: %j", size)
   let data = c.getIndustryData(industry)
   data.aiCoreFactor ??= 0
   data.robotFactor ??= 0
@@ -49,6 +47,21 @@ async function buyWarehouseFactors(ns, name, city, industry, fill) {
                 data.realEstateFactor * sizes.re;
   ns.printf("pkgSize: %j", pkgSize)
 
+  let size = 0
+  try {
+    size = c.getWarehouse(name, city).size
+  } catch (e) {
+    let amt = (100*fill)/pkgSize;
+    await warning(ns, "No warehouse API, buy, per 100: %j",
+      {
+        ai: data.aiCoreFactor * amt,
+        robot: data.robotFactor * amt,
+        hardware: data.hardwareFactor * amt,
+        re: data.realEstateFactor * amt,
+      })
+    ns.exit()
+  }
+  ns.printf("Size: %j", size)
   let amt = (size*fill)/pkgSize;
   let target = {
     ai: data.aiCoreFactor * amt,

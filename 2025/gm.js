@@ -89,6 +89,7 @@ export async function main(ons) {
           }
           let args = a.args?.map((a) => a == "DIV" ? d : a == "CITY" ? c : a)
           st[n]="r"
+          ns.printf("Running %s %j", script, args)
           await run(ns, script, args ?? [], a.fork)
 
           done[n] = true
@@ -121,7 +122,7 @@ async function run(ns, script, args, fork) {
 async function check(ns, n, cond, divName, city) {
   let c = ns.corporation
   let corp = await ns.corporation.getCorporation()
-  let div = await ns.corporation.getDivision(divName)
+  let div = divName ? await ns.corporation.getDivision(divName) : null
   let m = ns.getPlayer().money
   const print = async (tmpl, ...args) => cond?.debug ? await info(ns, tmpl, ...args) : ""
   await print("Checking %j (%s@%s)", cond, divName, city)
@@ -154,7 +155,7 @@ async function check(ns, n, cond, divName, city) {
     if (cond.corp[0] == "<" &&
       corp.funds > parseNumber(cond.corp.slice(1))) {
       return false
-    } else if (parseNumber(cond.corp) < corp.funds) {
+    } else if (corp.funds < parseNumber(cond.corp)) {
       return false
     }
     await print("corp: %j pass", cond.corp)
@@ -183,12 +184,12 @@ async function check(ns, n, cond, divName, city) {
   }
   if (cond.sharePrice) {
     if (cond.sharePrice[0] == "<" && 
-      corp.sharePrice >= cond.sharePrice.slice(1)) {
+      corp.sharePrice >= parseNumber(cond.sharePrice.slice(1))) {
       await print("sharePrice: %j fail (price=%d)",
         cond.sharePrice, corp.sharePrice)
       return false
     }
-    if (corp.sharePrice < cond.sharePrice) {
+    if (corp.sharePrice < parseNumber(cond.sharePrice)) {
       await print("sharePrice: %j fail (price=%d)",
         cond.sharePrice, corp.sharePrice)
       return false
@@ -228,7 +229,7 @@ async function check(ns, n, cond, divName, city) {
   } else if (cond.noRND) {
     await print("noRND: %j pass", cond.noRND)
   }
-  if (cond.income && corp.revenue < cond.income) {
+  if (cond.income && corp.revenue < parseNumber(cond.income)) {
     return false
   } else if (cond.income) {
     await print("income: %j pass", cond.income)
@@ -239,9 +240,9 @@ async function check(ns, n, cond, divName, city) {
     await print("ratio: %j pass", cond.cost)
   }
   if (cond.canResearch &&
-    (div.researchPoints <
+    (!divName || (div.researchPoints <
       await c.getResearchCost(divName, cond.canResearch) ||
-      await c.hasResearched(divName, cond.canResearch))
+      await c.hasResearched(divName, cond.canResearch)))
   ) {
     return false
   } else if (cond.canResearch) {
@@ -254,6 +255,7 @@ async function check(ns, n, cond, divName, city) {
 
 // Returns true if the ratio of funds to cost is high enough
 async function ratio(ns, cond, divName, city) {
+  if (!divName) return
   let c = ns.corporation
   let div = await c.getDivision(divName)
   let funds = ns.corporation.getCorporation().funds

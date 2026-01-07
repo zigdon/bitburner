@@ -18,15 +18,25 @@ export class nsRPC {
     "corporation_getCorporation",
     "corporation_getDivision",
     "corporation_getHireAdVertCost",
+    "corporation_getIndustryData",
+    "corporation_getOffice",
     "corporation_getOfficeSizeUpgradeCost",
     "corporation_getProduct",
     "corporation_getResearchCost",
     "corporation_getUpgradeLevelCost",
     "corporation_getUpgradeWarehouseCost",
+    "corporation_getWarehouse",
     "corporation_hasCorporation",
     "corporation_hasResearched",
     "corporation_hasUnlock",
     "corporation_hasWarehouse",
+    "corporation_hireEmployee",
+    "corporation_selMaterial",
+    "corporation_setAutoJobAssignment",
+    "corporation_setSmartSupply",
+    "corporation_setSmartSupplyOption",
+    "corporation_upgradeOfficeSize",
+    "corporation_upgradeWarehouse",
     "singularity_getAugmentationFactions",
     "singularity_getAugmentationPrereq",
     "singularity_getAugmentationPrice",
@@ -45,6 +55,8 @@ export class nsRPC {
     "singularity_purchaseAugmentation",
     "singularity_upgradeHomeCores",
     "singularity_upgradeHomeRam",
+    "corporation_purchaseWarehouse",
+    "corporation_expandIndustry",
 
   ].map((m, i) => [m, this._offset+i]))
 
@@ -171,7 +183,14 @@ export class nsRPC {
         continue
       }
 
-      let res = await callback(...args)
+      let res = null
+      try {
+        res = await callback(...args)
+      } catch (e) {
+        this._log("Caught error in callback: %j", e)
+        this._error("Error in %s (%d) callback",
+          this._ns.getScriptName(), this._ns.pid)
+      }
       let resPN = this._offset+pid
       let resPort = this._ns.getPortHandle(resPN)
       while (!resPort.tryWrite([pid, c, method, res])) {
