@@ -25,6 +25,16 @@ export async function main(ns) {
     return countGT(ns, srv.hostname)
   }
 
+  const c = (n) => {
+    let s = String(n)
+    let r = ""
+    while (s.length > 3) {
+      r = "," + s.slice(s.length-3) + r
+      s = s.slice(0, s.length-3)
+    }
+    return s + r
+  }
+
   var started = new Map()
   started.clear()
   var waitingForCapacity = false
@@ -60,7 +70,7 @@ export async function main(ns) {
       continue
     }
     waitingForCapacity = false
-    await debug(ns, "Can run %d threads total", capacity)
+    await debug(ns, "Can run %s threads total", c(capacity))
   
     var playerHack = ns.getPlayer().skills.hacking
     var opts = Array.from(hosts.keys()).filter((n) => {

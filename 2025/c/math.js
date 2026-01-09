@@ -36,7 +36,7 @@ export async function main(ns) {
   let types = new Map([
     ["Find All Valid Math Expressions", solve],
   ])
-  await init(ns, types, test, false, true)
+  await init(ns, types, test, false, false)
 }
 
 let cache = new Map()

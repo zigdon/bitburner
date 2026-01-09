@@ -1,9 +1,4 @@
 {
-  "pserv": {
-    "cashBuffer": 10e6,
-    "min": 256,
-    "disabled": true
-  },
   "run": [
     {"name": "console.js", "title": "Console"},
     {"name": "syslog.js", "title": "Syslog"},
@@ -18,10 +13,11 @@
     {"name": "g/program.js"},
     {"name": "g/factions.js"},
     {"name": "g/saveBonus.js"},
-    {"name": "g/idle.js"}
+    {"name": "g/pserv.js"},
+    {"name": "g/idle.js"},
+    {"name": "bar.tsx", "oneTime": true}
   ],
   "loop": {
-    "pserv": true,
     "contracts": true
   },
   "valid": true
