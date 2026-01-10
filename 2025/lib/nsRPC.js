@@ -73,6 +73,7 @@ export class nsRPC {
   _notLogged = [
     "args",
     "asleep",
+    "corporation_getCorporation",
     "exec",
     "formatNumber",
     "formatRam",

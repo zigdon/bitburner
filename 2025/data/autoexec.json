@@ -4,9 +4,9 @@
     {"name": "syslog.js", "title": "Syslog"},
     {"name": "gm.js", "title": "General Manager", "disabled": true},
     {"name": "g/tor.js", "oneTime": true},
-    {"name": "g/gym.js", "args": ["50"], "oneTime": true},
+    {"name": "g/gym.js", "args": ["30"], "oneTime": true},
     {"name": "map.js", "args": ["--silent"]},
-    {"name": "startRPC.js", "disabled": false},
+    {"name": "startRPC.js", "disabled": true},
     {"name": "go2.js", "title": "Hack Controller", "wait": 30},
     {"name": "ipvgo.js", "args": ["--op", 5], "title": "IPvGO Player"},
     {"name": "g/upgrade.js"},
@@ -15,7 +15,7 @@
     {"name": "g/saveBonus.js"},
     {"name": "g/pserv.js"},
     {"name": "g/idle.js"},
-    {"name": "bar.tsx", "oneTime": true}
+    {"name": "bar.tsx", "oneTime": true, "disabled": true}
   ],
   "loop": {
     "contracts": true

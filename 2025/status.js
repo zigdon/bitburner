@@ -13,7 +13,14 @@ export async function main(ns) {
   var hosts = dns(ns)
   var allMem = 0
   var usedMem = 0
-  for (var h of hosts.keys()) {
+  
+  for (var h of Array.from(
+    hosts.values()
+  ).filter(
+    (h) => h.root
+  ).map(
+    (h) => h.name
+  )) {
     allMem += ns.getServerMaxRam(h)
     usedMem += ns.getServerUsedRam(h)
   }
