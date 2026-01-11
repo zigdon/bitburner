@@ -14,21 +14,14 @@ interface SumServer {
 export async function main(ns : NS) {
   [
     "asleep",
-    "getServerBaseSecurityLevel",
-    "getServerMinSecurityLevel",
-    "getServerMoneyAvailable",
-    "getServerSecurityLevel",
   ].forEach((f) => ns.disableLog(f))
   const lid = "#overview-extra-hook-0"
-  const uid = "#overview-extra-hook-0"
   const win = eval("window")
   const doc = eval("document")
   const React = win.React
   const ReactDOM = win.ReactDOM
   const bar = doc.querySelector(lid)
-  const util = doc.querySelector(uid)
   const player = ns.getPlayer()
-  const hosts = dns(ns)
   const Ledger = () => {
     const sum = (l:number[]) => l.reduce((a:number,i:number) => a + i, 0)
     const loot = (ent: SumServer) => 
@@ -36,6 +29,7 @@ export async function main(ns : NS) {
         ns.formulas.hacking.hackPercent(ent.srv, player) * sum(ent.h) * ent.mon
         : ent.hack * sum(ent.h)
   
+    let hosts = dns(ns)
     let data : SumServer[] = Array.from(collectData(ns).values())
     let timeline : number[] = []
     data.filter(
@@ -69,7 +63,7 @@ export async function main(ns : NS) {
       ).map(
         (h) => h.ram
       )
-    )*1.75
+    )/1.75
     ns.printf("w: %d, g: %d, h: %d, total: %d", wt, gt, ht, tot)
     wt = Math.ceil(wt*width/tot)
     gt = Math.ceil(gt*width/tot)
@@ -83,7 +77,8 @@ export async function main(ns : NS) {
       w.repeat(wt) +
       g.repeat(gt) +
       h.repeat(ht) +
-      idle.repeat(Math.max(width-wt-gt-ht, 0))
+      idle.repeat(Math.max(width-wt-gt-ht, 0)) +
+      " "+ns.formatNumber(tot, 0)
     )
     
     return (
@@ -91,17 +86,7 @@ export async function main(ns : NS) {
     )
   }
 
-  const Util = () => {
-    return (
-      <div>
-      <div>W: {mkBar(wt)}</div>
-      <div>G: {mkBar(gt)}</div>
-      <div>H: {mkBar(ht)}</div>
-      </div>
-    )
-  }
-
-  if (bar && util) {
+  if (bar) {
     ns.atExit(()=>bar.innerHTML="")
     while (true) {
       await ns.asleep(1000)

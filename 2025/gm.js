@@ -8,22 +8,13 @@ import { singleInstance, parseNumber, parseTime } from "@/lib/util.js"
 const config = "data/gm.json"
 var cfg = {valid: false}
 
-const cities = [
-  "Sector-12",
-  "Aevum",
-  "Volhaven",
-  "Chongqing",
-  "New Tokyo",
-  "Ishima",
-]
-
 var done = []
 var lastRun = new Map()
 
 /** @param {NS} ons */
 export async function main(ons) {
   ons.ramOverride(3.5)
-  if (!singleInstance(ons)) { return }
+  if (!singleInstance(ons)) return
   ons.disableLog("asleep")
   ons.disableLog("run")
   /** @type {NS} */
@@ -31,7 +22,7 @@ export async function main(ons) {
 
   cfg = await loadCfg(ns, config, cfg)
   let loopDelay = cfg.loopDelay ?? 30000
-  await info(ns, "Starting loop")
+  await info(ns, "Starting corp manager loop")
   let st = []
   while (true) {
     await ns.asleep(loopDelay)
@@ -49,7 +40,7 @@ export async function main(ons) {
     for (let i=0; i< cfg.actions?.length; i++) {
       let corp = await ns.corporation.getCorporation()
       let a = cfg.actions[i]
-      let cs = a.perCity ? cities : [cities[0]]
+      let cs = a.perCity ? Object.values(ns.enum.CityName) : [ns.enum.CityName.Sector12]
       let divs = a.perDiv ?  corp.divisions : [corp.divisions[0]]
       for (let d of divs) {
         for (let c of cs) {

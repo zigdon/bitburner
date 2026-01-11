@@ -6,49 +6,50 @@ import {colors, stripColors} from "@/colors.js"
  * @return Array
  * */
 export function table(ns, headers, data) {
-  var sizes = headers.map((h, i) => Math.max(h.length, ...data.map((l) => getSize(getText(l[i])[0]))))
-  var fmt = sizes.map((i) => "%s%-" + i + "s%s").join(" │ ")
-  var sep = sizes.map((i) => "═".repeat(i)).join("═╪═")
-  var rowText = data.map((l) => ns.sprintf(fmt, ...Array.from(l.map((i) => {
-      var parse = getText(i)
-      var txt = parse[0]
-      var color = parse[1]
+  const getSize = (t) => {
+    return stripColors(t).length
+  }
+  let sizes = headers.map(
+    (h, i) => Math.max(h.length, ...data.map(
+      (l) => getSize(getText(l[i], true)[0])
+    ))
+  )
+  let fmt = sizes.map((i) => "%s%-" + i + "s%s").join(" │ ")
+  let sep = sizes.map((i) => "═".repeat(i)).join("═╪═")
+  let rowText = data.map((l) => ns.sprintf(fmt, ...Array.from(l.map((i) => {
+      let parse = getText(i)
+      let txt = parse[0]
+      let color = parse[1]
       if (color) {
         return [colors[color], txt, colors["reset"]]
       }
       return ['', txt, '']
     })).flat()))
-  var ret = [
+  let ret = [
     ns.sprintf(fmt, ...Array.from(headers.map((i) => ['', i, ''])).flat()),
       sep,
-      ...rowText]
+      ...rowText.map((r) => r.replaceAll("%", "%%"))]
   return "\n"+ret.join("\n")
 }
 
 /**
  * @param {String|List} i
+ * @param {Boolean} unformat
  * @return List
  */
-function getText(i) {
+function getText(i, unformat) {
+  // const fmt = (t) => unformat ? t : t.replaceAll("%", "%%") 
   if (typeof(i) == "object") {
     return [i[0], i[1]]
   }
   return [i, '']
 }
 
-/**
- * @param {Any} t
- * @return Number
- */
-function getSize(t) {
-  return stripColors(t).length
-}
-
 /** @param {NS} ns */
 export async function main(ns) {
   ns.clearLog()
-  var h = ["this", "is", "a", "test"]
-  var data = [
+  let h = ["this", "is", "a", "test"]
+  let data = [
     ["some", "values", 1234, "other"],
     ["some", "extra values", 1234, "other"],
   ]

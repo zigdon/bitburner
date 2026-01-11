@@ -1,0 +1,13 @@
+{
+  "actions": [
+    { "cond": {"stamina": "<50" }, "do": "regen" },
+    { "cond": {"stamina": "<100", "cur": "regen" }, "do": "regen" },
+    { "cond": {"chaos": ">50", "city": "current" }, "do": "diplomacy" },
+    { "cond": {"pop": "<1.2b" }, "do": "travel" },
+    { "cond": {"communities": "<50" }, "do": "travel" },
+    { "cond": {"chance": ">50", "type": "operations" }, "do": "operations" },
+    { "cond": {"chance": ">50", "type": "contract" }, "do": "contract" },
+    { "do": "gym" }
+  ],
+  "valid": true
+}
