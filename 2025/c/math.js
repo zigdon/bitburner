@@ -42,7 +42,7 @@ export async function main(ns) {
 let cache = new Map()
 let ncache = new Map()
 let queue = []
-const key = (l) => l.join("/")
+const key = (l) => l?.join("/")
 /**
  * @param {NS} ns
  * @param {[String, Number]} data
@@ -59,7 +59,7 @@ async function solve(ns, data) {
     let next = queue.shift()
     // ns.printf("next = %j", next)
     combine2(ns, next)
-    if (next.join("") == data[0])
+    if (next?.join("") == data[0])
       for (let r of cache.get(key(next)) ?? []) {
         if (eval(ns.sprintf("%s==%d", r, data[1]))) {
           if (!res.includes(r)) res.push(r)

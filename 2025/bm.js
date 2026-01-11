@@ -4,7 +4,7 @@ import { singleInstance, parseNumber } from "@/lib/util.js"
 import { bbActionTypes, bbActionNames } from "@/lib/constants.js"
 
 const config = "data/bm.json"
-var cfg = {valid: false, actions: [{"do": "gym"}]}
+var cfg = {valid: false}
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -15,15 +15,21 @@ export async function main(ns) {
   if (!singleInstance(ns)) return
   [
     "asleep",
+    "bladeburner.upgradeSkill",
   ].forEach((f) => ns.disableLog(f))
     
+  let b = ns.bladeburner
   let loopDelay = cfg.loopDelay ?? 10000
+  let cfgTime = 0
   await info(ns, "Starting blademaster loop")
   while (true) {
-    await ns.asleep(loopDelay)
-    ns.printf("=== %s", Date().toString())
-    cfg = await loadCfg(ns, config, cfg)
-    ns.printf("okay, now what")
+    await b.nextUpdate()
+
+    if (Date.now() - cfgTime > loopDelay) {
+      ns.printf("=== %s", Date().toString())
+      cfg = await loadCfg(ns, config, cfg)
+      cfgTime = Date.now()
+    }
 
     if (cfg.disabled) {
       await debug(ns, "BM disabled")
@@ -31,19 +37,108 @@ export async function main(ns) {
       continue
     }
 
+    await bbSkills(ns)
+
     for (let a of cfg.actions) {
       let res = a.cond ? check(ns, a) : [true, null]
-      ns.printf("check(%j) -> %j", a, res)
       if (res[0]) {
-        bbDo(ns, a, res[1])
+        await bbDo(ns, a, res[1])
         break
       }
     }
   }
 }
 
-function bbDo(ns, a, match) {
-  ns.tprintf("do: %j %j", a, match)
+const skillPri = [
+  "Blade's Intuition",
+  "Digital Observer",
+  "Reaper",
+  "Evasive System",
+  "Cloak@25",
+  "Short-Circuit@25",
+  "Tracer@10",
+  "Overclock",
+  "Hyperdrive@20",
+]
+
+async function bbSkills(ns) {
+  await ns.asleep(1)
+  let b = ns.bladeburner
+  let skills = [...skillPri]
+  let upgrades = new Map()
+  let spent = 0
+  while (skills.length > 0) {
+    let s = skills[0]
+    let cap = 0
+    if (s.includes("@")) {
+      [s, cap] = s.split("@")
+    }
+    let cost = b.getSkillUpgradeCost(s)
+    if (((cap == 0) || (b.getSkillLevel(s) <= cap)) && cost <= b.getSkillPoints()) {
+      if (!upgrades.has(s)) upgrades.set(s, 0)
+      upgrades.set(s, upgrades.get(s)+1)
+      if (!b.upgradeSkill(s)) {
+        ns.printf("Failed to upgrade %s", s)
+        break
+      }
+      spent += cost
+    } else {
+      skills.shift()
+    }
+  }
+  if (spent >0) {
+    ns.printf("Upgraded skills for %d points:", spent)
+    for (let s of Array.from(upgrades.keys()).sort()) {
+      ns.printf("  %s: %d levels", s, upgrades.get(s))
+    }
+  }
+}
+
+async function bbDo(ns, a, match) {
+  let b = ns.bladeburner
+  const start = async (t, n) => {
+    let cur = b.getCurrentAction()
+    if (cur.type == t && cur.name == n) return
+    if (b.startAction(t, n)) {
+      await info(ns, "BM: Starting %s.%s", t, n)
+    } else {
+      await info(ns, "BM: Failed to start %s.%s", t, n)
+    }
+  }
+
+  switch (a.do) {
+    case "travel": {
+      // Go to the next city.
+      let cities = Object.values(ns.enums.CityNames)
+      let dest = cities[
+        (cities.indexOf(b.getCity())+1) % cities.length
+      ]
+      if (b.switchCity(dest)) {
+        await info(ns, "BM: Travelling to %s", dest)
+      } else {
+        await info(ns, "BM: Failed to travel to %s", dest)
+      }
+      break
+    }
+    case "contracts":
+    case "operations":
+    case "blackops": {
+      let [type, name] = match.split(".")
+      await start(type, name)
+      break
+    }
+    default: {
+      for (let t of bbActionTypes) {
+        for (let n of bbActionNames(ns, t)) {
+          if (n.toLowerCase().includes(a.do.toLowerCase())) {
+            await start(t, n)
+            return
+          }
+        }
+      }
+      await critical(ns, "BM: Unknown action %j", a.do)
+    }
+  }
 }
 
 /**
@@ -56,17 +151,19 @@ function check(ns, act) {
   let pass = true
   let match = null
 
+  // ns.printf("\nstarting check(%j)...", act)
+
   const cmpV = (c, v) => {
     if (c == undefined) return
     if (v == undefined) return
     let dir = c[0]
     c = parseNumber(c.slice(1))
     if (dir == ">") {
-      pass &&= c >= v
-      ns.printf("cmpv(%j, %j) -> %j", c, v, c>=v)
+      pass &&= c <= v
+      // ns.printf("cmpv(%j, %j) -> %j", c, v, c<=v)
     } else {
-      pass &&= c < v
-      ns.printf("cmpv(%j, %j) -> %j", c, v, c<v)
+      pass &&= c > v
+      // ns.printf("cmpv(%j, %j) -> %j", c, v, c>v)
     }
   }
 
@@ -74,11 +171,11 @@ function check(ns, act) {
     if (a == undefined) return
     if (b == undefined) return
     pass &&= a == b
-    ns.printf("cmpb(%j, %j) -> %j", a, b, a==b)
+    // ns.printf("cmpb(%j, %j) -> %j", a, b, a==b)
   }
 
   const action = async (a) => {
-    if (a == undefined) return null
+    if (a == undefined) return undefined
     let res = ""
     for (let t of bbActionTypes) {
       for (let n of bbActionNames(ns, t)) {
@@ -94,21 +191,23 @@ function check(ns, act) {
       }
     }
 
-    ns.printf("action(%j) -> %j", a, res)
+    // ns.printf("action(%j) -> %j", a, res)
     return res
   }
 
   const checkChance = (c, type) => {
     if (c == undefined) return
     if (type == undefined) return
-    ns.printf("checking chance: %j, %j", c, type)
+    // ns.printf("checking chance: %j, %j", c, type)
     type = bbActionTypes.filter((t) => t.toLowerCase() == type?.toLowerCase())[0]
+    // ns.printf("-> checking chance: %j, %j", c, type)
     let dir = c[0] == ">" ? 1 : -1
     let chance = c.slice(1)
     if (type == undefined) return
     for (let a of bbActionNames(ns, type).reverse()) {
       let est = b.getActionEstimatedSuccessChance(type, a)
-      if (dir * chance > dir * est*100) {
+      // ns.printf("... %s -> %j", a, est)
+      if (dir * chance < dir * est[0]*100) {
         pass &&= true
         return ns.sprintf("%s.%s", type, a)
       }
@@ -119,7 +218,7 @@ function check(ns, act) {
   let stam = b.getStamina()
   cmpV(cond.stamina, 100*stam[0]/stam[1])
   let curAct = b.getCurrentAction()
-  cmpB(action(cond.cur), curAct.type+"."+curAct.name)
+  if (cond.cur) cmpB(action(cond.cur), curAct.type+"."+curAct.name)
 
   let player = ns.getPlayer()
   let city = cond.city

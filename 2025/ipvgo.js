@@ -1,4 +1,4 @@
-var ops = [
+const ops = [
   "Netburners",     // 0 hacknet
   "Slum Snakes",    // 1 crime success rate
   "The Black Hand", // 2 hacking money
@@ -8,20 +8,33 @@ var ops = [
   // ???? hacking level
 ]
 
+const bonus = [
+  "hacknet",
+  "crime",
+  "hacking",
+  "combat",
+  "rep",
+  "speed",
+]
+
 import { table } from "@/table.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
   let flags = ns.flags([
-    ["op", 4],
+    ["op", 0],
+    ["bonus", ""],
     ["size", 7],
   ]);
-  if (flags["op"] == 0) {
-    ops.forEach((o, i) => ns.tprintf("%d. %s", i+1, o));
+  if (flags["op"] == 0 && flags["bonus"] == "") {
+    ops.forEach((o, i) => ns.tprintf("%d. %s (%s)", i+1, o, bonus[i]));
     return;
-  } else {
-    ns.tprintf("Start IPvGO automation against %s", ops[flags["op"]-1]);
   }
+
+  if (flags["bonus"] != "") flags["op"] = bonus.indexOf(flags["bonus"])+1
+  ns.tprintf("Start IPvGO automation against %s (%s)",
+    ops[flags["op"]-1], bonus[flags["op"]-1]);
+
   if (![5, 7, 9, 13].includes(flags["size"])) {
     ns.tprintf("Invalid size, pick oned of 5, 7, 9, 13");
     return;
@@ -208,7 +221,7 @@ export async function main(ns) {
      */
     let stats = ns.go.analysis.getStats();
     let data = [];
-    for (var o of ops) {
+    for (let o of ops) {
       let s = stats[o]
       if (s === undefined) { continue }
       data.push([
