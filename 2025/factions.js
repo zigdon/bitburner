@@ -146,9 +146,11 @@ async function formatReq(ns, r) {
         [need,
           need > pend.length ? "red" : need > inst.length ? "yellow" : "green"]]]
     case "someCondition":
-      return r.conditions.map(
-        async (c) => await formatReq(ns, c)
-      ).flat()
+      let cnds = []
+      for (let c of r.conditions) {
+        cnds.push(await formatReq(ns, c))
+      }
+      return cnds.flat()
     case "jobTitle":
       let titles = Object.values(pl.jobs)
       return [["  Title",

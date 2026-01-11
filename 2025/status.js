@@ -83,14 +83,15 @@ export function collectData(ns) {
     if (summary.has(target)) {
       ent = summary.get(target)
     } else {
-      var min = ns.getServerMinSecurityLevel(target)
-      var base = ns.getServerBaseSecurityLevel(target)
-      var sec = ns.getServerSecurityLevel(target)
+      let srv = ns.getServer(target)
+      var min = srv.minDifficulty
+      var base = srv.baseDifficulty
+      var sec = srv.hackDifficulty
       ent = {
         host: target, w: [], g: [], h: [],
-        mon: ns.getServerMoneyAvailable(target),
+        mon: srv.moneyAvailable,
         sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
-        srv: ns.getServer(target),
+        srv: srv,
         hack: ns.hackAnalyze(target),
         when: ts - now,
       }

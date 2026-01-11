@@ -1,5 +1,4 @@
-
-export var factionList = [
+export const factionList = [
   // From NetscriptDefinitions.d.ts
   "Aevum",
   "Bachman & Associates",
@@ -37,3 +36,16 @@ export var factionList = [
   "Volhaven",
 ]
 
+export const bbActionTypes = [
+  "General", "Contracts", "Operations", "Black Operations"
+]
+
+export function bbActionNames(ns, n) {
+  let b = ns.bladeburner
+  return {
+    General: b.getGeneralActionNames(),
+    Contracts: b.getContractNames(),
+    Operations: b.getOperationNames(),
+    "Black Operations": b.getBlackOpNames(),
+  }[n]
+}
