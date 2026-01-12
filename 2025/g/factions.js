@@ -1,12 +1,16 @@
 import {toast} from "@/log.js"
-/** @param {NS} ns */
-export async function main(ns) {
+import {nsRPC} from "@/lib/nsRPC.js"
+/** @param {NS} ons */
+export async function main(ons) {
+  let ns = new nsRPC(ons)
+  ns.ramOverride(1.6)
   // Check and accept any faction invites.
   var joined = []
   var failed = []
-  var owned = ns.singularity.getOwnedAugmentations(true)
-  for (var f of ns.singularity.checkFactionInvitations()) {
-    var offered = ns.singularity.getAugmentationsFromFaction(f).filter(
+  var owned = await ns.singularity.getOwnedAugmentations(true)
+  for (var f of await ns.singularity.checkFactionInvitations()) {
+    var offered = await ns.singularity.getAugmentationsFromFaction(f)
+    offered = offered.filter(
       (f) => !owned.includes(f)
     )
 
@@ -14,7 +18,7 @@ export async function main(ns) {
       ns.printf("Skipping faction invite: %s", f)
       continue
     }
-    if (ns.singularity.joinFaction(f)) {
+    if (await ns.singularity.joinFaction(f)) {
       joined.push(f)
     } else {
       failed.push(f)

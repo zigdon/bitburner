@@ -57,6 +57,7 @@ export class nsRPC {
     "singularity_upgradeHomeRam",
     "corporation_purchaseWarehouse",
     "corporation_expandIndustry",
+    "singularity_checkFactionInvitations",
 
   ].map((m, i) => [m, this._offset+i]))
 

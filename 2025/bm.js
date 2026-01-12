@@ -1,4 +1,4 @@
-import { debug, info, critical } from "@/log.js"
+import { debug, info, toast, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 import { singleInstance, parseNumber } from "@/lib/util.js"
 import { bbActionTypes, bbActionNames } from "@/lib/constants.js"
@@ -19,7 +19,7 @@ export async function main(ns) {
   ].forEach((f) => ns.disableLog(f))
     
   let b = ns.bladeburner
-  let loopDelay = cfg.loopDelay ?? 10000
+  let loopDelay = cfg.loopDelay ?? 30000
   let cfgTime = 0
   await info(ns, "Starting blademaster loop")
   while (true) {
@@ -98,7 +98,9 @@ async function bbDo(ns, a, match) {
   let b = ns.bladeburner
   const start = async (t, n) => {
     let cur = b.getCurrentAction()
-    if (cur.type == t && cur.name == n) return
+    if (cur?.type == t && cur?.name == n) return
+    if (a.msg) await info(ns, "BM: %s", a.msg)
+    if (a.toast) await toast(ns, "BM: %s", a.toast)
     if (b.startAction(t, n)) {
       await info(ns, "BM: Starting %s.%s", t, n)
     } else {
@@ -109,7 +111,7 @@ async function bbDo(ns, a, match) {
   switch (a.do) {
     case "travel": {
       // Go to the next city.
-      let cities = Object.values(ns.enums.CityNames)
+      let cities = Object.values(ns.enums.CityName)
       let dest = cities[
         (cities.indexOf(b.getCity())+1) % cities.length
       ]
@@ -120,9 +122,9 @@ async function bbDo(ns, a, match) {
       }
       break
     }
+    case "blackops": 
     case "contracts":
-    case "operations":
-    case "blackops": {
+    case "operations": {
       let [type, name] = match.split(".")
       await start(type, name)
       break
@@ -205,6 +207,8 @@ function check(ns, act) {
     let chance = c.slice(1)
     if (type == undefined) return
     for (let a of bbActionNames(ns, type).reverse()) {
+      if (b.getActionCountRemaining(type, a) == 0) continue
+      if (type == "Black Operations" && a != b.getNextBlackOp()?.name) continue
       let est = b.getActionEstimatedSuccessChance(type, a)
       // ns.printf("... %s -> %j", a, est)
       if (dir * chance < dir * est[0]*100) {
@@ -218,14 +222,13 @@ function check(ns, act) {
   let stam = b.getStamina()
   cmpV(cond.stamina, 100*stam[0]/stam[1])
   let curAct = b.getCurrentAction()
-  if (cond.cur) cmpB(action(cond.cur), curAct.type+"."+curAct.name)
+  if (cond.cur) cmpB(action(cond.cur), curAct?.type+"."+curAct?.name)
 
-  let player = ns.getPlayer()
   let city = cond.city
-  if (city == "current") city = player.city
+  if (city == "current") city = b.getCity()
   if (city) cmpV(cond.chaos, b.getCityChaos(city))
-  cmpV(cond.pop, b.getCityEstimatedPopulation(player.city))
-  cmpV(cond.communities, b.getCityCommunities(player.city))
+  cmpV(cond.pop, b.getCityEstimatedPopulation(b.getCity()))
+  cmpV(cond.communities, b.getCityCommunities(b.getCity()))
   match = checkChance(cond.chance, cond.type)
 
   return [pass, match]

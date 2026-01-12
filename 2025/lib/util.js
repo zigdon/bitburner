@@ -56,6 +56,8 @@ export function parseTime(str) {
   switch (suf) {
     case "m": return prefix*60
     case "h": return prefix*60*60
+    case "d": return prefix*60*60*24
+    case "w": return prefix*60*60*24*7
   }
   return str
 }

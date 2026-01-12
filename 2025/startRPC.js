@@ -21,6 +21,19 @@ export async function main(ns) {
     if (checkRunning(ns, r)) continue
     await start(ns, r)
   }
+
+  // Check all the running servers, if we have two versions running (one on
+  // home and one elsewhere), kill the version on home.
+  for (let r of rpcs) {
+    await ns.asleep(1)
+    if (!ns.scriptRunning(r, "home")) continue
+    if (!checkRunning(ns, r)) continue
+    if (ns.kill(r, "home")) {
+      await info(ns, "Moved %s off home", r)
+    } else {
+      await info(ns, "Failed to kill home's version of %s", r)
+    }
+  }
 }
 
 const tmpl = `
@@ -52,7 +65,7 @@ function createScripts(ns) {
 }
 
 async function checkCorp(ns) {
-  if (!checkRunning(ns, "lib/rpc/corporation/hasCorporation.js")) return false
+  if (!checkRunning(ns, "lib/rpc/corporation/hasCorporation.js", false)) return false
   let net = new nsRPC(ns)
   return await net.corporation.hasCorporation()
 }
@@ -72,12 +85,10 @@ async function start(ns, name) {
 
   let mem = ns.getScriptRam(name)
   let fleet = dns(ns)
-  let hosts = Array.from(fleet.values()).sort(
-    (a,b) => {
-      if (a.root && !b.root) return 1
-      if (b.root && !a.root) return -1
-      return b.used - a.used
-    }
+  let hosts = Array.from(fleet.values()).filter(
+    (h) => h.root
+  ).sort(
+    (a,b) => b.used - a.used
   )
   hosts = hosts.filter((h) => h.name != "home")
   hosts.push(fleet.get("home"))
@@ -89,6 +100,9 @@ async function start(ns, name) {
       continue
     }
 
+    // If it's already running on home, move on.
+    if (h.name == "home" && checkRunning(ns, name, false)) continue
+
     ns.scp([name, "log.js", "/lib/nsRPC.js"], h.name)
     let pid = ns.exec(name, h.name, 1)
     if (pid > 0) {
@@ -98,16 +112,21 @@ async function start(ns, name) {
     }
   }
 
-  await warning(ns, "Couldn't start %s", name)
+  // Only warn if we don't end up with a running version anywhere.
+  if (!checkRunning(ns, name, false))
+    await warning(ns, "Couldn't start %s", name)
 }
 
 /**
  * @param {NS} ns
  * @param {string} name
+ * @param {boolean} skipHome
  **/
-function checkRunning(ns, name) {
+function checkRunning(ns, name, skipHome=true) {
   let hosts = dns(ns)
   for (let h of hosts.keys()) {
+    // Ignore versions that are running on home, we can try to relocate them.
+    if (skipHome && h == "home") continue
     if (ns.scriptRunning(name, h)) {
       ns.printf("Found %s running on %s", name, h)
       return true

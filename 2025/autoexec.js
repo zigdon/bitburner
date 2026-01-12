@@ -51,6 +51,10 @@ export async function main(ns) {
     if (cfg.loop.contracts) await findContracts(ns)
     await ns.asleep(100)
 
+    // Record a ledger
+    let rec = {ts: Date.now(), player: ns.getPlayer()}
+    ns.write("logs/player.json", JSON.stringify(rec)+"\n", "a")
+
     ns.printf("Loop done: %s", Date())
     first = false
     await ns.asleep(60000)
