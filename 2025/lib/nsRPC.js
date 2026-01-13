@@ -58,6 +58,7 @@ export class nsRPC {
     "corporation_purchaseWarehouse",
     "corporation_expandIndustry",
     "singularity_checkFactionInvitations",
+    "singularity_joinFaction",
 
   ].map((m, i) => [m, this._offset+i]))
 
@@ -161,14 +162,17 @@ export class nsRPC {
   /**
    * @param {string} method
    * @param {function(any) any} callback
+   * @param {?number} pn
    */
-  async listen(method, callback) {
-    if (!this._ports.has(method)) {
-      this._log("Can't set up listener for unknown method %j in %j",
-        method, this._ns.getScriptName())
-      return
+  async listen(method, callback, pn=null) {
+    if (pn == null) {
+      if (!this._ports.has(method)) {
+        this._log("Can't set up listener for unknown method %j in %j",
+          method, this._ns.getScriptName())
+        return
+      }
+      pn = this._ports.get(method)
     }
-    let pn = this._ports.get(method)
     let ph = this._ns.getPortHandle(pn)
     this._log("Handling %s calls on port %d", method, pn)
     while (true) {

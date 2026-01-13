@@ -1,5 +1,4 @@
 import {table} from "@/table.js"
-import {colors} from "@/colors.js"
 import {parseTime} from "@/lib/util.js"
 
 /*
@@ -24,11 +23,8 @@ export async function main(ns) {
       d.getMinutes()
     )
   }
-  ns.tprintf("hist=%d", hist)
-  ns.tprintf("entries=%d", data.length)
   if (hist > 60*60*1e3) { // hours
     data = data.filter((_, i) => i % 10 == 0)
-    ns.tprintf("entries=%d", data.length)
   }
   for (let d of data) {
     if (d.ts < limit) continue

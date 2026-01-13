@@ -208,7 +208,8 @@ function check(ns, act) {
     if (type == undefined) return
     for (let a of bbActionNames(ns, type).reverse()) {
       if (b.getActionCountRemaining(type, a) == 0) continue
-      if (type == "Black Operations" && a != b.getNextBlackOp()?.name) continue
+      if (type == "Black Operations")
+        if (a != b.getNextBlackOp()?.name || b.getBlackOpRank(a) > b.getRank()) continue
       let est = b.getActionEstimatedSuccessChance(type, a)
       // ns.printf("... %s -> %j", a, est)
       if (dir * chance < dir * est[0]*100) {
