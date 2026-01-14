@@ -231,6 +231,7 @@ function check(ns, act) {
   cmpV(cond.pop, b.getCityEstimatedPopulation(b.getCity()))
   cmpV(cond.communities, b.getCityCommunities(b.getCity()))
   match = checkChance(cond.chance, cond.type)
+  if (cond.has != undefined) checkChance(">0", cond.has)
 
   return [pass, match]
 }

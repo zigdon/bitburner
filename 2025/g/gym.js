@@ -49,25 +49,27 @@ export async function main(ns) {
   var sk = ns.getPlayer().skills
   var gym = getFacility(ns, gyms)
   var univ = getFacility(ns, univs)
+  var started = false
   for (var s of stats) {
     if (sk[s] < target) {
+      started = true
       if (["charisma", "hacking"].includes(s)) {
         if (univ == "") {
           ns.tprintf("No uni here.")
-          return
+          continue
         }
         await course(ns, univ, s, flags["focus"], target)
         continue
       }
       if (gym == "") {
         ns.tprintf("No gym here.")
-        return
+        continue
       }
       await train(ns, gym, s, flags["focus"], target)
     }
   }
 
-  ns.toast("Done training at the gym", "success", null)
+  if (started) ns.toast("Done training at the gym", "success", null)
 }
 
 async function course(ns, uni, s, focus, target) {
