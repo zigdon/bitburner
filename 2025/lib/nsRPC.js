@@ -273,9 +273,11 @@ export class nsRPC {
       if (this._ns.isRunning(srv.pid, srv.host)) {
         return srv.port
       }
+      this._log("Removing stale BNS cache: %j", srv)
     }
     let srv = await this._sendRPC("BNS.find", {method: method}, this._bnsPort)
     this._bnsCache.set(method, srv)
+    this._log("Caching BNS result for %s: %j. Cache size: %d", method, srv, this._bnsCache.size)
     return srv.port
   }
 
@@ -306,13 +308,13 @@ export class nsRPC {
       await this._ns.asleep(1)
 
       if (Date.now() - start > 60000) {
-        this._log("TIMEOUT waiting for a reply from %s on %d", method, mid)
-        return
+        this._log("TIMEOUT waiting for a reply from %s on %d, retrying", method, mid)
+        return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
       }
 
       let msg = ph.peek()
       if (msg == "NULL PORT DATA") {
-        await ph.nextWrite()
+        await this._ns.asleep(10)
         continue
       }
       if (msg.id != mid) {

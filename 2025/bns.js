@@ -199,6 +199,7 @@ class BNS {
     for (let i of this._lru) {
       let srv = this._servers.get(i.method)
       if (srv == undefined || !this.isRunning(srv.pid)) {
+        this.log("Server MIA: %j", srv)
         dead.push(i.method)
         continue
       }
@@ -234,9 +235,7 @@ class BNS {
     // If we have a live server, use it. Otherwise, start one.
     let method = msg?.payload?.method
     let srv = this._servers.get(method)
-    if (srv != undefined && this.isRunning(srv.pid)) {
-      // this.debug("Found %s on %s:%d", method, srv.host, srv.port)
-    } else {
+    if (srv == undefined || !this.isRunning(srv.pid)) {
       do {
         await this.asleep(1)
       } while (await this._startRPCServer(method) == 0)
@@ -255,8 +254,8 @@ class BNS {
     /** @type {RPCServer} */
     let srv = msg.payload
     let method = srv.method
-    if (this._servers.has(method)) {
-      let prev = this._servers.get(method)
+    let prev = this._servers.get(method)
+    if (prev != undefined && this.isRunning(prev.pid, prev.host)) {
       if (prev.port != srv.port || prev.host != srv.host) {
         if (prev.host != "home") {
           this.debug("Not replacing %s on %s:%d (%d)", method, prev.host, prev.port, prev.pid)
@@ -297,7 +296,6 @@ class BNS {
       }
     }
     this.rm(this.sprintf(this.bnsPath, method), "home")
-    this._lru = this._lru.filter((i) => i.method != method)
     await this.log("Deregistered %s (%d@%s)", method, srv.pid, srv.host)
   }
 
@@ -373,6 +371,7 @@ class BNS {
 
       let now = Date.now()
       let killed = false
+      let mia = []
       for (let s of this._lru.filter((e) => now-e.ts > this.lruTimeout)) {
         if (!this._servers.has(s.method)) {
           this.debug("......No entry for a %s server, skipping", s.method)
@@ -380,8 +379,9 @@ class BNS {
         }
         let oomPID = this._servers.get(s.method).pid
         if (!this.isRunning(oomPID)) {
-          this.debug("......No %s server MIA, removing from server list", s.method)
+          this.debug("......Server %s MIA, removing from server list", s.method)
           this._servers.delete(s.method)
+          mia.push(s.method)
           continue
         }
         this.log("...Killing %s (%d) so %s can start", s.method, oomPID, method)
@@ -389,6 +389,9 @@ class BNS {
         this.log("...Killed %s (%d)", s.method, oomPID)
         killed = true
         break
+      }
+      if (mia.length > 0) {
+        this._lru = this._lru.filter((e) => !mia.includes(e.method))
       }
       if (killed) continue
 
