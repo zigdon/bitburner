@@ -1,14 +1,18 @@
+import { nsRPC } from "@/lib/nsRPC.js"
 import { debug, info, toast, critical } from "@/log.js"
 import { loadCfg } from "@/lib/config.js"
 import { singleInstance, parseNumber } from "@/lib/util.js"
-import { bbActionTypes, bbActionNames } from "@/lib/constants.js"
+import { bbActionTypes, bbActionNames, gyms } from "@/lib/constants.js"
 
 const config = "data/bm.json"
 var cfg = {valid: false}
 
-/** @param {NS} ns */
-export async function main(ns) {
-  if (!ns.bladeburner.inBladeburner()) {
+/** @param {NS} ons */
+export async function main(ons) {
+  ons.ramOverride(2.3)
+  /** @param {NS} ns */
+  let ns = new nsRPC(ons)
+  if (!await ns.bladeburner.inBladeburner()) {
     await critical(ns, "Not in bladeburner.")
     return
   }
@@ -40,7 +44,7 @@ export async function main(ns) {
     await bbSkills(ns)
 
     for (let a of cfg.actions) {
-      let res = a.cond ? check(ns, a) : [true, null]
+      let res = a.cond ? await check(ns, a) : [true, null]
       if (res[0]) {
         await bbDo(ns, a, res[1])
         break
@@ -73,11 +77,12 @@ async function bbSkills(ns) {
     if (s.includes("@")) {
       [s, cap] = s.split("@")
     }
-    let cost = b.getSkillUpgradeCost(s)
-    if (((cap == 0) || (b.getSkillLevel(s) <= cap)) && cost <= b.getSkillPoints()) {
+    let cost = await b.getSkillUpgradeCost(s)
+    if (((cap == 0) ||
+      (await b.getSkillLevel(s) <= cap)) && cost <= await b.getSkillPoints()) {
       if (!upgrades.has(s)) upgrades.set(s, 0)
       upgrades.set(s, upgrades.get(s)+1)
-      if (!b.upgradeSkill(s)) {
+      if (!await b.upgradeSkill(s)) {
         ns.printf("Failed to upgrade %s", s)
         break
       }
@@ -97,29 +102,60 @@ async function bbSkills(ns) {
 async function bbDo(ns, a, match) {
   let b = ns.bladeburner
   const start = async (t, n) => {
-    let cur = b.getCurrentAction()
+    let cur = await b.getCurrentAction()
     if (cur?.type == t && cur?.name == n) return
     if (a.msg) await info(ns, "BM: %s", a.msg)
     if (a.toast) await toast(ns, "BM: %s", a.toast)
-    if (b.startAction(t, n)) {
+    if (await b.startAction(t, n)) {
       await info(ns, "BM: Starting %s.%s", t, n)
     } else {
       await info(ns, "BM: Failed to start %s.%s", t, n)
     }
   }
 
+  let atGym = ""
+  const doGym = async () => {
+    let cur = ns.getPlayer().city
+    if (!gyms.has(cur)) {
+      await info(ns, "BM: No gym at %s, going home", cur)
+      await ns.singularity.travelToCity("Sector-12")
+    }
+
+    let skill = Object.entries(ns.getPlayer().skills).filter(
+      (s) => ["strength", "defense", "dexterity", "agility"].includes(s[0])
+    ).sort(
+      (a,b) => a[1] - b[1]
+    )[0][0]
+    if (skill != atGym) {
+      atGym = skill
+      await info(ns, "BM: Training %s", skill)
+      await ns.singularity.gymWorkout(gyms.get(cur), skill, false)
+    }
+  }
+
+  if (await ns.singularity.isBusy() && atGym=="") {
+    await toast(ns, "Bladeburner waiting 1m for current action to finish")
+    await ns.asleep(60000)
+    return
+  }
+
+  atGym = ""
   switch (a.do) {
     case "travel": {
       // Go to the next city.
       let cities = Object.values(ns.enums.CityName)
       let dest = cities[
-        (cities.indexOf(b.getCity())+1) % cities.length
+        (cities.indexOf(await b.getCity())+1) % cities.length
       ]
-      if (b.switchCity(dest)) {
+      if (await b.switchCity(dest)) {
         await info(ns, "BM: Travelling to %s", dest)
       } else {
         await info(ns, "BM: Failed to travel to %s", dest)
       }
+      break
+    }
+    case "gym": {
+      await doGym()
       break
     }
     case "blackops": 
@@ -131,7 +167,7 @@ async function bbDo(ns, a, match) {
     }
     default: {
       for (let t of bbActionTypes) {
-        for (let n of bbActionNames(ns, t)) {
+        for (let n of await bbActionNames(ns, t)) {
           if (n.toLowerCase().includes(a.do.toLowerCase())) {
             await start(t, n)
             return
@@ -147,7 +183,7 @@ async function bbDo(ns, a, match) {
  * @param {NS} ns
  * @param {Action} act
  */
-function check(ns, act) {
+async function check(ns, act) {
   let b = ns.bladeburner
   let cond = act.cond
   let pass = true
@@ -162,10 +198,10 @@ function check(ns, act) {
     c = parseNumber(c.slice(1))
     if (dir == ">") {
       pass &&= c <= v
-      // ns.printf("cmpv(%j, %j) -> %j", c, v, c<=v)
+      // ns.printf("cmpv(%j, %j) -> %j (%j)", c, v, c<=v, pass)
     } else {
       pass &&= c > v
-      // ns.printf("cmpv(%j, %j) -> %j", c, v, c>v)
+      // ns.printf("cmpv(%j, %j) -> %j (%j)", c, v, c>v, pass)
     }
   }
 
@@ -173,14 +209,14 @@ function check(ns, act) {
     if (a == undefined) return
     if (b == undefined) return
     pass &&= a == b
-    // ns.printf("cmpb(%j, %j) -> %j", a, b, a==b)
+    // ns.printf("cmpb(%j, %j) -> %j (%j)", a, b, a==b, pass)
   }
 
   const action = async (a) => {
     if (a == undefined) return undefined
     let res = ""
     for (let t of bbActionTypes) {
-      for (let n of bbActionNames(ns, t)) {
+      for (let n of await bbActionNames(ns, t)) {
         if (n.toLowerCase().includes(a.toLowerCase())) {
           if (res == "") {
             res = ns.sprintf("%s.%s", t, n)
@@ -197,21 +233,27 @@ function check(ns, act) {
     return res
   }
 
-  const checkChance = (c, type) => {
+  const checkChance = async (c, type) => {
     if (c == undefined) return
     if (type == undefined) return
-    // ns.printf("checking chance: %j, %j", c, type)
     type = bbActionTypes.filter((t) => t.toLowerCase() == type?.toLowerCase())[0]
-    // ns.printf("-> checking chance: %j, %j", c, type)
     let dir = c[0] == ">" ? 1 : -1
     let chance = c.slice(1)
     if (type == undefined) return
-    for (let a of bbActionNames(ns, type).reverse()) {
-      if (b.getActionCountRemaining(type, a) == 0) continue
-      if (type == "Black Operations")
-        if (a != b.getNextBlackOp()?.name || b.getBlackOpRank(a) > b.getRank()) continue
-      let est = b.getActionEstimatedSuccessChance(type, a)
-      // ns.printf("... %s -> %j", a, est)
+    let acts = []
+    if (type == "Black Operations") {
+      let blops = await b.getNextBlackOp()
+      if (!blops || blops.rank < await b.getRank()) {
+        pass = false
+        return
+      }
+      acts = [blops.name]
+    } else {
+      acts = await bbActionNames(ns, type)
+    }
+    for (let a of acts.reverse()) {
+      if (await b.getActionCountRemaining(type, a) < 1) continue
+      let est = await b.getActionEstimatedSuccessChance(type, a)
       if (dir * chance < dir * est[0]*100) {
         pass &&= true
         return ns.sprintf("%s.%s", type, a)
@@ -220,18 +262,20 @@ function check(ns, act) {
     pass = false
   }
 
-  let stam = b.getStamina()
+  let stam = await b.getStamina()
   cmpV(cond.stamina, 100*stam[0]/stam[1])
-  let curAct = b.getCurrentAction()
-  if (cond.cur) cmpB(action(cond.cur), curAct?.type+"."+curAct?.name)
+  let curAct = await b.getCurrentAction()
+  if (cond.cur) cmpB(await action(cond.cur), curAct?.type+"."+curAct?.name)
 
   let city = cond.city
-  if (city == "current") city = b.getCity()
-  if (city) cmpV(cond.chaos, b.getCityChaos(city))
-  cmpV(cond.pop, b.getCityEstimatedPopulation(b.getCity()))
-  cmpV(cond.communities, b.getCityCommunities(b.getCity()))
-  match = checkChance(cond.chance, cond.type)
+  let curCity = await b.getCity()
+  if (city == "current") city = curCity
+  if (city) cmpV(cond.chaos, await b.getCityChaos(city))
+  cmpV(cond.pop, await b.getCityEstimatedPopulation(curCity))
+  cmpV(cond.communities, await b.getCityCommunities(curCity))
+  match = await checkChance(cond.chance, cond.type)
   if (cond.has != undefined) checkChance(">0", cond.has)
 
+  ns.printf("Check %j returning [%j, %j]", act, pass, match)
   return [pass, match]
 }
