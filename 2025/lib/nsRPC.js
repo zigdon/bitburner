@@ -1,4 +1,4 @@
-import {warning} from "@/log.js"
+import {warning, critical} from "@/log.js"
 
 /*
  * Can be used instead of ns. For supported methods, it'll send the request
@@ -7,63 +7,17 @@ import {warning} from "@/log.js"
  */
 export class nsRPC {
   _offset = 1e10
+  _bnsPort = 411
   _counter = 0
 
   /** @type {NS} _ns */
   _ns
-  /** @type {Map<string, int} */
-  _ports = new Map([
-    "bladeburner_getRank",
-    "codingcontract_createDummyContract",
-    "corporation_getCorporation",
-    "corporation_getDivision",
-    "corporation_getHireAdVertCost",
-    "corporation_getIndustryData",
-    "corporation_getOffice",
-    "corporation_getOfficeSizeUpgradeCost",
-    "corporation_getProduct",
-    "corporation_getResearchCost",
-    "corporation_getUpgradeLevelCost",
-    "corporation_getUpgradeWarehouseCost",
-    "corporation_getWarehouse",
-    "corporation_hasCorporation",
-    "corporation_hasResearched",
-    "corporation_hasUnlock",
-    "corporation_hasWarehouse",
-    "corporation_hireEmployee",
-    "corporation_selMaterial",
-    "corporation_setAutoJobAssignment",
-    "corporation_setSmartSupply",
-    "corporation_setSmartSupplyOption",
-    "corporation_upgradeOfficeSize",
-    "corporation_upgradeWarehouse",
-    "singularity_getAugmentationFactions",
-    "singularity_getAugmentationPrereq",
-    "singularity_getAugmentationPrice",
-    "singularity_getAugmentationRepReq",
-    "singularity_getAugmentationStats",
-    "singularity_getAugmentationsFromFaction",
-    "singularity_getFactionEnemies",
-    "singularity_getFactionFavor",
-    "singularity_getFactionInviteRequirements",
-    "singularity_getFactionRep",
-    "singularity_getFactionWorkTypes",
-    "singularity_getOwnedAugmentations",
-    "singularity_getOwnedSourceFiles",
-    "singularity_getUpgradeHomeCoresCost",
-    "singularity_getUpgradeHomeRamCost",
-    "singularity_purchaseAugmentation",
-    "singularity_upgradeHomeCores",
-    "singularity_upgradeHomeRam",
-    "corporation_purchaseWarehouse",
-    "corporation_expandIndustry",
-    "singularity_checkFactionInvitations",
-    "singularity_joinFaction",
-
-  ].map((m, i) => [m, this._offset+i]))
 
   // Function namespace, look up ports with "$namespace_" prefix
+  /** @type {string} _namespace */
   _namespace
+
+  _server = false
 
   _nsSupport = [
     'bladeburner',
@@ -73,24 +27,23 @@ export class nsRPC {
   ]
 
   _notLogged = [
-    "args",
-    "asleep",
-    "corporation_getCorporation",
-    "exec",
-    "formatNumber",
-    "formatRam",
-    "getPlayer",
-    "getPortHandle",
-    "getScriptName",
-    "print",
-    "printf",
-    "read",
-    "run",
-    "sprintf",
-    "tprint",
-    "tprintf",
-    "writePort",
+    "corporation/getCorporation",
+    "getGeneralActionNames",
+    "getContractNames",
+    "getOperationNames",
+    "getBlackOpNames",
   ]
+
+  _notHandled = [
+    "bladeburner/getGeneralActionNames",
+    "bladeburner/getContractNames",
+    "bladeburner/getOperationNames",
+    "bladeburner/getBlackOpNames",
+    "codingcontract/getContract",  // Can't clone a contract
+    "singularity/installBackdoor",
+  ]
+
+  _bnsCache = new Map()
 
   /**
    * @param {NS} ns
@@ -98,16 +51,19 @@ export class nsRPC {
    * @returns NS
    **/
   constructor(ns, namespace) {
-    ns.print("init ", namespace)
+    // ns.print("init ", namespace)
+    ns.disableLog("disableLog")
     ns.disableLog("asleep")
     this._ns = ns;
     this._namespace = namespace ?? ""
 
+    this.bns = null
 
     return new Proxy(this, {
       get(target, prop) {
         const maybeLog = (prop, tmpl, ...args) => {
-          if (!target._notLogged.includes(prop)) target._log(target._ns.sprintf(tmpl, ...args))
+          if (!target._notLogged.includes(prop))
+            target._log(target._ns.sprintf(tmpl, ...args))
         }
 
         // Anything starting with _ is never handled by ns
@@ -126,22 +82,16 @@ export class nsRPC {
           return new nsRPC(target._ns, prop)
         }
 
-        // If we have it in our config, create a handler for it
-        if (target._namespace == "" && target._ports.has(prop)) {
-          maybeLog(prop, "Handling %s", prop)
-          return target._mkMethod(prop)
-        } else if (target._ports.has(target._namespace+"_"+prop)) {
-          maybeLog(prop, "Handling %s in %s", prop, target._namespace)
-          return target._mkMethod(target._namespace+"_"+prop)
-        } else {
-          maybeLog(prop, "Not handled: %s", target._namespace+"_"+prop)
+        // If it's one of the namespaces we handle, handle it.
+        if (target._namespace != "" &&
+          !target._notHandled.includes(target._namespace+"/"+prop)) {
+          // maybeLog(prop, "Handling %s in %s", prop, target._namespace)
+          return target._mkMethod(target._namespace+"/"+prop)
         }
 
         // Otherwise, redirect the call to the game's 'ns' object
         let val = target._ns[prop];
-        if (target._namespace == "") {
-          maybeLog(prop, "Passing through %s", prop)
-        } else {
+        if (target._namespace != "") {
           maybeLog(prop, "Passing through %s in %s", prop, target._namespace)
           val = target._ns[target._namespace][prop];
         }
@@ -155,8 +105,90 @@ export class nsRPC {
     await warning(this._ns, tmpl, ...args)
   }
 
+  _setTitle(tmpl, ...args) {
+    let name = this._ns.getScriptName()
+    tmpl = name + " - " + tmpl
+    this._ns.ui.setTailTitle(this._ns.sprintf(tmpl, ...args))
+  }
+
+  _binlog(tmpl, ...args) {
+    let logName = this._ns.getScriptName()
+    let now = new Date()
+    let date = this._ns.sprintf("%02d%02d", now.getDate(), now.getHours())
+    logName = logName.slice(logName.lastIndexOf("/")+1).split(".")[0]
+    if (this._server) {
+      logName = this._ns.sprintf("%s.%s.%d.txt",
+        this._namespace || "core", logName, this._ns.pid)
+    } else {
+      logName = this._ns.sprintf("%s.%d.txt", logName, this._ns.pid)
+    }
+    let line = this._ns.sprintf(tmpl, ...args) + "\n"
+    this._ns.write("/logs/rpc/"+date+"/"+logName, line)
+  }
+
   _log(tmpl, ...args) {
-    this._ns.printf(tmpl, ...args)
+    let now = new Date()
+    let ts = now.toLocaleTimeString()
+    tmpl = ts + ": " + tmpl
+    this._ns.print(this._ns.sprintf(tmpl, ...args))
+    this._binlog(tmpl, ...args)
+  }
+
+  /**
+   * @param {?number} id
+   * @param {?string} method
+   * @param {?number} port
+   * @returns {any}
+   */
+  async bnsRead(id=0, method=undefined, port=undefined) {
+    let host = this._ns.read("hosts.txt")
+    port ??= this._ns.pid + this._offset
+    let ph = this._ns.getPortHandle(port)
+    if (ph.peek() == "NULL PORT DATA") await ph.nextWrite()
+
+    let msg = ph.read()
+    if (method != undefined && msg.method != method) {
+      await critical(this._ns,
+        "bns message method mismatch, aborting %s@%s: %j",
+        this._ns.getScriptName(), host, msg)
+      this._ns.exit()
+    }
+    id ||= this._counter
+    if (msg.id != this._counter-1) {
+      await critical(this._ns,
+        "bns message ID mismatch want %d, got %d, aborting %s@%s: %j",
+        this._counter, msg.id, this._ns.getScriptName(), host, msg)
+      this._ns.exit()
+    }
+
+    this._log("bnsRead: %j", msg)
+    return msg.payload
+  }
+
+  async bnsRegister(method) {
+    // Send a register BNSMessage to BNS, ask for a port
+    // If we got one, start listening on it
+    let host = this._ns.read("hosts.txt")
+    let msg = await this._sendRPC("BNS.register",
+      {method: method, pid: this._ns.pid, host: host}, this._bnsPort)
+
+    if (msg.status == "NOK") {
+      await warning(this._ns, "Registration rejected: %s@%s, aborting",
+        this._ns.getScriptName(), host)
+      return 0
+    }
+
+    this.bns = {method: method, pid: this._ns.pid, host: host, port: msg.port}
+    this._log("Registered %s on %s: %j", this.bns.method, this.bns.host, this.bns)
+
+    return msg.port
+  }
+
+  async bnsUnregister() {
+    if (!this.bns) return
+    // Send an unregister BNSMessage to BNS
+    let msg = await this._sendRPC("BNS.unregister", this.bns, this._bnsPort)
+    this._log("Unregister reply: %j", msg)
   }
 
   /**
@@ -165,45 +197,61 @@ export class nsRPC {
    * @param {?number} pn
    */
   async listen(method, callback, pn=null) {
-    if (pn == null) {
-      if (!this._ports.has(method)) {
-        this._log("Can't set up listener for unknown method %j in %j",
-          method, this._ns.getScriptName())
-        return
-      }
-      pn = this._ports.get(method)
+    // Ignore any quit messages at startup
+    let startup = true
+    this._server = true
+
+    // Register with BNS, and ask for a port if we don't have one.
+    let host = this._ns.read("hosts.txt")
+    let srv = {method: method, pid: this._ns.pid, host: host}
+    if (pn != null) srv.port = pn
+    let reg = await this._sendRPC("BNS.register", srv, this._bnsPort)
+    if (reg.status == "NOK") {
+      this._log("Registration rejected: %j", reg)
+      return
     }
-    let ph = this._ns.getPortHandle(pn)
-    this._log("Handling %s calls on port %d", method, pn)
+    srv.port = reg.port
+    this._log("Registered on port %d: %j", reg.port, srv)
+
+    let ph = this._ns.getPortHandle(srv.port)
+    this._log("Handling %s calls on port %j", method, srv.port)
     while (true) {
+      this._setTitle("... %d ?", srv.port)
       await this._ns.asleep(1)
       let msg = ph.read()
       if (msg == "NULL PORT DATA") {
-        await this._ns.nextPortWrite(pn);
+        startup = false
+        await ph.nextWrite()
         continue
       }
-      this._log("<%s: %j", msg)
-      let [pid, c, req, args] = msg
-      if (req != method) {
-        this._error("Ignoring misdirected call (got %j, want %j)", req, method)
+      this._setTitle("... %d <", srv.port)
+      this._log("<%j", msg)
+      if (msg.payload == "/quitquitquit") {
+        if (startup) {
+          this._log("Ignoring quit command on startup")
+          continue
+        }
+        this._log("Quitting...")
+        await this.bnsUnregister()
+        return
+      }
+      if (msg.cmd != method) {
+        this._error("Ignoring misdirected call (got %j, want %j)", msg.cmd, method)
+        await this._send(msg.replyTo, "ERR.retry", msg, msg.id)
         continue
       }
 
       let res = null
       try {
-        res = await callback(...args)
+        res = await callback(...msg.payload)
       } catch (e) {
         this._log("Caught error in callback: %j", e)
         this._error("Error in %s (%d) callback",
           this._ns.getScriptName(), this._ns.pid)
       }
-      let resPN = this._offset+pid
-      let resPort = this._ns.getPortHandle(resPN)
-      while (!resPort.tryWrite([pid, c, method, res])) {
-        this._log("Waiting for %s reply port %d", method, resPN)
-        await this._ns.asleep(1)
-      }
-      this._log(">%d: %s(%j)", pn, method, args)
+      this._setTitle("... %d >", srv.port)
+      this._log(">%j", res)
+      await this._send(msg.replyTo, method, res, msg.id)
     }
   }
 
@@ -218,15 +266,30 @@ export class nsRPC {
 
   /**
    * @param {string} method
-   * @param {any} args
-   * @returns any */
-  async _sendRPC(method, args) {
-    if (!this._ports.has(method)) {
-      this._log("Can't send to unknown method %j in %j",
-        method, this._ns.getScriptName())
-      return
+   */
+  async _getPort(method) {
+    if (this._bnsCache.has(method)) {
+      let srv = this._bnsCache.get(method)
+      if (this._ns.isRunning(srv.pid, srv.host)) {
+        return srv.port
+      }
     }
-    let mid = await this._send(this._ns.pid, this._ports.get(method), method, args)
+    let srv = await this._sendRPC("BNS.find", {method: method}, this._bnsPort)
+    this._bnsCache.set(method, srv)
+    return srv.port
+  }
+
+  /**
+   * @param {string} method
+   * @param {any} args
+   * @param {?number} port
+   * @returns any */
+  async _sendRPC(method, args, port=0) {
+    this._setTitle("... ? %s:%d", method, port)
+    port ||= await this._getPort(method)
+    this._setTitle("... > %s:%d", method, port)
+    let mid = await this._send(port, method, args)
+    this._setTitle("... < %s:%d", method, port)
     return await this._getReply(method, mid)
   }
 
@@ -238,7 +301,6 @@ export class nsRPC {
   async _getReply(method, mid) {
     let pn = this._offset+this._ns.pid
     let ph = this._ns.getPortHandle(pn)
-    let last = ""
     let start = Date.now()
     while (true) {
       await this._ns.asleep(1)
@@ -248,49 +310,48 @@ export class nsRPC {
         return
       }
 
-      let data = ph.peek()
-      if (data != last) {
-        this._log("<%d: %j", pn, data)
-        last = data
-      }
-      if (data == "NULL PORT DATA") {
-        await this._ns.nextPortWrite(pn);
+      let msg = ph.peek()
+      if (msg == "NULL PORT DATA") {
+        await ph.nextWrite()
         continue
       }
-      // [pid, mid, method, res]
-      if (data[0] != this._ns.pid) {
+      if (msg.id != mid) {
         continue
       }
-      if (data[1] != mid) {
-        continue
+      if (msg.cmd == "ERR.retry") {
+        this._log("Retrying... %j", msg.payload)
+        return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
       }
-      if (data[2] != method) {
+      if (msg.cmd != method) {
         continue
       }
 
-      // this._log("Got reply on %d: %j", pn, data[3])
       ph.read()
-      return data[3]
+      this._binlog("<%s(%j)", method, msg.payload)
+      return msg.payload
     }
   }
 
   /**
-   * @param {int} pid
-   * @param {int} port
+   * @param {number} port
    * @param {string} method
-   * @param {any} args
+   * @param {any} payload
+   * @param {?number} id
    * @returns string
    */
-  async _send(pid, port, method, args) {
+  async _send(port, method, payload, id=null) {
+    let pid = this._ns.pid
     let ph = this._ns.getPortHandle(port)
-    let c = this._counter++
-    while (!ph.tryWrite([pid, c, method, args])) {
+    let c = id || this._counter++
+    let replyTo = this._offset+pid
+    while (!ph.tryWrite({
+      cmd: method, "replyTo": replyTo, id: c, payload: payload
+    })) {
       this._log("Waiting for %s port", method)
       await this._ns.asleep(1)
     }
-    this._log(">%d: %s(%j)", port, method, args)
+    this._binlog(">%s(%j)", method, payload)
 
     return c
   }
 }
-
