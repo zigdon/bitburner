@@ -1,8 +1,10 @@
 import { colors } from "@/colors.js"
+import { singleInstance } from "@/lib/util.js"
 var loglevels = [ "CRITICAL", "WARNING", "INFO", "DEBUG" ]
 
 /** @param {NS} ns */
 export async function main(ns) {
+  if (!singleInstance(ns)) return
   ns.disableLog("asleep")
   ns.ui.openTail()
   var ws = ns.ui.windowSize()

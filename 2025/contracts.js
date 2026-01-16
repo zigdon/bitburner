@@ -56,15 +56,14 @@ export async function main(ons) {
       err(ns, "No contracts found on ", host)
       return
     } else if (files.length > 1) {
-      ns.printf("59: ns.codingcontract.getContract(%j, %j)", f, host)
-      let cct = await ns.codingcontract.getContract(f, host)
+      let cct = await ns.codingcontract.getContractType(f, host)
       if (fs["toast"]) {
         log(ns, "Found contracts:")
-        files.forEach((f) => log(ns, "%s: %s", f, cct.type))
+        files.forEach((f) => log(ns, "%s: %s", f, cct))
         return
       } else {
         ns.tprint("Found contracts:")
-        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, cct.type))
+        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, cct))
         if (Number(file) > 0 && Number(file) <= files.length) {
           ns.tprintf("Selecting %j", file)
           file = files[Number(file)-1]
@@ -79,7 +78,6 @@ export async function main(ons) {
   }
 
   ns.printf("Reading %s@%s", file, host)
-  ns.printf("82: ns.codingcontract.getContract(%j, %j)", file, host)
   var c = await ns.codingcontract.getContract(file, host)
   if (!types.has(c.type)) {
     err(ns, "Unknown contract type %s", c.type)
@@ -268,7 +266,6 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
   if (file == undefined) {
     let ccts = new Map()
     for (let cct of ns.ls(host, "contract-")) {
-      ns.printf("267: ns.codingcontract.getContract(%j, %j)", c, host)
       ccts.set(cct, await ns.codingcontract.getContract(c, host))
     }
     let cs = ns.ls(host, "contract-").filter(
@@ -285,7 +282,6 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
       return
     }
   }
-  ns.printf("284: ns.codingcontract.getContract(%j, %j)", file, host)
   var c = await ns.codingcontract.getContract(file, host)
   if (!c) {
     err(ns, "Can't get contract %s@%s", file, host)
@@ -351,7 +347,6 @@ async function listContracts(ns, flags) {
       ).map((f) => [h.name, f])).flat(1)
     ns.printf("ccts=%j", ccts)
     for (let cct of ccts) {
-      ns.printf("349: getcontract(%j, %j)", cct[1], cct[0])
       let c = await ns.codingcontract.getContract(cct[1], cct[0])
       data.push([cct[0], cct[1], c.type])
     }
@@ -372,7 +367,6 @@ async function listContracts(ns, flags) {
         continue
       }
       ns.tprintf("Reading %s@%s", file, host)
-      ns.printf("370: ns.codingcontract.getContract(%j, %j)", file, host)
       var c = await ns.codingcontract.getContract(file, host)
       if (!types.has(c.type)) {
         ns.tprintf("Unknown contract type %s", c.type)

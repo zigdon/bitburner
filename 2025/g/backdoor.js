@@ -6,7 +6,7 @@ var hosts;
 
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(67.45)
+  // ons.ramOverride(67.45)
   /** @type {NS} */
   let ns = new nsRPC(ons)
   while (ns.args.length > 1) {
@@ -30,7 +30,7 @@ export async function main(ons) {
   }
 
   await backdoor(ns, hosts.get(target))
-  ssh(ns, hosts, "home")
+  await ssh(ns, hosts, "home")
 }
 
 export function autocomplete(data, args) {
@@ -50,9 +50,9 @@ async function backdoor(ns, host) {
     return
   }
 
-  if (ssh(ns, hosts, host.name)) {
+  if (await ssh(ns, hosts, host.name)) {
     ns.printf("Starting backdoor on %s", host.name)
-    return ns.singularity.installBackdoor()
+    return await ns.singularity.installBackdoor()
   } else {
     ns.printf("Failed to ssh to %s", host.name)
   }

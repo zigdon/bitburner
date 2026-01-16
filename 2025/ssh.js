@@ -40,7 +40,7 @@ export function autocomplete(data, args) {
  * @param {Map} hosts
  * @param {String} target
  */
-export function ssh(ns, hosts, target) {
+export async function ssh(ns, hosts, target) {
   var src = ns.getHostname()
   var host = hosts.get(target)
   var path = [target]
@@ -53,9 +53,9 @@ export function ssh(ns, hosts, target) {
     }
   }
   ns.print(path)
-  ns.singularity.connect("home")
+  await ns.singularity.connect("home")
   while (path.length > 0) {
-    if (!ns.singularity.connect(path[0])) {
+    if (!await ns.singularity.connect(path[0])) {
       ns.tprintf("Failed to connect to %s", path[0])
       return false
     }

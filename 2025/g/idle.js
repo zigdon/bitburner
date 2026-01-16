@@ -4,7 +4,7 @@ import {warning} from "@/log.js"
 export async function main(ns) {
   let s = ns.singularity
   let b = ns.bladeburner
-  if (s.isBusy() || b?.getCurrentAction()) {
+  if (s.isBusy() || (b.inBladeburner() && b.getCurrentAction())) {
     return
   }
   await warning(ns, "Player is idle")

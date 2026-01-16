@@ -36,16 +36,27 @@ export const factionList = [
   "Volhaven",
 ]
 
+export const gyms = new Map([
+  ["Sector-12", "Powerhouse Gym"],
+  ["Aevum", "Snap Fitness Gym"],
+  ["Volhaven", "Millenium Fitness Gym"],
+])
+
+export const univs = new Map([
+  ["Sector-12", "Rothman University"],
+  ["Volhaven", "ZB Institute of Technology"],
+])
+
 export const bbActionTypes = [
   "General", "Contracts", "Operations", "Black Operations"
 ]
 
-export function bbActionNames(ns, n) {
+export async function bbActionNames(ns, n) {
   let b = ns.bladeburner
   return {
-    General: b.getGeneralActionNames(),
-    Contracts: b.getContractNames(),
-    Operations: b.getOperationNames(),
-    "Black Operations": b.getBlackOpNames(),
+    General: await b.getGeneralActionNames(),
+    Contracts: await b.getContractNames(),
+    Operations: await b.getOperationNames(),
+    "Black Operations": await b.getBlackOpNames(),
   }[n]
 }

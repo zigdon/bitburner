@@ -44,7 +44,7 @@ export async function main(ns) {
   ns.tprint(
     table(
       ns,
-      ["Target", "Hack", "Grow", "Weaken", "Take", "Money", "Security"],
+      ["Target", "Hack", "Grow", "Weaken", "Take", "Money", "Security %"],
       Array.from(summary.keys()).sort().map((h) => [
         summary.get(h).host,
         [ns.sprintf("%d (%d-%d, %d hosts)", ...details(summary.get(h).h))],
@@ -90,7 +90,7 @@ export function collectData(ns) {
       ent = {
         host: target, w: [], g: [], h: [],
         mon: srv.moneyAvailable,
-        sec: ns.sprintf("%%%d", 100 * (sec - min) / (base - min)),
+        sec: ns.sprintf("%d", 100 * (sec - min) / (base - min)),
         srv: srv,
         hack: ns.hackAnalyze(target),
         when: ts - now,

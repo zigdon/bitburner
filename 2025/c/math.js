@@ -58,6 +58,7 @@ async function solve(ns, data) {
     // queue.forEach((v) => ns.print(v))
     let next = queue.shift()
     // ns.printf("next = %j", next)
+    if (next == undefined) continue
     combine2(ns, next)
     if (next?.join("") == data[0])
       for (let r of cache.get(key(next)) ?? []) {
@@ -78,7 +79,7 @@ async function solve(ns, data) {
  * @param {Number[]} nums
  * @return String[]
  */
-async function combine2(ns, nums) {
+function combine2(ns, nums) {
   // if a single number, just return it.
   // if it's cached, return the cache
   // if two numbers, return them with +-*

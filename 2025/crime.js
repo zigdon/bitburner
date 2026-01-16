@@ -8,7 +8,7 @@ export async function main(ns) {
     let t = s.getCrimeStats(c) // = {} // 
     data.push([
       c,
-      ns.sprintf("%.2f%%", s.getCrimeChance(c)*100),
+      ns.sprintf("%.2f", s.getCrimeChance(c)*100),
       ns.sprintf("%.2f", t.difficulty ??0),
       t.karma,
       t.kills,

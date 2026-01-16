@@ -1,13 +1,4 @@
-var gyms = new Map([
-  ["Sector-12", "Powerhouse Gym"],
-  ["Aevum", "Snap Fitness Gym"],
-  ["Volhaven", "Millenium Fitness Gym"],
-]);
-
-var univs = new Map([
-  ["Sector-12", "Rothman University"],
-  ["Volhaven", "ZB Institute of Technology"],
-])
+import {gyms, univs} from "@/lib/constants.js"
 
 /** @param {NS} ns */
 export async function main(ns) {

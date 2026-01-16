@@ -173,7 +173,9 @@ function scan(ns, s, host) {
     return []
   }
   var added = []
-  var files = ns.ls(host).filter((f) => !f.endsWith(".js") && f != "hosts.txt")
+  var files = ns.ls(host).filter(
+    (f) => !f.endsWith(".js") && f != "hosts.txt" && !f.includes("logs/")
+  )
   if (host != "home") {
     files.filter((f) => {
       if (f.endsWith(".lit")) {

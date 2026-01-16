@@ -9,6 +9,7 @@ import { warning, info } from "@/log.js"
 export async function loadCfg(ns, name, old) {
   let next = await readCfg(ns, name)
   if (next?.valid) {
+    /*
     let d = await diff(ns, old, next)
     if (d.length > 0) {
       await info(ns, "New config loaded from %s, %d differences", name, d.length)
@@ -16,6 +17,7 @@ export async function loadCfg(ns, name, old) {
         await info(ns, l)
       }
     }
+    */
     return next
   } else {
     return old
