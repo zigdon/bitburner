@@ -42,9 +42,18 @@ export async function main(ons) {
     }
 
     await bbSkills(ns)
+    
+    /** @type BBState */
+    let state = {
+      stam: await b.getStamina(),
+      blops: await b.getNextBlackOp(),
+      rank: await b.getRank(),
+      curAct: await b.getCurrentAction(),
+      city: await b.getCity(),
+    }
 
     for (let a of cfg.actions) {
-      let res = a.cond ? await check(ns, a) : [true, null]
+      let res = a.cond ? await check(ns, state, a) : [true, null]
       if (res[0]) {
         await bbDo(ns, a, res[1])
         break
@@ -181,9 +190,10 @@ async function bbDo(ns, a, match) {
 
 /**
  * @param {NS} ns
+ * @param {BBState} state
  * @param {Action} act
  */
-async function check(ns, act) {
+async function check(ns, state, act) {
   let b = ns.bladeburner
   let cond = act.cond
   let pass = true
@@ -242,8 +252,7 @@ async function check(ns, act) {
     if (type == undefined) return
     let acts = []
     if (type == "Black Operations") {
-      let blops = await b.getNextBlackOp()
-      if (!blops || blops.rank < await b.getRank()) {
+      if (!state.blops || state.blops.rank < state.rank) {
         pass = false
         return
       }
@@ -262,13 +271,13 @@ async function check(ns, act) {
     pass = false
   }
 
-  let stam = await b.getStamina()
+  let stam = state.stam
   cmpV(cond.stamina, 100*stam[0]/stam[1])
-  let curAct = await b.getCurrentAction()
+  let curAct = state.curAct
   if (cond.cur) cmpB(await action(cond.cur), curAct?.type+"."+curAct?.name)
 
   let city = cond.city
-  let curCity = await b.getCity()
+  let curCity = state.city
   if (city == "current") city = curCity
   if (city) cmpV(cond.chaos, await b.getCityChaos(city))
   cmpV(cond.pop, await b.getCityEstimatedPopulation(curCity))

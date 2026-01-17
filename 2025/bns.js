@@ -139,6 +139,7 @@ class BNS {
         data.push([
           l.method,
           srv.host,
+          srv.pid,
           srv.port,
           this._ns.tFormat(now-l.ts),
         ])
@@ -146,7 +147,7 @@ class BNS {
     )
     if (data.length > 0) {
       this.debug("LRU:")
-      this._ns.printf(table(this._ns, ["Name", "Host", "Port", "Age"], data))
+      this._ns.printf(table(this._ns, ["Name", "Host", "PID", "Port", "Age"], data))
     }
   }
 
@@ -257,7 +258,7 @@ class BNS {
     let prev = this._servers.get(method)
     if (prev != undefined && this.isRunning(prev.pid, prev.host)) {
       if (prev.port != srv.port || prev.host != srv.host) {
-        if (prev.host != "home") {
+        if (prev.host != "home" || srv.host == "home") {
           this.debug("Not replacing %s on %s:%d (%d)", method, prev.host, prev.port, prev.pid)
           this._send(msg.replyTo, "BNS.register", {status: "NOK"}, msg.id)
           return

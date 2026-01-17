@@ -15,7 +15,7 @@ export async function main(ns) {
   while (pop != marker) {
     await ns.asleep(1)
     pop = ph.read()
-    if (pop == marker) break
+    if (pop == marker || pop == "NULL PORT DATA") break
     ns.tprintf("%d: %j", i++, pop)
     ph.write(pop)
   }

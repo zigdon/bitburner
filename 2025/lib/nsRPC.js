@@ -79,7 +79,10 @@ export class nsRPC {
 
         // If it's a known namespace, return a new proxy for that namespace
         if (target._nsSupport.includes(prop) && prop != target._namespace) {
-          return new nsRPC(target._ns, prop)
+          let sub = new nsRPC(target._ns, prop)
+          sub._bnsCache = target._bnsCache
+          sub._counter = target._counter
+          return sub
         }
 
         // If it's one of the namespaces we handle, handle it.
@@ -140,6 +143,7 @@ export class nsRPC {
    * @param {?number} port
    * @returns {any}
    */
+  /*
   async bnsRead(id=0, method=undefined, port=undefined) {
     let host = this._ns.read("hosts.txt")
     port ??= this._ns.pid + this._offset
@@ -164,6 +168,7 @@ export class nsRPC {
     this._log("bnsRead: %j", msg)
     return msg.payload
   }
+  */
 
   async bnsRegister(method) {
     // Send a register BNSMessage to BNS, ask for a port
@@ -292,15 +297,16 @@ export class nsRPC {
     this._setTitle("... > %s:%d", method, port)
     let mid = await this._send(port, method, args)
     this._setTitle("... < %s:%d", method, port)
-    return await this._getReply(method, mid)
+    return await this._getReply(method, mid, args)
   }
 
   /**
    * @param {string} method
    * @param {int} mid
+   * @param {any} args
    * @returns any
    */
-  async _getReply(method, mid) {
+  async _getReply(method, mid, args) {
     let pn = this._offset+this._ns.pid
     let ph = this._ns.getPortHandle(pn)
     let start = Date.now()
@@ -308,8 +314,12 @@ export class nsRPC {
       await this._ns.asleep(1)
 
       if (Date.now() - start > 60000) {
-        this._log("TIMEOUT waiting for a reply from %s on %d, retrying", method, mid)
-        return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
+        this._log("TIMEOUT waiting for a reply from %s on %d, retrying", method, pn)
+        if (method == "BNS.find") {
+          return await this._sendRPC(method, args, this._bnsPort)
+        } else {
+          return await this._sendRPC(method, args)
+        }
       }
 
       let msg = ph.peek()
@@ -317,7 +327,9 @@ export class nsRPC {
         await this._ns.asleep(10)
         continue
       }
+      msg = ph.read()
       if (msg.id != mid) {
+        this._log("Discarding incorrect mid. want: %d, got: %j", mid, msg)
         continue
       }
       if (msg.cmd == "ERR.retry") {
@@ -325,10 +337,10 @@ export class nsRPC {
         return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
       }
       if (msg.cmd != method) {
+        this._log("Discarding incorrect method. want: %d, got: %j", method, msg)
         continue
       }
 
-      ph.read()
       this._binlog("<%s(%j)", method, msg.payload)
       return msg.payload
     }
@@ -352,7 +364,7 @@ export class nsRPC {
       this._log("Waiting for %s port", method)
       await this._ns.asleep(1)
     }
-    this._binlog(">%s(%j)", method, payload)
+    this._binlog(">%s:%d(%j)", method, c, payload)
 
     return c
   }
