@@ -339,7 +339,7 @@ export class nsRPC {
         return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
       }
       if (msg.cmd != method) {
-        this._log("Discarding incorrect method. want: %d, got: %j", method, msg)
+        this._log("Discarding incorrect method. want: %j, got: %j", method, msg)
         continue
       }
 
