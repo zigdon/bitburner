@@ -85,9 +85,12 @@ export class nsRPC {
           return sub
         }
 
-        // If it's one of the namespaces we handle, handle it.
+        // If it's one of the namespaces we handle, and it actually requires
+        // some ram, handle it.
         if (target._namespace != "" &&
-          !target._notHandled.includes(target._namespace+"/"+prop)) {
+          !target._notHandled.includes(target._namespace+"/"+prop) &&
+          target._ns.getFunctionRamCost(target._namespace+"."+prop) > 2
+        ) {
           // maybeLog(prop, "Handling %s in %s", prop, target._namespace)
           return target._mkMethod(target._namespace+"/"+prop)
         }

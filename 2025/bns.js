@@ -138,6 +138,8 @@ class BNS {
         if (!srv) return
         data.push([
           l.method,
+          this._ns.formatRam(
+            this._ns.getFunctionRamCost(l.method.replace("/","."))),
           srv.host,
           srv.pid,
           srv.port,
@@ -147,7 +149,8 @@ class BNS {
     )
     if (data.length > 0) {
       this.debug("LRU:")
-      this._ns.printf(table(this._ns, ["Name", "Host", "PID", "Port", "Age"], data))
+      this._ns.printf(table(this._ns,
+        ["Name", "RAM", "Host", "PID", "Port", "Age"], data))
     }
   }
 
@@ -364,8 +367,10 @@ class BNS {
         }
       }
 
+      // If we found a host, we can use it!
+      if (dest != "") break
       // If our best efforts were not sufficient, give up.
-      if (dest == "" && bestEffort) return 0
+      if (bestEffort) return 0
 
       // If there isn't one, make space, or keep trying until you do.
       this.debug("...Attempt to free %s", this.formatRam(reqMem))
@@ -378,16 +383,16 @@ class BNS {
           this.debug("......No entry for a %s server, skipping", s.method)
           continue
         }
-        let oomPID = this._servers.get(s.method).pid
-        if (!this.isRunning(oomPID)) {
+        let oom = this._servers.get(s.method)
+        if (!this.isRunning(oom.pid, oom.host)) {
           this.debug("......Server %s MIA, removing from server list", s.method)
           this._servers.delete(s.method)
           mia.push(s.method)
           continue
         }
-        this.debug("...Killing %s (%d) so %s can start", s.method, oomPID, method)
-        if (!this.kill(oomPID)) continue
-        this.log("...Killed %s (%d)", s.method, oomPID)
+        this.debug("...Killing %s (%d@%s) so %s can start", s.method, oom.pid, oom.host, method)
+        if (!this.kill(oom.pid)) continue
+        this.log("...Killed %s (%d@%s)", s.method, oom.pid, oom.host)
         killed = true
         break
       }

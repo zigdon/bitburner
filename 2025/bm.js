@@ -9,7 +9,7 @@ var cfg = {valid: false}
 
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(2.4)
+  ons.ramOverride(6.9)
   /** @param {NS} ns */
   let ns = new nsRPC(ons)
   if (!await ns.bladeburner.inBladeburner()) {
@@ -252,11 +252,11 @@ async function check(ns, state, act) {
     if (type == undefined) return
     let acts = []
     if (type == "Black Operations") {
-      if (!state.blops || state.blops.rank < state.rank) {
+      if (!state.blops || state.blops.rank > state.rank) {
         pass = false
         return
       }
-      acts = [blops.name]
+      acts = [state.blops.name]
     } else {
       acts = await bbActionNames(ns, type)
     }

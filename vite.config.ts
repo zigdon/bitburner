@@ -5,8 +5,8 @@ import { resolve } from 'path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'bitburner/2025'),
-      '/src': resolve(__dirname, '/'),
+      '@/': resolve(__dirname, '/'),
+      '/src/': resolve(__dirname, '/'),
     },
   },
   build: {
