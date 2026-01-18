@@ -325,7 +325,7 @@ class BNS {
     // the handy template.
     let fn = this.sprintf(this.serverPath, method)
     if (!this.fileExists(fn, "home"))
-      this.log("...Generating server from template")
+      this.debug("...Generating server from template")
       this.write(fn, this.sprintf(
         this.serverTemplate,
         new Date().toLocaleString(),
@@ -334,11 +334,11 @@ class BNS {
 
     // Get memory requirement.
     let reqMem = this.getScriptRam(fn, "home")
-    this.log("...%s required", this.formatRam(reqMem))
+    this.debug("...%s required", this.formatRam(reqMem))
 
     // Select port.
     let port = this.nextPort++
-    this.log("...Assigned port %d", port)
+    this.debug("...Assigned port %d", port)
 
     // Find a server that has space.
     let dest = ""
@@ -357,7 +357,7 @@ class BNS {
       for (let h of hosts) {
         let mem = this.getServerUsedRam(h.name)
         if (h.ram - mem >= reqMem) {
-          this.log("...Selected %s, with %s free",
+          this.debug("...Selected %s, with %s free",
             h.name, this.formatRam(h.ram-mem))
           dest = h.name
           break
@@ -385,7 +385,7 @@ class BNS {
           mia.push(s.method)
           continue
         }
-        this.log("...Killing %s (%d) so %s can start", s.method, oomPID, method)
+        this.debug("...Killing %s (%d) so %s can start", s.method, oomPID, method)
         if (!this.kill(oomPID)) continue
         this.log("...Killed %s (%d)", s.method, oomPID)
         killed = true

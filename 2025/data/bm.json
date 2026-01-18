@@ -6,7 +6,7 @@
     { "cond": {"stamina": "<50" }, "do": "regen" },
     { "cond": {"stamina": "<95", "cur": "regen" }, "do": "regen" },
     { "cond": {"chance": ">50", "type": "black operations" }, "do": "blackops", "toast": "Starting next blockops" },
-    { "cond": {"chance": ">50", "type": "operations", "has": "black operations" }, "do": "operations" },
+    { "cond": {"chance": ">50", "type": "operations" }, "do": "operations" },
     { "cond": {"chance": ">50", "type": "contracts" }, "do": "contracts" },
     { "do": "gym" }
   ],

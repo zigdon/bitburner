@@ -328,10 +328,12 @@ export class nsRPC {
         continue
       }
       msg = ph.read()
+      /* whyyyyy
       if (msg.id != mid) {
         this._log("Discarding incorrect mid. want: %d, got: %j", mid, msg)
         continue
       }
+      */
       if (msg.cmd == "ERR.retry") {
         this._log("Retrying... %j", msg.payload)
         return await this._sendRPC(msg.payload.cmd, msg.payload.payload)

@@ -9,7 +9,7 @@ var cfg = {valid: false}
 
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(2.3)
+  ons.ramOverride(2.4)
   /** @param {NS} ns */
   let ns = new nsRPC(ons)
   if (!await ns.bladeburner.inBladeburner()) {
