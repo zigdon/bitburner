@@ -67,9 +67,9 @@ class BNS {
   _lru = []
 
   // How long should it be since a server was last used before we OOM it?
-  lruTimeout = 10 * 1e3   // 10s
+  lruTimeout = 10 * 1000   // 10s
   // How long should it be since a server was last used before we shut it down?
-  timeout = 5 * 60 * 1e3  // 5m
+  timeout = 5 * 60 * 1000  // 5m
   bnsPath = "data/bns/%s.json"
   serverPath = "lib/rpc/%s.js"
   nextPort = 1e6
@@ -195,7 +195,8 @@ class BNS {
     }
   }
 
-  // Go through the LRU, kill all servers that are idle for more than the timeout.
+  // Go through the LRU, ping all servers that are idle for more than the
+  // timeout. They should terminate if they've been unused.
   async reap() {
     let now = Date.now()
     let dead = []
@@ -207,11 +208,13 @@ class BNS {
         dead.push(i.method)
         continue
       }
-      if (srv.host == "home") evict.push(srv.method)
-      if (now - i.ts < this.timeout) continue
-      this.log("Shutting down %s at %s:%d, timeout", srv.method, srv.host, srv.port)
-      this.quit(srv)
-      dead.push(i.method)
+      if (now - i.ts < this.timeout) {
+        if (srv.host == "home") evict.push(srv.method)
+        continue
+      }
+      this.debug("Pinging %s at %s:%d", srv.method, srv.host, srv.port)
+      this._send(srv.port, "PING", this.timeout)
+      i.ts = now
     }
 
     this._lru = this._lru.filter((i) => !dead.includes(i.method))
@@ -227,7 +230,7 @@ class BNS {
    * @param {RPCServer} srv
    **/
   async quit(srv) {
-    await this._send(srv.port, "quit", "/quitquitquit", 0)
+    await this._send(srv.port, "QUIT", "/quitquitquit", 0)
   }
 
   /**
@@ -259,6 +262,7 @@ class BNS {
     let srv = msg.payload
     let method = srv.method
     let prev = this._servers.get(method)
+    let status = "none"
     if (prev != undefined && this.isRunning(prev.pid, prev.host)) {
       if (prev.port != srv.port || prev.host != srv.host) {
         if (prev.host != "home" || srv.host == "home") {
@@ -266,11 +270,14 @@ class BNS {
           this._send(msg.replyTo, "BNS.register", {status: "NOK"}, msg.id)
           return
         }
+        status = "migrated"
         await this.log("Re-registering %s: %d@%s -> %d@%s",
           method, prev.pid, prev.host, srv.pid, srv.host)
+        this.log("Shutting down %s at %s:%d, evicted", prev.method, prev.host, prev.port)
         await this.quit(prev)
       }
     } else {
+      status = "new"
       await this.log("Registered %s: %d@%s", method, srv.pid, srv.host)
     }
     if (!srv.port) {
@@ -281,7 +288,7 @@ class BNS {
     this._lru = this._lru.filter((i) => i.method != method)
     this._lru.push({method: method, ts: Date.now()})
     this.write(this.sprintf(this.bnsPath, method), JSON.stringify(srv), "w")
-    this._send(msg.replyTo, "BNS.register", {status: "OK", port: srv.port}, msg.id)
+    this._send(msg.replyTo, "BNS.register", {status: status, port: srv.port}, msg.id)
   }
 
   /** @param {BNSMessage} msg */
@@ -338,10 +345,6 @@ class BNS {
     // Get memory requirement.
     let reqMem = this.getScriptRam(fn, "home")
     this.debug("...%s required", this.formatRam(reqMem))
-
-    // Select port.
-    let port = this.nextPort++
-    this.debug("...Assigned port %d", port)
 
     // Find a server that has space.
     let dest = ""
@@ -405,6 +408,10 @@ class BNS {
       this.debug("No luck, waiting 5s")
       await this.asleep(5000)
     }
+
+    // Select port.
+    let port = this.nextPort++
+    this.debug("...Assigned port %d", port)
 
     // Copy the code over.
     this.scp(["log.js", "lib/nsRPC.js", fn], dest, "home")

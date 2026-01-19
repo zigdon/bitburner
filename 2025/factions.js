@@ -33,9 +33,9 @@ export async function main(ons) {
 async function listFactions(ns, name) {
   var s = ns.singularity
   var data = []
-  var joined = await getFactions(ns, {all: false})
-  var owned = await ns.singularity.getOwnedAugmentations(true)
-  var fs = await getFactions(ns, {all: true})
+  var joined = ns.getPlayer().factions
+  var owned = await s.getOwnedAugmentations(true)
+  var fs = factionList
   fs = fs.filter(
     (f) => f.toLowerCase().includes(name?.toLowerCase() ?? ""))
   if (fs.length == 1) {
@@ -67,7 +67,7 @@ async function listFactions(ns, name) {
 
 async function showFaction(ns, f) {
   var s = ns.singularity
-  var joined = await getFactions(ns, {all: false})
+  var joined = ns.getPlayer().factions
   var enemies = await s.getFactionEnemies(f)
   var data = []
   let wt = await s.getFactionWorkTypes(f)
@@ -100,17 +100,6 @@ async function showFaction(ns, f) {
   ns.tprint(table(ns, ["Name", f], data))
 
   return
-}
-
-export async function getFactions(ns, flags) {
-  if (flags["all"]) {
-    return factionList
-  }
-  return factionList.filter(
-    async (f) => await ns.singularity.getFactionRep(f) > 0
-  ).filter(
-    (f) => f.includes(flags["factions"] || "")
-  )
 }
 
 async function formatReq(ns, r) {

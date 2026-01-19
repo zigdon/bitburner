@@ -18,20 +18,13 @@ export class nsRPC {
   _namespace
 
   _server = false
+  _lastUsed = 0
 
   _nsSupport = [
     'bladeburner',
     'codingcontract',
     'corporation',
     'singularity'
-  ]
-
-  _notLogged = [
-    "corporation/getCorporation",
-    "getGeneralActionNames",
-    "getContractNames",
-    "getOperationNames",
-    "getBlackOpNames",
   ]
 
   _notHandled = [
@@ -61,11 +54,6 @@ export class nsRPC {
 
     return new Proxy(this, {
       get(target, prop) {
-        const maybeLog = (prop, tmpl, ...args) => {
-          if (!target._notLogged.includes(prop))
-            target._log(target._ns.sprintf(tmpl, ...args))
-        }
-
         // Anything starting with _ is never handled by ns
         if (prop[0] == "_") {
           return target[prop]
@@ -73,7 +61,6 @@ export class nsRPC {
 
         // If the property exists in our class (like our custom methods), use it
         if (prop in target) {
-          maybeLog(prop, "Overriding %s", prop)
           return target[prop];
         }
 
@@ -91,14 +78,12 @@ export class nsRPC {
           !target._notHandled.includes(target._namespace+"/"+prop) &&
           target._ns.getFunctionRamCost(target._namespace+"."+prop) > 2
         ) {
-          // maybeLog(prop, "Handling %s in %s", prop, target._namespace)
           return target._mkMethod(target._namespace+"/"+prop)
         }
 
         // Otherwise, redirect the call to the game's 'ns' object
         let val = target._ns[prop];
         if (target._namespace != "") {
-          maybeLog(prop, "Passing through %s in %s", prop, target._namespace)
           val = target._ns[target._namespace][prop];
         }
         if (typeof val === 'function') return val.bind(target._ns);
@@ -187,7 +172,7 @@ export class nsRPC {
     }
 
     this.bns = {method: method, pid: this._ns.pid, host: host, port: msg.port}
-    this._log("Registered %s on %s: %j", this.bns.method, this.bns.host, this.bns)
+    this._log("Registered %s on %s (%j): %j", this.bns.method, this.bns.host, this.bns, msg.status)
 
     return msg.port
   }
@@ -219,7 +204,7 @@ export class nsRPC {
       return
     }
     srv.port = reg.port
-    this._log("Registered on port %d: %j", reg.port, srv)
+    this._log("Registered on port %d (%j): %j", reg.port, reg.status, srv)
 
     let ph = this._ns.getPortHandle(srv.port)
     this._log("Handling %s calls on port %j", method, srv.port)
@@ -243,11 +228,24 @@ export class nsRPC {
         await this.bnsUnregister()
         return
       }
+      if (msg.cmd == "PING") {
+        let idle = Date.now() - this._lastUsed
+        this._log("Got ping: %s idle, %s threshold",
+          this._ns.tFormat(idle), this._ns.tFormat(msg.payload))
+        if (idle > msg.payload) {
+          this._log("Quitting...")
+          await this.bnsUnregister()
+          return
+        }
+        continue
+      }
       if (msg.cmd != method) {
         this._error("Ignoring misdirected call (got %j, want %j)", msg.cmd, method)
         await this._send(msg.replyTo, "ERR.retry", msg, msg.id)
         continue
       }
+
+      this._lastUsed = Date.now()
 
       let res = null
       try {

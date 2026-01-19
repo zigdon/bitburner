@@ -2,7 +2,7 @@ import {toast} from "@/log.js"
 import {nsRPC} from "@/lib/nsRPC.js"
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(1.6)
+  ons.ramOverride(1.7)
   let ns = new nsRPC(ons)
   // Check and accept any faction invites.
   var joined = []

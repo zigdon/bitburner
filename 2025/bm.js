@@ -168,6 +168,11 @@ async function bbDo(ns, a, match) {
       break
     }
     case "blackops": 
+      let remaining = b.getBlackOpNames().filter(
+        (op) => await b.getActionCountRemaining("Black Operations", op) >= 1
+      ).length
+      if (remaining > 0) await toast(ns, "BM: %d blops remains", remaining-1)
+        else ns.toast("Last blops started!", "success", null)
     case "contracts":
     case "operations": {
       let [type, name] = match.split(".")

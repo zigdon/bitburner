@@ -5,7 +5,7 @@
     { "cond": {"communities": "<50" }, "do": "travel", "msg": "Too few communities" },
     { "cond": {"stamina": "<50" }, "do": "regen" },
     { "cond": {"stamina": "<95", "cur": "regen" }, "do": "regen" },
-    { "cond": {"chance": ">50", "type": "black operations" }, "do": "blackops", "toast": "Starting next blockops" },
+    { "cond": {"chance": ">50", "type": "black operations" }, "do": "blackops", "toast": "Starting next blops" },
     { "cond": {"chance": ">50", "type": "operations" }, "do": "operations" },
     { "cond": {"chance": ">50", "type": "contracts" }, "do": "contracts" },
     { "do": "gym" }
