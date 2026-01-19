@@ -6,7 +6,7 @@ export async function main(ns: NS) {
   const React = win.React
   const ReactDOM = win.ReactDOM;
 
-  if (!ns.inBladeburner()) return
+  if (!ns.bladeburner.inBladeburner()) return
 
   function StamBar() {
     const [val, setVal] = React.useState([0, 0]);

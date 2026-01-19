@@ -9,7 +9,7 @@ var cfg = {valid: false}
 
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(6.9)
+  ons.ramOverride(7.4)
   /** @param {NS} ns */
   let ns = new nsRPC(ons)
   if (!await ns.bladeburner.inBladeburner()) {
@@ -129,7 +129,7 @@ async function bbDo(ns, a, match) {
     }
   }
 
-  let atGym = ""
+  let curTask = await ns.singularity.getCurrentWork()
   const doGym = async () => {
     let cur = ns.getPlayer().city
     if (!gyms.has(cur)) {
@@ -142,20 +142,18 @@ async function bbDo(ns, a, match) {
     ).sort(
       (a,b) => a[1] - b[1]
     )[0][0]
-    if (skill != atGym) {
-      atGym = skill
+    if (skill.toLowerCase().slice(0,3) != curTask?.classType) {
       await info(ns, "BM: Training %s", skill)
       await ns.singularity.gymWorkout(gyms.get(cur), skill, false)
     }
   }
 
-  if (await ns.singularity.isBusy() && atGym=="") {
+  if (curTask != null && curTask?.type != "CLASS") {
     await toast(ns, "Bladeburner waiting 1m for current action to finish")
     await ns.asleep(60000)
     return
   }
 
-  atGym = ""
   switch (a.do) {
     case "travel": {
       // Go to the next city.

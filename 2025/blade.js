@@ -1,3 +1,4 @@
+import {nsRPC} from "@/lib/nsRPC.js"
 import {table} from "@/table.js"
 import {bbActionTypes} from "@/lib/constants.js"
 
@@ -11,14 +12,16 @@ let cmds = new Map([
 ])
 
 /** @param {NS} ns */
-export async function main(ns) {
-  if (!ns.bladeburner.inBladeburner()) {
+export async function main(ons) {
+  ons.ramOverride(4.1)
+  let ns = new nsRPC(ons)
+  if (!await ns.bladeburner.inBladeburner()) {
     ns.tprint("Not in bladeburner.")
     return
   }
 
   if (cmds.has(ns.args[0])) {
-    cmds.get(ns.args[0])(ns, ns.args.slice(1))
+    await cmds.get(ns.args[0])(ns, ns.args.slice(1))
   } else {
     ns.tprintf(
       "Unknown command %j. Pick one of %j",
@@ -38,10 +41,10 @@ const skillPri = [
   "Hyperdrive@20",
 ]
 
-function bbSkills(ns, args) {
+async function bbSkills(ns, args) {
   let b = ns.bladeburner
   if (args.length > 0) {
-    let skills = b.getSkillNames()
+    let skills = await b.getSkillNames()
     if (args[0] == "all") {
       skills = [...skillPri]
     } else {
@@ -51,8 +54,8 @@ function bbSkills(ns, args) {
     }
     ns.printf("skills = %j", skills)
     if (skills.length == 1) {
-      if (b.upgradeSkill(skills[0])) {
-        ns.tprintf("Upgraded %s to %d", skills[0], b.getSkillLevel(skills[0]))
+      if (await b.upgradeSkill(skills[0])) {
+        ns.tprintf("Upgraded %s to %d", skills[0], await b.getSkillLevel(skills[0]))
       } else {
         ns.tprintf("Failed to upgrade %s", skills[0])
       }
@@ -65,11 +68,11 @@ function bbSkills(ns, args) {
       if (s.includes("@")) {
         [s, cap] = s.split("@")
       }
-      if (((cap == 0) || (b.getSkillLevel(s) <= cap)) &&
-        b.getSkillUpgradeCost(s) <= b.getSkillPoints()) {
+      if (((cap == 0) || (await b.getSkillLevel(s) <= cap)) &&
+        await b.getSkillUpgradeCost(s) <= await b.getSkillPoints()) {
         ns.tprintf("Upgrading %s for %d/%d",
-          s, b.getSkillUpgradeCost(s), b.getSkillPoints())
-        if (!b.upgradeSkill(s)) {
+          s, await b.getSkillUpgradeCost(s), await b.getSkillPoints())
+        if (!await b.upgradeSkill(s)) {
           ns.tprintf("Failed to upgrade")
           break
         }
@@ -80,21 +83,21 @@ function bbSkills(ns, args) {
     return
   }
   let data = []
-  for (let s of b.getSkillNames()) {
+  for (let s of await b.getSkillNames()) {
     data.push([
       s,
-      b.getSkillLevel(s),
-      b.getSkillUpgradeCost(s),
+      await b.getSkillLevel(s),
+      await b.getSkillUpgradeCost(s),
     ])
   }
-  ns.tprintf("Skill points: %d", b.getSkillPoints())
+  ns.tprintf("Skill points: %d", await b.getSkillPoints())
   ns.tprintf(table(ns, ["Name", "Level", "Upgrade Cost"], data))
 }
 
-function bbDo(ns, args) {
+async function bbDo(ns, args) {
   let b = ns.bladeburner
   let acts = new Map()
-  let types = getTypes(ns)
+  let types = await getTypes(ns)
   for (let s of bbActionTypes) {
     for (let a of types[s]) {
       acts.set(a.toLowerCase(), [s, a])
@@ -114,36 +117,39 @@ function bbDo(ns, args) {
 
   let a = acts.get(sel[0])
   ns.tprintf("Starting %s > %s", a[0], a[1])
-  b.startAction(a[0], a[1])
+  await b.startAction(a[0], a[1])
 }
 
-function getTypes(ns) {
+async function getTypes(ns) {
   let b = ns.bladeburner
   return {
-    General: b.getGeneralActionNames(),
-    Contracts: b.getContractNames(),
-    Operations: b.getOperationNames(),
-    "Black Operations": b.getBlackOpNames(),
+    General: await b.getGeneralActionNames(),
+    Contracts: await b.getContractNames(),
+    Operations: await b.getOperationNames(),
+    "Black Operations": await b.getBlackOpNames(),
   }
 }
 
-function bbTasks(ns, sect, subset) {
+async function bbTasks(ns, sect, subset) {
   let b = ns.bladeburner
   let all = new Map()
-  let types = getTypes(ns)
+  let types = await getTypes(ns)
   let sections = bbActionTypes
   if (sect) {
     sections = bbActionTypes.filter((s) => s.toLowerCase().indexOf(sect) == 0)
   }
-  const getLine = (sect, act) => [
-    act,
-    ns.tFormat(b.getActionTime(sect, act)),
-    ns.formatNumber(b.getActionCountRemaining(sect, act), 0),
-    ns.sprintf("%d%%-%d%%", ...b.getActionEstimatedSuccessChance(sect, act).map(
-        (esc) => Math.floor(esc*100)
-      )),
-    ns.formatNumber(b.getActionRepGain(sect, act)),
-  ]
+  const getLine = async (sect, act) => {
+    let est = await b.getActionEstimatedSuccessChance(sect, act)
+    return [
+      act,
+      ns.tFormat(await b.getActionTime(sect, act)),
+      ns.formatNumber(await b.getActionCountRemaining(sect, act), 0),
+      ns.sprintf("%d%%-%d%%", ...est.map(
+          (esc) => Math.floor(esc*100)
+        )),
+      ns.formatNumber(await b.getActionRepGain(sect, act)),
+    ]
+  }
   if (subset) {
     ns.tprintf(table(ns,
       ["Name", "Time", "Available", "Est. Chance", "Rep"],
@@ -166,35 +172,35 @@ function bbTasks(ns, sect, subset) {
   }
 }
 
-function bbStatus(ns, args) {
+async function bbStatus(ns, args) {
   let b = ns.bladeburner
   let pl = ns.getPlayer()
-  let st = b.getStamina()
-  let act = b.getCurrentAction()
+  let st = await b.getStamina()
+  let act = await b.getCurrentAction()
   let data = [
     ["HP", ns.sprintf("%d/%d", pl.hp.current, pl.hp.max)],
     ["Stamina", ns.sprintf("%d/%d", st[0], st[1])],
     ["Penalty", ns.sprintf("%.2f%%", Math.max(100-100*st[0]/st[1]/0.5, 0))],
-    ["Skill points", b.getSkillPoints()],
-    ["Team size", b.getTeamSize()],
+    ["Skill points", await b.getSkillPoints()],
+    ["Team size", await b.getTeamSize()],
     ["Activity", act ?
       ns.sprintf("%s/%s (%d remaining)",
-        act.type, act.name, b.getActionCountRemaining(act.type, act.name))
+        act.type, act.name, await b.getActionCountRemaining(act.type, act.name))
     : "N/A"],
   ]
 
   ns.tprintf(table(ns, ["Player stats", ""], data))
 }
 
-function bbCities(ns, args) {
+async function bbCities(ns, args) {
   let data = []
   let b = ns.bladeburner
   for (let c of Object.values(ns.enums.CityName)) {
     data.push([
       c,
-      ns.formatNumber(b.getCityEstimatedPopulation(c)),
-      b.getCityCommunities(c),
-      ns.sprintf("%.2f", b.getCityChaos(c)),
+      ns.formatNumber(await b.getCityEstimatedPopulation(c)),
+      await b.getCityCommunities(c),
+      ns.sprintf("%.2f", await b.getCityChaos(c)),
     ])
   }
 
