@@ -25,6 +25,7 @@ export async function main(ons) {
   let b = ns.bladeburner
   let loopDelay = cfg.loopDelay ?? 30000
   let cfgTime = 0
+  let done = false
   await info(ns, "Starting blademaster loop")
   while (true) {
     await b.nextUpdate()
@@ -50,6 +51,12 @@ export async function main(ons) {
       rank: await b.getRank(),
       curAct: await b.getCurrentAction(),
       city: await b.getCity(),
+    }
+
+    if (state.blops == null && !done) {
+      done = true
+      await info(ns, "Blops all done, ready to destroy bitnode.")
+      ns.toast("Bitnode ready for destruction", "success", null)
     }
 
     for (let a of cfg.actions) {
@@ -168,9 +175,11 @@ async function bbDo(ns, a, match) {
       break
     }
     case "blackops": 
-      let remaining = b.getBlackOpNames().filter(
-        (op) => await b.getActionCountRemaining("Black Operations", op) >= 1
-      ).length
+      let remaining = 0
+      for (let blop of b.getBlackOpNames()) {
+        if (await b.getActionCountRemaining("Black Operations", blop) >= 1) 
+            remaining++
+      }
       if (remaining > 0) await toast(ns, "BM: %d blops remains", remaining-1)
         else ns.toast("Last blops started!", "success", null)
     case "contracts":
@@ -288,7 +297,7 @@ async function check(ns, state, act) {
   cmpV(cond.pop, await b.getCityEstimatedPopulation(curCity))
   cmpV(cond.communities, await b.getCityCommunities(curCity))
   match = await checkChance(cond.chance, cond.type)
-  if (cond.has != undefined) checkChance(">0", cond.has)
+  checkChance(">0", cond.has)
 
   ns.printf("Check %j returning [%j, %j]", act, pass, match)
   return [pass, match]

@@ -3,7 +3,7 @@ import {gyms, univs} from "@/lib/constants.js"
 /** @param {NS} ns */
 export async function main(ns) {
   ns.disableLog("asleep")
-  var flags = ns.flags([
+  let flags = ns.flags([
     ["str", false],
     ["agi", false],
     ["def", false],
@@ -12,13 +12,13 @@ export async function main(ns) {
     ["hack", false],
     ["focus", false],
   ]);
-  var target = flags._[0];
+  let target = flags._[0];
   if (target == undefined) {
     ns.tprintf("Target must be specified")
     return
   }
   target = Number(target);
-  var stats = [];
+  let stats = [];
   if (flags.str) { stats.push("strength") }
   if (flags.agi) { stats.push("agility") }
   if (flags.def) { stats.push("defense") }
@@ -27,21 +27,21 @@ export async function main(ns) {
   if (flags.hack) { stats.push("hacking") }
   if (stats.length == 0) {
     stats = [
+      "hacking",
+      "defense",
       "strength",
       "agility",
-      "defense",
       "dexterity",
       "charisma",
-      "hacking",
     ];
   }
   ns.tprintf("Training to %d: %j", target, stats)
 
-  var sk = ns.getPlayer().skills
-  var gym = getFacility(ns, gyms)
-  var univ = getFacility(ns, univs)
-  var started = false
-  for (var s of stats) {
+  let sk = ns.getPlayer().skills
+  let gym = getFacility(ns, gyms)
+  let univ = getFacility(ns, univs)
+  let started = false
+  for (let s of stats) {
     if (sk[s] < target) {
       started = true
       if (["charisma", "hacking"].includes(s)) {
@@ -64,12 +64,15 @@ export async function main(ns) {
 }
 
 async function course(ns, uni, s, focus, target) {
+  let topic = ""
+  if (s == "charisma") {
+    topic = "Leadership"
+  } else {
+    topic = "Algorithms"
+  }
   while (ns.getPlayer().skills[s] < target) {
-    if (s == "charisma") {
-      ns.singularity.universityCourse(uni, "Leadership", focus)
-    } else {
-      ns.singularity.universityCourse(uni, "Algorithms", focus)
-    }
+    if (ns.singularity.getCurrentWork()?.classType != topic)
+      ns.singularity.universityCourse(uni, topic, focus)
     await ns.asleep(1000)
   }
   ns.printf("Finished training %s: %d", s, ns.getPlayer().skills[s])
@@ -78,7 +81,8 @@ async function course(ns, uni, s, focus, target) {
 
 async function train(ns, gym, stat, focus, target) {
   while (ns.getPlayer().skills[stat] < target) {
-    ns.singularity.gymWorkout(gym, stat.slice(0,3), focus)
+    if (ns.singularity.getCurrentWork()?.classType != stat.toLowerCase().slice(0, 3))
+      ns.singularity.gymWorkout(gym, stat.slice(0,3), focus)
     await ns.asleep(1000)
   }
   ns.printf("Finished training stat: %d", ns.getPlayer().skills[stat])
@@ -86,7 +90,7 @@ async function train(ns, gym, stat, focus, target) {
 }
 
 function getFacility(ns, yb) {
-  var city = ns.getPlayer().city
+  let city = ns.getPlayer().city
   if (yb.has(city)) {
     return yb.get(city)
   }

@@ -234,6 +234,35 @@ function save(ns, data) {
   ns.write("/data/contracts.json", JSON.stringify(data), "w")
 }
 
+async function record(ns, type, msg) {
+  let data = {valid: true, log: []}
+  if (ns.fileExists("/data/contractHistory.json")) {
+    data = JSON.parse(ns.read("/data/contractHistory.json"))
+    if (!data?.valid) {
+      await warning(ns, "Saved contract history invalid!")
+      return
+    }
+  }
+  let bounty = 0
+  let rep = 0
+  let facts = []
+  if (msg.includes("Gained $")) {
+    bounty = msg.split("$")[1]
+    let suf = bounty[bounty.length-1]
+    bounty = parseFloat(bounty)
+    if (suf == "m") bounty *= 1e6
+    else if (suf == "b") bounty *= 1e9
+    else if (suf == "t") bounty *= 1e12
+    else await warning(ns, "Unknown bounty suffix %s in %s", suf, msg)
+  } else if (msg.includes("reputation")) {
+    rep = parseInt(msg.split(" ")[1])
+    facts.push(...msg.split(": ")[1].split(", "))
+  }
+
+  data.log.push({ts: Date.now(), type: type, msg: msg, bounty: bounty, rep: rep, factions: facts})
+  ns.write("/data/contractHistory.json", JSON.stringify(data), "w")
+}
+
 /*
  * @param {NS} ons
  * @param {Map} types
@@ -314,6 +343,7 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
   var fn = types.get(c.type)
   var data = c.data
   ns.printf("data=%j", data)
+  await info(ns, "Attempting to solve contract %s...", c.type)
   var res = await fn(ns, data)
   var msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
@@ -329,8 +359,8 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
     ns.tprint(msg)
     await info(ns, msg)
   }
-
   await info(ns, "Attempted to solve contract %s: %s", c.type, msg)
+  await record(ns, c.type, msg)
 }
 
 async function listContracts(ns, flags) {

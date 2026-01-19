@@ -22,6 +22,13 @@ export default defineConfig({
         filename: file.replace(/^bitburner\/2025/, ''),
         server: "home"
       }]
+    },{
+      pattern: 'bitburner/2025/**/*.json',
+      transform: false,
+      location: (file) => [{
+              filename: file.replace(/^bitburner\/2025/, ''),
+              server: "home"
+            }]
     }],
     sourcemap: 'inline',
   },

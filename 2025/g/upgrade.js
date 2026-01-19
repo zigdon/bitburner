@@ -1,20 +1,21 @@
 import { toast } from "@/log.js"
 import { nsRPC } from "@/lib/nsRPC.js"
 
-/** @param {NS} ns */
+/** @param {NS} ons */
 export async function main(ons) {
   ons.ramOverride(2.6)
+  /** @type {NS} */
   let ns = new nsRPC(ons)
-  var s = ns.singularity
-  var p = ns.getPlayer
-  var up = {cores:0, ram:0}
-  while (s.getUpgradeHomeCoresCost() < p().money) {
-    if (s.upgradeHomeCores()) {
+  let s = ns.singularity
+  let p = ns.getPlayer
+  let up = {cores:0, ram:0}
+  while (await s.getUpgradeHomeCoresCost() < p().money) {
+    if (await s.upgradeHomeCores()) {
       up.cores++
     }
   }
-  while (s.getUpgradeHomeRamCost() < p().money) {
-    if (s.upgradeHomeRam()) {
+  while (await s.getUpgradeHomeRamCost() < p().money) {
+    if (await s.upgradeHomeRam()) {
       up.ram++
     }
   }

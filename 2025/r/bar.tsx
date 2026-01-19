@@ -86,6 +86,8 @@ export async function main(ns : NS) {
     )
   }
 
+  if (ns.getServerMaxRam("home") < 64) return
+
   if (bar) {
     ns.atExit(()=>bar.innerHTML="")
     while (true) {
