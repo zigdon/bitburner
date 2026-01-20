@@ -18,6 +18,7 @@ import {err, init} from "@/contracts.js"
 import {diff} from "@/lib/util.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   var types = new Map([
     ["Generate IP Addresses", solve],
   ])

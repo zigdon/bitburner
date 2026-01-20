@@ -3,6 +3,7 @@ import {diff} from "@/lib/util.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   /*
   Find All Valid Math Expressions
   You are given the following string which contains only digits between 0 and 9:

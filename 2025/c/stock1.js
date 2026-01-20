@@ -36,6 +36,7 @@
 import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   var types = new Map([
     ["Algorithmic Stock Trader I",   s1],
     ["Algorithmic Stock Trader II",  s2],

@@ -26,42 +26,24 @@
 
 */
 
-import {err, flags} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
-  var fs = flags(ns)
-  var host = fs._[0]
-  var file = fs._[1]
+  ns.ramOverride(16.9)
+  var types = new Map([
+    ["Array Jumping Game", s1],
+    ["Array Jumping Game II", s2],
+  ])
+  await init(ns, types, undefined, false, false)
+}
 
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  var type = [
-    "Array Jumping Game",
-    "Array Jumping Game II",
-  ].indexOf(c.type)
-  if (type == -1) {
-    err(ns, "Wrong contract type: %s", c.type)
-    return
-  }
-  // ns.tprint(c.description)
-  var data = c.data
-  ns.print(data)
-  var res = solve(ns, data, 0)
-  ns.print(res)
-  if (type == 0) {
-    res = res > -1 ? 1 : 0
-  } else {
-    res = res > -1 ? res : 0
-  }
-  var msg = c.submit(res)
-  if (fs["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(data)
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+function s1(ns, data) {
+  return solve(ns, data, 0) > -1 ? 1 : 0
+}
+
+function s2(ns, data) {
+  res = solve(ns, data, 0)
+  return res > -1 ? res : 0
 }
 
 /**

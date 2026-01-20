@@ -6,6 +6,7 @@
 import {err, init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   var types = new Map([
     ["Find Largest Prime Factor", solve],
   ])

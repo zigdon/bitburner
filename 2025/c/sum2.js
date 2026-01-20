@@ -12,6 +12,7 @@ import {err, init} from "@/contracts.js"
 import {table} from "@/table.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   var types = new Map([
     ["Total Ways to Sum II", solve],
   ])

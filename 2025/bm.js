@@ -9,7 +9,7 @@ var cfg = {valid: false}
 
 /** @param {NS} ons */
 export async function main(ons) {
-  ons.ramOverride(7.4)
+  ons.ramOverride(5.4)
   /** @param {NS} ns */
   let ns = new nsRPC(ons)
   if (!await ns.bladeburner.inBladeburner()) {
@@ -143,7 +143,8 @@ async function bbDo(ns, a, match) {
       (a,b) => a[1] - b[1]
     )[0][0]
     if (skill.toLowerCase().slice(0,3) != curTask?.classType) {
-      await info(ns, "BM: Training %s", skill)
+      // await info(ns, "BM: Training %s", skill)
+      await ns.bladeburner.stopBladeburnerAction()
       await ns.singularity.gymWorkout(gyms.get(cur), skill, false)
     }
   }

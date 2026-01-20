@@ -36,6 +36,7 @@
 import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   var types = new Map([
     [ "HammingCodes: Encoded Binary to Integer", decode ],
     [ "HammingCodes: Integer to Encoded Binary", encode ],

@@ -158,13 +158,17 @@ class BNS {
   async listen() {
     let ph = this.getPortHandle(this._port)
     let reaperTS = Date.now()
+    let statusTS = Date.now()
     while (true) {
       while (ph.peek() == "NULL PORT DATA") {
         await this.asleep(100)
         if (Date.now() - reaperTS > 30000) {
           await this.reap()
           reaperTS = Date.now()
+        }
+        if (Date.now() - statusTS > 300000) {
           this.status()
+          statusTS = Date.now()
         }
       }
 
@@ -264,6 +268,7 @@ class BNS {
     let prev = this._servers.get(method)
     let status = "none"
     if (prev != undefined && this.isRunning(prev.pid, prev.host)) {
+      await this.log("Found pervious server: %j", prev)
       if (prev.port != srv.port || prev.host != srv.host) {
         if (prev.host != "home" || srv.host == "home") {
           this.debug("Not replacing %s on %s:%d (%d)", method, prev.host, prev.port, prev.pid)
@@ -275,6 +280,9 @@ class BNS {
           method, prev.pid, prev.host, srv.pid, srv.host)
         this.log("Shutting down %s at %s:%d, evicted", prev.method, prev.host, prev.port)
         await this.quit(prev)
+      } else {
+        status = "duplicate"
+        await this.log("Duplicate registration on %s: %d and %d", prev.pid, srv.pid)
       }
     } else {
       status = "new"
@@ -461,6 +469,7 @@ class BNS {
       this.log("Found server for %s on port %d", srv.method, srv.port)
       this.nextPort = Math.max(this.nextPort, srv.port+1)
       this._lru.push({method: srv.method, ts: now})
+      this.status()
     }
   }
 

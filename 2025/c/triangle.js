@@ -1,6 +1,7 @@
-import {err, flags} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   /*
     Given a triangle, find the minimum path sum from top to bottom.
     In each step of the path, you may only move to adjacent numbers
@@ -15,23 +16,9 @@ export async function main(ns) {
 
     The minimum path sum is 11 (2 -> 3 -> 5 -> 1).
   */
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Minimum Path Sum in a Triangle" || err(ns, "Wrong contract type: %s", c.type)
-  var data = c.data
-  var res = solve(data, 0)
-  var msg = c.submit(res)
-  if (f["toast"]) {
-    ns.print(res)
-    ns.print(msg)
-    ns.toast(msg)
-  } else {
-    ns.tprint(res)
-    ns.tprint(msg)
-  }
+  await init(ns, new Map([
+    ["Minimum Path Sum in a Triangle", (data) => solve(data, 0)]
+  ]), undefined, false, false)
 }
 
 /**

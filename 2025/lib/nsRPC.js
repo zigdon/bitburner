@@ -76,7 +76,7 @@ export class nsRPC {
         // some ram, handle it.
         if (target._namespace != "" &&
           !target._notHandled.includes(target._namespace+"/"+prop) &&
-          target._ns.getFunctionRamCost(target._namespace+"."+prop) > 2
+          target._ns.getFunctionRamCost(target._namespace+"."+prop) >= 2
         ) {
           return target._mkMethod(target._namespace+"/"+prop)
         }

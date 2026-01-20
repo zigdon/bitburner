@@ -1,6 +1,7 @@
-import {err, flags} from "@/contracts.js"
+import {init} from "@/contracts.js"
 /** @param {NS} ns */
 export async function main(ns) {
+  ns.ramOverride(16.9)
   /*
   Square Root
   You are given a ~200 digit BigInt. Find the square root of this number, to the
@@ -16,27 +17,10 @@ export async function main(ns) {
   212944707162126806509262934660767282548802561525114580961832928758519796585180714802067298159526596192030677964074770173480215855362026691922772166021685250577908498248495244867239132531893326579190931
   */
 
-  var f = flags(ns)
-  var host = f._[0]
-  var file = f._[1]
-
-  var c = ns.codingcontract.getContract(file, host) || err(ns, "Can't get contract %s@%s", file, host)
-  c.type == "Square Root" || err(ns, "Wrong contract type: %s", c.type)
-  // ns.tprint(c.description)
-  var data = c.data
-  var res = solve(ns, data)
-  if (!res) {
-    ns.tprintf("Failed to solve %s@%s", file, host)
-    return
-  }
-  if (f["toast"]) {
-    ns.toast(c.submit(res[0]))
-    ns.toast(c.submit(res[1]))
-  } else {
-    ns.tprint(data)
-    ns.tprint(c.submit(res[0]))
-    ns.tprint(c.submit(res[1]))
-  }
+  let types = new Map([
+    ["Square Root", solve],
+  ])
+  await init(ns, types, undefined, false, false)
 }
 
 /**

@@ -3,7 +3,7 @@ import { table } from "@/table.js"
 import { warning, info } from "@/log.js"
 import { nsRPC } from "@/lib/nsRPC.js"
 
-export var types = new Map([
+export let types = new Map([
     ["Algorithmic Stock Trader I", "/c/stock1.js"],
     ["Algorithmic Stock Trader II", "/c/stock1.js"],
     ["Algorithmic Stock Trader III", "/c/stock1.js"],
@@ -39,9 +39,9 @@ export async function main(ons) {
   ons.ramOverride(18.4)
   /** @type {NS} ns */
   let ns = new nsRPC(ons)
-  var fs = flags(ns)
-  var host = fs._[0]
-  var file = fs._[1]
+  let fs = flags(ns)
+  let host = fs._[0]
+  let file = fs._[1]
   ns.disableLog("getServerMaxRam")
   ns.disableLog("getServerUsedRam")
   ns.disableLog("asleep")
@@ -50,7 +50,7 @@ export async function main(ons) {
   }
 
   if (file == undefined || String(file).match(/^[0-9]+$/)) {
-    var files = ns.ls(host, ".cct")
+    let files = ns.ls(host, ".cct")
     ns.printf("Contracts found: %j", files)
     if (files.length == 0) {
       err(ns, "No contracts found on ", host)
@@ -78,7 +78,7 @@ export async function main(ons) {
   }
 
   ns.printf("Reading %s@%s", file, host)
-  var c = await ns.codingcontract.getContract(file, host)
+  let c = await ns.codingcontract.getContract(file, host)
   if (!types.has(c.type)) {
     err(ns, "Unknown contract type %s", c.type)
     err(ns, "%s", c.description)
@@ -89,7 +89,7 @@ export async function main(ons) {
     err(ns, "%d attempts remaining", c.numTriesRemaining)
     return
   }
-  var code = types.get(c.type)
+  let code = types.get(c.type)
 
   if (fs["test"]) {
     file = await ns.codingcontract.createDummyContract(c.type)
@@ -99,7 +99,7 @@ export async function main(ons) {
 
   // Check if we have enough memory available.
   if (ns.getScriptRam(code) > ns.getServerMaxRam("home") - ns.getServerUsedRam("home")) {
-    var msg = ns.sprintf(
+    let msg = ns.sprintf(
       "Can't start %s, needs %s but only have %s available",
       code, ns.formatRam(ns.getScriptRam(code)),
       ns.formatRam(ns.getServerMaxRam("home") - ns.getServerUsedRam("home")))
@@ -117,7 +117,7 @@ export async function main(ons) {
         (p) => p.filename == code &&
                 p.args[0] == host &&
                 p.args[1] == file).length > 0) {
-    var msg = ns.sprintf("Already have an instance of %s running on %s@%s", c.type, file, host)
+    let msg = ns.sprintf("Already have an instance of %s running on %s@%s", c.type, file, host)
     ns.print(msg)
     if (!fs["toast"]) {
       ns.tprintf(msg)
@@ -125,7 +125,7 @@ export async function main(ons) {
     return
   }
   if (fs["debug"]) {
-    var pid = ns.run(code, 1, host, file)
+    let pid = ns.run(code, 1, host, file)
     ns.ui.openTail(pid)
     return
   }
@@ -196,12 +196,12 @@ export function flags(ns) {
 }
 
 export function blocked(ns, type) {
-  var data = state(ns)
+  let data = state(ns)
   return data.includes(type)
 }
 
 export async function block(ns, type) {
-  var data = state(ns)
+  let data = state(ns)
   if (!data.includes(type)) {
     data.push(type)
     ns.toast(ns.sprintf("Blocking contract type %s", type), "warning")
@@ -211,8 +211,8 @@ export async function block(ns, type) {
 }
 
 export async function unblock(ns, type) {
-  var data = state(ns)
-  var updated = data.filter((t) => t != type)
+  let data = state(ns)
+  let updated = data.filter((t) => t != type)
   ns.printf("%j", data)
   if (data.length != updated.length) {
     ns.printf("%j", updated)
@@ -256,7 +256,10 @@ async function record(ns, type, msg) {
     else await warning(ns, "Unknown bounty suffix %s in %s", suf, msg)
   } else if (msg.includes("reputation")) {
     rep = parseInt(msg.split(" ")[1])
-    facts.push(...msg.split(": ")[1].split(", "))
+    if (msg.includes(":"))
+      facts.push(...msg.split(": ")[1].split(", "))
+    else
+      facts.push(...msg.split("reputation for ")[1])
   }
 
   data.log.push({ts: Date.now(), type: type, msg: msg, bounty: bounty, rep: rep, factions: facts})
@@ -271,7 +274,7 @@ async function record(ns, type, msg) {
  */
 export async function init(ons, types, testfn, nosubmit, noauto) {
   let ns = new nsRPC(ons)
-  var fs = flags(ns)
+  let fs = flags(ns)
   if (noauto && fs["toast"]) {
     ns.printf("Auto-run is disabled")
     return
@@ -290,8 +293,8 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
     return await autotest(ns, types, fs["autotest"], fs["limit"])
   }
 
-  var host = fs._[0]
-  var file = fs._[1]
+  let host = fs._[0]
+  let file = fs._[1]
   if (file == undefined) {
     let ccts = new Map()
     for (let cct of ns.ls(host, "contract-")) {
@@ -311,7 +314,7 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
       return
     }
   }
-  var c = await ns.codingcontract.getContract(file, host)
+  let c = await ns.codingcontract.getContract(file, host)
   if (!c) {
     err(ns, "Can't get contract %s@%s", file, host)
     return
@@ -340,12 +343,12 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
   }
 
   ns.printf("type=%s", c.type)
-  var fn = types.get(c.type)
-  var data = c.data
+  let fn = types.get(c.type)
+  let data = c.data
   ns.printf("data=%j", data)
   await info(ns, "Attempting to solve contract %s...", c.type)
-  var res = await fn(ns, data)
-  var msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
+  let res = await fn(ns, data)
+  let msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
   if (fs["toast"]) {
     ns.printf("Input data:\n%j", data)
@@ -364,12 +367,12 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
 }
 
 async function listContracts(ns, flags) {
-  var hosts = Array.from(dns(ns).values()).
+  let hosts = Array.from(dns(ns).values()).
     filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0)
   if (hosts.length > 0) {
     ns.tprintf("Hosts with contracts:")
-    var data = []
-    var ccts = hosts.map(
+    let data = []
+    let ccts = hosts.map(
       (h) => h.files.filter(
         (f) => f.endsWith(".cct")
       ).filter(
@@ -390,49 +393,87 @@ async function listContracts(ns, flags) {
   }
 
   if (flags["all"]) {
+    let start  = Date.now()
+    let run, skipped, blocked, error
     ns.tprintf("Attempting to solve all contracts...")
-    for (var d of data) {
-      var [host, file, type] = d
+    for (let d of data) {
+      let [host, file, type] = d
       if (!ns.fileExists(file, host)) {
+        error = error ?? 0 + 1
         continue
       }
       ns.tprintf("Reading %s@%s", file, host)
-      var c = await ns.codingcontract.getContract(file, host)
+      let c = await ns.codingcontract.getContract(file, host)
       if (!types.has(c.type)) {
         ns.tprintf("Unknown contract type %s", c.type)
         ns.printf("Unknown contract type %s", c.type)
+        error = error ?? 0 + 1
         continue
       }
       ns.printf("%d attempts remaining", c.numTriesRemaining)
       if (c.numTriesRemaining < 10) {
         ns.tprintf("Skipping with %d attempts remaining...", c.numTriesRemaining)
+        skipped = skipped ?? 0 + 1
         continue
       }
-      var code = types.get(c.type)
+      let code = types.get(c.type)
       if (ns.getScriptRam(code) > ns.getServerMaxRam("home") - ns.getServerUsedRam("home")) {
         ns.tprintf(
           "Can't start %s, needs %s but only have %s available",
           code, ns.formatRam(ns.getScriptRam(code)),
           ns.formatRam(ns.getServerMaxRam("home") - ns.getServerUsedRam("home")))
+        skipped = skipped ?? 0 + 1
         continue
       }
       if (blocked(ns, type)) {
         ns.tprintf("Skipping blocked contract: %s", type)
+        blocked = blocked ?? 0 + 1
         continue
       }
-      var pid = ns.run(code, 1, host, file, "--toast")
+      let pid = ns.run(code, 1, host, file, "--toast")
+      run = run ?? 0 + 1
       while (ns.isRunning(pid)) {
         await ns.asleep(5000)
       }
     }
-    ns.tprintf("Done processing contracts.")
+    let msg = []
+    if (run > 0) msg.push(ns.sprintf("%d run", run))
+    if (skipped > 0) msg.push(ns.sprintf("%d skipped", skipped))
+    if (blocked > 0) msg.push(ns.sprintf("%d blocked", blocked))
+    if (error > 0) msg.push(ns.sprintf("%d error", error))
+    ns.tprintf("Done: %s", msg.join(", "))
+    if (ns.fileExists("/data/contractHistory.json")) {
+      data = JSON.parse(ns.read("/data/contractHistory.json")).filter(
+        (d) => d.ts > start
+      )
+      let bounty = data.map((d) => d.bounty).reduce((a,i) => a + i, 0)
+      let fcs = new Map()
+      data.forEach(
+        (d) => d.factions.forEach(
+          (f) => fcs.set(f, fcs.get(f) ?? 0 + d.rep)
+        )
+      )
+      if (bounty > 0) {
+        ns.tprintf("Total bounty: $%s", ns.formatNumber(bounty))
+      }
+      let fs = Array.from(fcs.keys()).sort()
+      if (fs.length > 0) {
+        ns.tprintf("Reputation gains:")
+        ns.tprintf(
+          table(ns,
+            ["Faction", "Rep gain"],
+            fs.map(
+              (f) => [f, ns.formatNumber(fcs.get(f))]
+            )))
+      }
+    }
   }
 
   return
 }
 
 async function autotest(ns, types, type, limit=100) {
-  var allTypes = Array.from(types.keys())
+  let allTypes = Array.from(types.keys())
   if (allTypes.length == 1) {
     type = allTypes[0]
   } else {
@@ -444,15 +485,15 @@ async function autotest(ns, types, type, limit=100) {
     }
     type = type[0]
   }
-  var good = []
-  var bad = []
+  let good = []
+  let bad = []
   await info(ns, "Running %d autotest for %s", limit, type)
   for (let n=0; n<limit; n++) {
-    var file = await ns.codingcontract.createDummyContract(type)
+    let file = await ns.codingcontract.createDummyContract(type)
     ns.printf("Created contract: %s", file)
-    var c = await ns.codingcontract.getContract(file, "home")
+    let c = await ns.codingcontract.getContract(file, "home")
     ns.printf("data=%j", c.data)
-    var res = await types.get(type)(ns, c.data)
+    let res = await types.get(type)(ns, c.data)
     ns.printf("res=%j", res)
     if (c.submit(res)) {
       ns.printf("Test success!")
