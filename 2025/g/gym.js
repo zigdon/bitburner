@@ -27,7 +27,6 @@ export async function main(ns) {
   if (flags.hack) { stats.push("hacking") }
   if (stats.length == 0) {
     stats = [
-      "hacking",
       "defense",
       "strength",
       "agility",

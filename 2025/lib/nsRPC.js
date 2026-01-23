@@ -274,6 +274,7 @@ export class nsRPC {
    * @param {string} method
    */
   async _getPort(method) {
+    if (method.includes("BNS.")) return this._bnsPort
     if (this._bnsCache.has(method)) {
       let srv = this._bnsCache.get(method)
       if (this._ns.isRunning(srv.pid, srv.host)) {

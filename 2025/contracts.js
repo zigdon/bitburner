@@ -45,6 +45,8 @@ export async function main(ons) {
   ns.disableLog("getServerMaxRam")
   ns.disableLog("getServerUsedRam")
   ns.disableLog("asleep")
+  ns.tprint(fs)
+  if (fs["log"] != "") return printLog(ns, fs["log"])
   if (host == undefined) {
     return await listContracts(ns, fs)
   }
@@ -56,14 +58,17 @@ export async function main(ons) {
       err(ns, "No contracts found on ", host)
       return
     } else if (files.length > 1) {
-      let cct = await ns.codingcontract.getContractType(f, host)
+      let ccts = new Map()
+      for (let f of files) {
+        ccts.set(f, await ns.codingcontract.getContractType(f, host))
+      }
       if (fs["toast"]) {
         log(ns, "Found contracts:")
-        files.forEach((f) => log(ns, "%s: %s", f, cct))
+        files.forEach((f) => log(ns, "%s: %s", f, ccts.get(f)))
         return
       } else {
         ns.tprint("Found contracts:")
-        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, cct))
+        files.forEach((f, n) => ns.tprintf("%d. %s: %s", n+1, f, ccts.get(f)))
         if (Number(file) > 0 && Number(file) <= files.length) {
           ns.tprintf("Selecting %j", file)
           file = files[Number(file)-1]
@@ -192,6 +197,7 @@ export function flags(ns) {
     ["check", false],
     ["autotest", ""],
     ["limit", 100],
+    ["log", ""],
   ])
 }
 
@@ -345,20 +351,19 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
   ns.printf("type=%s", c.type)
   let fn = types.get(c.type)
   let data = c.data
-  ns.printf("data=%j", data)
+  ns.printf("data=%j", typeof data == "bigint" ? data.toString() : data)
   await info(ns, "Attempting to solve contract %s...", c.type)
   let res = await fn(ns, data)
   let msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
   msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
   if (fs["toast"]) {
-    ns.printf("Input data:\n%j", data)
-    ns.printf("Result: %j", res)
+    ns.printf("Result: %j", typeof res == "bigint" ? res.toString() : res)
     ns.print(msg)
     ns.toast(msg, msg.includes("failed") ? "warning" : "success")
     await info(ns, msg)
   } else {
-    ns.tprintf("Input data:\n%j", data)
-    ns.tprintf("Result: %j", res)
+    ns.tprintf("Input data:\n%j", typeof data == "bigint" ? data.toString() : data)
+    ns.tprintf("Result: %s", res)
     ns.tprint(msg)
     await info(ns, msg)
   }
@@ -369,9 +374,9 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
 async function listContracts(ns, flags) {
   let hosts = Array.from(dns(ns).values()).
     filter((h) => h.files.filter((f) => f.endsWith(".cct")).length > 0)
+  let data = []
   if (hosts.length > 0) {
     ns.tprintf("Hosts with contracts:")
-    let data = []
     let ccts = hosts.map(
       (h) => h.files.filter(
         (f) => f.endsWith(".cct")
@@ -394,12 +399,12 @@ async function listContracts(ns, flags) {
 
   if (flags["all"]) {
     let start  = Date.now()
-    let run, skipped, blocked, error
+    let [run, skip, block, error] = [0, 0, 0, 0]
     ns.tprintf("Attempting to solve all contracts...")
     for (let d of data) {
       let [host, file, type] = d
       if (!ns.fileExists(file, host)) {
-        error = error ?? 0 + 1
+        error++
         continue
       }
       ns.tprintf("Reading %s@%s", file, host)
@@ -407,13 +412,13 @@ async function listContracts(ns, flags) {
       if (!types.has(c.type)) {
         ns.tprintf("Unknown contract type %s", c.type)
         ns.printf("Unknown contract type %s", c.type)
-        error = error ?? 0 + 1
+        error++
         continue
       }
       ns.printf("%d attempts remaining", c.numTriesRemaining)
       if (c.numTriesRemaining < 10) {
         ns.tprintf("Skipping with %d attempts remaining...", c.numTriesRemaining)
-        skipped = skipped ?? 0 + 1
+        skip++
         continue
       }
       let code = types.get(c.type)
@@ -422,54 +427,64 @@ async function listContracts(ns, flags) {
           "Can't start %s, needs %s but only have %s available",
           code, ns.formatRam(ns.getScriptRam(code)),
           ns.formatRam(ns.getServerMaxRam("home") - ns.getServerUsedRam("home")))
-        skipped = skipped ?? 0 + 1
+        skip++
         continue
       }
       if (blocked(ns, type)) {
         ns.tprintf("Skipping blocked contract: %s", type)
-        blocked = blocked ?? 0 + 1
+        block++
         continue
       }
       let pid = ns.run(code, 1, host, file, "--toast")
-      run = run ?? 0 + 1
+      run++
       while (ns.isRunning(pid)) {
         await ns.asleep(5000)
       }
     }
     let msg = []
     if (run > 0) msg.push(ns.sprintf("%d run", run))
-    if (skipped > 0) msg.push(ns.sprintf("%d skipped", skipped))
-    if (blocked > 0) msg.push(ns.sprintf("%d blocked", blocked))
+    if (skip > 0) msg.push(ns.sprintf("%d skipped", skip))
+    if (block > 0) msg.push(ns.sprintf("%d blocked", block))
     if (error > 0) msg.push(ns.sprintf("%d error", error))
     ns.tprintf("Done: %s", msg.join(", "))
-    if (ns.fileExists("/data/contractHistory.json")) {
-      data = JSON.parse(ns.read("/data/contractHistory.json")).filter(
-        (d) => d.ts > start
-      )
-      let bounty = data.map((d) => d.bounty).reduce((a,i) => a + i, 0)
-      let fcs = new Map()
-      data.forEach(
-        (d) => d.factions.forEach(
-          (f) => fcs.set(f, fcs.get(f) ?? 0 + d.rep)
-        )
-      )
-      if (bounty > 0) {
-        ns.tprintf("Total bounty: $%s", ns.formatNumber(bounty))
-      }
-      let fs = Array.from(fcs.keys()).sort()
-      if (fs.length > 0) {
-        ns.tprintf("Reputation gains:")
-        ns.tprintf(
-          table(ns,
-            ["Faction", "Rep gain"],
-            fs.map(
-              (f) => [f, ns.formatNumber(fcs.get(f))]
-            )))
-      }
-    }
+    printReport(ns, start)
   }
 
   return
+}
+
+function printLog(ns, dateString) {
+  let ts = Date.parse(dateString)
+  if (ts > 0) return printReport(ns, ts)
+  ns.tprintf("Failed to parse %j", dateString)
+}
+
+function printReport(ns, start) {
+  if (ns.fileExists("/data/contractHistory.json")) {
+    let hist = JSON.parse(ns.read("/data/contractHistory.json")).log.filter(
+      (d) => d.ts > start
+    )
+    let bounty = hist.map((d) => d.bounty).reduce((a,i) => a + i, 0)
+    let fcs = new Map()
+    hist.forEach(
+      (d) => d.factions.forEach(
+        (f) => fcs.set(f, fcs.get(f) ?? 0 + d.rep)
+      )
+    )
+    if (bounty > 0) {
+      ns.tprintf("Total bounty: $%s", ns.formatNumber(bounty))
+    }
+    let fs = Array.from(fcs.keys()).sort()
+    if (fs.length > 0) {
+      ns.tprintf("Reputation gains:")
+      ns.tprintf(
+        table(ns,
+          ["Faction", "Rep gain"],
+          fs.map(
+            (f) => [f, ns.formatNumber(fcs.get(f))]
+          )))
+    }
+  }
 }
 
 async function autotest(ns, types, type, limit=100) {

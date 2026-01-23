@@ -17,7 +17,7 @@ export async function main(ns) {
     The minimum path sum is 11 (2 -> 3 -> 5 -> 1).
   */
   await init(ns, new Map([
-    ["Minimum Path Sum in a Triangle", (data) => solve(data, 0)]
+    ["Minimum Path Sum in a Triangle", (_, data) => solve(data, 0)]
   ]), undefined, false, false)
 }
 

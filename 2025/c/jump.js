@@ -42,7 +42,7 @@ function s1(ns, data) {
 }
 
 function s2(ns, data) {
-  res = solve(ns, data, 0)
+  let res = solve(ns, data, 0)
   return res > -1 ? res : 0
 }
 

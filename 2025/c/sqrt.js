@@ -28,12 +28,13 @@ export async function main(ns) {
  * @param {BigInt} data
  * @return BigInt
  */
-function solve(ns, data) {
+async function solve(ns, data) {
   var sqrt = 1n
   var min = 1n
   var max = data
   var sq = sqrt
   while (max-min > 1n) {
+    await ns.asleep(1)
     var range = max-min
     // ns.print("wnt: ", data)
     ns.print("min: ", min)
@@ -53,7 +54,7 @@ function solve(ns, data) {
     sq = sqrt ** 2n
   }
 
-  return [min, max]
+  return min ** 2n == data ? min : max
 
   /*
   for (var n=min; n<=max; n+=1n) {

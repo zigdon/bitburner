@@ -282,7 +282,6 @@ class BNS {
         await this.quit(prev)
       } else {
         status = "duplicate"
-        await this.log("Duplicate registration on %s: %d and %d", prev.pid, srv.pid)
       }
     } else {
       status = "new"
