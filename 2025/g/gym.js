@@ -1,7 +1,11 @@
 import {gyms, univs} from "@/lib/constants.js"
+import {nsRPC} from "@/lib/nsRPC.js"
+import {checkBM} from "@/lib/util.js"
 
-/** @param {NS} ns */
-export async function main(ns) {
+/** @param {NS} ons */
+export async function main(ons) {
+  // ons.ramOverride(2.4)
+  let ns = new nsRPC(ons)
   ns.disableLog("asleep")
   let flags = ns.flags([
     ["str", false],
@@ -70,6 +74,10 @@ async function course(ns, uni, s, focus, target) {
     topic = "Algorithms"
   }
   while (ns.getPlayer().skills[s] < target) {
+    if (checkBM(ns)) {
+      ns.toast("Aborting gym when bm is running")
+      ns.exit()
+    }
     if (ns.singularity.getCurrentWork()?.classType != topic)
       ns.singularity.universityCourse(uni, topic, focus)
     await ns.asleep(1000)
@@ -80,6 +88,7 @@ async function course(ns, uni, s, focus, target) {
 
 async function train(ns, gym, stat, focus, target) {
   while (ns.getPlayer().skills[stat] < target) {
+    checkBM(ns)
     if (ns.singularity.getCurrentWork()?.classType != stat.toLowerCase().slice(0, 3))
       ns.singularity.gymWorkout(gym, stat.slice(0,3), focus)
     await ns.asleep(1000)

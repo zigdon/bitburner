@@ -161,7 +161,7 @@ async function bbTasks(ns, sect, subset) {
   for (let t of sections) {
     let data = []
     for (let a of types[t]) {
-      data.push(getLine(t, a))
+      data.push(await getLine(t, a))
     }
     all.set(t, data)
   }

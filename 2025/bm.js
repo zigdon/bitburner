@@ -157,11 +157,18 @@ async function bbDo(ns, a, match) {
 
   switch (a.do) {
     case "travel": {
-      // Go to the next city.
       let cities = Object.values(ns.enums.CityName)
+      // By default, go to the next city.
       let dest = cities[
         (cities.indexOf(await b.getCity())+1) % cities.length
       ]
+      // Unless we can find a GOOD city.
+      for (let c of cities) {
+        if (await b.getCityEstimatedPopulation(c) < 500e6) continue
+        if (await b.getCityChaos(c) > 45) continue
+        dest = c
+        break
+      }
       if (await b.switchCity(dest)) {
         await info(ns, "BM: Travelling to %s", dest)
       } else {
@@ -284,6 +291,19 @@ async function check(ns, state, act) {
     pass = false
   }
 
+  const checkCan = async (type) => {
+    if (type == undefined) return
+    if (type != "travel") return
+    // Make sure there's a city with at least 500m pop and <50 chaos
+    for (let c of Object.values(ns.enums.CityName)) {
+      if (await b.getCityEstimatedPopulation(c) < 500e6) continue
+      if (await b.getCityChaos(c) > 45) continue
+      pass &&= true
+      return
+    }
+    pass = false
+  }
+
   let stam = state.stam
   cmpV(cond.stamina, 100*stam[0]/stam[1])
   let curAct = state.curAct
@@ -297,6 +317,7 @@ async function check(ns, state, act) {
   cmpV(cond.communities, await b.getCityCommunities(curCity))
   match = await checkChance(cond.chance, cond.type)
   checkChance(">0", cond.has)
+  await checkCan(cond.can)
 
   ns.printf("Check %j returning [%j, %j]", act, pass, match)
   return [pass, match]

@@ -69,3 +69,8 @@ export function singleInstance(ns) {
   ns.tprintf("Can't launched another instance of %s", ns.getScriptName())
   return false
 }
+
+export function checkBM(ns) {
+  return ns.ps().some((p) => p.filename.includes("bm.js"))
+}
+

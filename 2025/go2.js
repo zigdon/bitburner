@@ -1,7 +1,6 @@
 import { dns } from "@/hosts.js"
 import { table } from "@/table.js"
 import { warning, info, debug } from "@/log.js"
-import { colors } from "@/colors.js"
 
 const buffer = 300
 const minThreadsForBatch = 50
@@ -257,9 +256,8 @@ function checkCapacity(ns) {
   for (var h of hosts.values()) {
     if (!h.root) continue
     var save = 0
-    if (h.name == "home") {
+    if (h.name == "home") 
       save = Math.min(buffer, ns.getServer("home").maxRam/2)
-    }
     var srv = ns.getServer(h.name)
     var avail = Math.floor((srv.maxRam - srv.ramUsed - save) / 1.75)
     t += avail

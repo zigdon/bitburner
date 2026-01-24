@@ -45,7 +45,6 @@ export async function main(ons) {
   ns.disableLog("getServerMaxRam")
   ns.disableLog("getServerUsedRam")
   ns.disableLog("asleep")
-  ns.tprint(fs)
   if (fs["log"] != "") return printLog(ns, fs["log"])
   if (host == undefined) {
     return await listContracts(ns, fs)
@@ -265,7 +264,7 @@ async function record(ns, type, msg) {
     if (msg.includes(":"))
       facts.push(...msg.split(": ")[1].split(", "))
     else
-      facts.push(...msg.split("reputation for ")[1])
+      facts.push(msg.split("reputation for ")[1])
   }
 
   data.log.push({ts: Date.now(), type: type, msg: msg, bounty: bounty, rep: rep, factions: facts})

@@ -1,7 +1,10 @@
 import {dns} from "@/hosts.js"
 import {table} from "@/table.js"
-import {debug, info, warning} from "@/log.js"
+import {info, warning} from "@/log.js"
 import {singleInstance} from "@/lib/util.js"
+
+// In nodes where hacking is secondary, prioritize RPC servers over HGW jobs.
+const RPCPreemptsHGW = true
 
 // at startup:
 //   - read home:/bns/*.json, each should list {pid, host, method, port}, verify
@@ -96,6 +99,7 @@ class BNS {
     this.isRunning = ns.isRunning
     this.kill = ns.kill
     this.ls = ns.ls
+    this.ps = ns.ps
     this.read = ns.read
     this.rm = ns.rm
     this.scp = ns.scp
@@ -290,6 +294,8 @@ class BNS {
     if (!srv.port) {
       srv.port = this.nextPort++
       this.log("Selected port %d for %s", srv.port, srv.method)
+    } else {
+      this.nextPort = Math.max(this.nextPort, srv.port+1)
     }
     this._servers.set(method, srv)
     this._lru = this._lru.filter((i) => i.method != method)
@@ -379,6 +385,56 @@ class BNS {
 
       // If we found a host, we can use it!
       if (dest != "") break
+
+      // If hacking is secondary, it's okay to kill HGW jobs for RPC servers.
+      if (RPCPreemptsHGW) {
+        // Find a set of HGW jobs we can kill that will free up enough RAM.
+        let jobs = hosts.map(
+          (h) => {return {
+            name: h.name,
+            free: h.ram - this.getServerUsedRam(h.name),
+            tasks: this.ps(h.name).filter(
+              (p) => p.filename.includes("bin/")
+            ).map(
+              (p) => {return {
+                pid: p.pid,
+                name: p.filename,
+                mem: p.threads * (p.filename.includes("hack") ? 1.7 : 1.75 )
+              }}
+            )
+          }}
+        ).sort( // Sort by most free-ram first
+          (a,b) => b.free-a.free
+        )
+        for (let j of jobs) {
+          if (j.free + Math.sum(...j.tasks.map((t) => t.mem)) < reqMem) continue
+          let kill = []
+          let need = reqMem - j.free
+          // Sort tasks by most-memory first
+          let tasks = j.tasks.sort((a,b) => b.mem - a.mem)
+          // But put the hack tasks first
+          tasks = tasks.filter(
+            (t) => t.name.includes("hack")
+          ) + tasks.filter(
+            (t) => !t.name.includes("hack")
+          )
+          while (need > 0 && tasks.length > 0) {
+            await this.asleep(1)
+            let t = tasks.shift()
+            kill.push(t.pid)
+            need -= t.mem
+          }
+          if (need < 0) {
+            for (let k of kill) this.kill(k)
+            this.log("Killed %d HGW jobs on %s", kill.length, j.name)
+            dest = j.name
+            break
+          }
+        }
+
+        if (dest != "") break
+      }
+
       // If our best efforts were not sufficient, give up.
       if (bestEffort) return 0
 
