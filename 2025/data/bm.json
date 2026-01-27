@@ -1,7 +1,7 @@
 {
   "actions": [
-    { "cond": {"chaos": ">50", "can": "travel" }, "do": "diplomacy", "msg": "Chaos too high" },
-    { "cond": {"chaos": ">50", "city": "current" }, "do": "diplomacy", "msg": "Chaos too high" },
+    { "cond": {"chaos": ">50", "can": "travel" }, "do": "travel", "msg": "Chaos too high" },
+    { "cond": {"chaos": ">50" }, "do": "diplomacy", "msg": "Chaos too high" },
     { "cond": {"pop": "<500m", "can": "travel" }, "do": "travel", "msg": "Population too low"},
     { "cond": {"communities": "<20", "can": "travel" }, "do": "travel", "msg": "Too few communities" },
     { "cond": {"stamina": "<50" }, "do": "regen" },

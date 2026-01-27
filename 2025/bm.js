@@ -5,7 +5,8 @@ import { singleInstance, parseNumber } from "@/lib/util.js"
 import { bbActionTypes, bbActionNames, gyms } from "@/lib/constants.js"
 
 const config = "data/bm.json"
-var cfg = {valid: false}
+let cfg = {valid: false}
+let blopsToast = 0
 
 /** @param {NS} ons */
 export async function main(ons) {
@@ -166,6 +167,7 @@ async function bbDo(ns, a, match) {
       for (let c of cities) {
         if (await b.getCityEstimatedPopulation(c) < 500e6) continue
         if (await b.getCityChaos(c) > 45) continue
+        if (await b.getCityCommunities(c) < 22) continue
         dest = c
         break
       }
@@ -186,8 +188,11 @@ async function bbDo(ns, a, match) {
         if (await b.getActionCountRemaining("Black Operations", blop) >= 1) 
             remaining++
       }
-      if (remaining > 0) await toast(ns, "BM: %d blops remains", remaining-1)
-        else ns.toast("Last blops started!", "success", null)
+      if (remaining != blopsToast) {
+        if (remaining > 0) await toast(ns, "BM: %d blops remains", remaining-1)
+          else ns.toast("Last blops started!", "success", null)
+        blopsToast = remaining
+      }
     case "contracts":
     case "operations": {
       let [type, name] = match.split(".")
@@ -309,10 +314,8 @@ async function check(ns, state, act) {
   let curAct = state.curAct
   if (cond.cur) cmpB(await action(cond.cur), curAct?.type+"."+curAct?.name)
 
-  let city = cond.city
   let curCity = state.city
-  if (city == "current") city = curCity
-  if (city) cmpV(cond.chaos, await b.getCityChaos(city))
+  cmpV(cond.chaos, await b.getCityChaos(curCity))
   cmpV(cond.pop, await b.getCityEstimatedPopulation(curCity))
   cmpV(cond.communities, await b.getCityCommunities(curCity))
   match = await checkChance(cond.chance, cond.type)

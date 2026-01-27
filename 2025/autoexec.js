@@ -43,6 +43,7 @@ export async function main(ns) {
       if (p.wait && Date.now() - start < p.wait*1000) continue
       let s = ns.getServer()
       if (p.ram && s.maxRam < p.ram) continue
+      if (p.pservs > 0 && p.pservs <= ns.getPurchasedServers().length) continue
       await check(ns, p)
       await ns.asleep(100)
     }

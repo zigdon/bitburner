@@ -13,10 +13,10 @@ export async function main(ns) {
 
   var ps = runPs(ns, flags)
   ns.tprint(table(ns,
-    ["Host", "PID", "Threads", "Filename", "Args", "Skip"],
+    ["Host", "PID", "Threads", "Memory", "Filename", "Args", "Skip"],
     ps.map(
       (p, n) => [
-        p[0], p[1].pid, p[1].threads, p[1].filename, p[1].args.join(" "),
+        p[0], p[1].pid, p[1].threads, ns.formatRam(p[2]), p[1].filename, p[1].args.join(" "),
         flags["keep"] > n ? "skip" : ""]
     )))
   if (flags["kill"] || flags["k"]) {
@@ -47,7 +47,7 @@ function runPs(ns, flags) {
     ps.push(...ns.ps(h).filter(
       (p) => p.filename != "pkill.js" &&
              [p.filename, ...p.args].join(" ").includes(flags._.join(" "))
-    ).map((p) => [h, p]))
+    ).map((p) => [h, p, ns.getScriptRam(p.filename, h) * p.threads]))
   }
 
   return ps

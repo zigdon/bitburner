@@ -28,11 +28,12 @@ export class nsRPC {
   ]
 
   _notHandled = [
-    "bladeburner/getGeneralActionNames",
-    "bladeburner/getContractNames",
-    "bladeburner/getOperationNames",
     "bladeburner/getBlackOpNames",
+    "bladeburner/getContractNames",
+    "bladeburner/getGeneralActionNames",
+    "bladeburner/getOperationNames",
     "codingcontract/getContract",  // Can't clone a contract
+    "singularity/connect",
     "singularity/installBackdoor",
   ]
 

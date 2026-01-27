@@ -406,18 +406,13 @@ class BNS {
         ).sort( // Sort by most free-ram first
           (a,b) => b.free-a.free
         )
+        const sum = (...l) => l.reduce((a,i) => a+i, 0)
         for (let j of jobs) {
-          if (j.free + Math.sum(...j.tasks.map((t) => t.mem)) < reqMem) continue
+          if (j.free + sum(...j.tasks.map((t) => t.mem)) < reqMem) continue
           let kill = []
           let need = reqMem - j.free
           // Sort tasks by most-memory first
           let tasks = j.tasks.sort((a,b) => b.mem - a.mem)
-          // But put the hack tasks first
-          tasks = tasks.filter(
-            (t) => t.name.includes("hack")
-          ) + tasks.filter(
-            (t) => !t.name.includes("hack")
-          )
           while (need > 0 && tasks.length > 0) {
             await this.asleep(1)
             let t = tasks.shift()
