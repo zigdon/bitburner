@@ -1,7 +1,7 @@
 import { toast } from "@/log.js"
 
 const cashBuffer = 1e7
-const minSize = 256
+const minSize = 128
 
 /**
  * @param {NS} ns

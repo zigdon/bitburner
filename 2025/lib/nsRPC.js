@@ -273,10 +273,11 @@ export class nsRPC {
 
   /**
    * @param {string} method
+   * @param {?boolean} flush
    */
-  async _getPort(method) {
+  async _getPort(method, flush=false) {
     if (method.includes("BNS.")) return this._bnsPort
-    if (this._bnsCache.has(method)) {
+    if (this._bnsCache.has(method) && !flush) {
       let srv = this._bnsCache.get(method)
       if (this._ns.isRunning(srv.pid, srv.host)) {
         return srv.port
@@ -293,13 +294,14 @@ export class nsRPC {
    * @param {string} method
    * @param {any} args
    * @param {?number} port
+   * @param {?boolean} flush
    * @returns any */
-  async _sendRPC(method, args, port=0) {
-    this._setTitle("... ? %s:%d", method, port)
-    port ||= await this._getPort(method)
-    this._setTitle("... > %s:%d", method, port)
+  async _sendRPC(method, args, port=0, flush=false) {
+    this._setTitle("... ? %s:%j", method, port)
+    port ||= await this._getPort(method, flush)
+    this._setTitle("... > %s:%j", method, port)
     let mid = await this._send(port, method, args)
-    this._setTitle("... < %s:%d", method, port)
+    this._setTitle("... < %s:%j", method, port)
     return await this._getReply(method, mid, args)
   }
 
@@ -321,7 +323,7 @@ export class nsRPC {
         if (method == "BNS.find") {
           return await this._sendRPC(method, args, this._bnsPort)
         } else {
-          return await this._sendRPC(method, args)
+          return await this._sendRPC(method, args, 0, true)
         }
       }
 
@@ -339,7 +341,7 @@ export class nsRPC {
       */
       if (msg.cmd == "ERR.retry") {
         this._log("Retrying... %j", msg.payload)
-        return await this._sendRPC(msg.payload.cmd, msg.payload.payload)
+        return await this._sendRPC(msg.payload.cmd, msg.payload.payload, 0, true)
       }
       if (msg.cmd != method) {
         this._log("Discarding incorrect method. want: %j, got: %j", method, msg)

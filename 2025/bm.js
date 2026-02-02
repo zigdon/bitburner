@@ -80,6 +80,7 @@ const skillPri = [
   "Tracer@10",
   "Overclock",
   "Hyperdrive@20",
+  "Hands of Midas",
 ]
 
 async function bbSkills(ns) {
@@ -144,7 +145,6 @@ async function bbDo(ns, a, match) {
       (a,b) => a[1] - b[1]
     )[0][0]
     if (skill.toLowerCase().slice(0,3) != curTask?.classType) {
-      // await info(ns, "BM: Training %s", skill)
       await ns.bladeburner.stopBladeburnerAction()
       await ns.singularity.gymWorkout(gyms.get(cur), skill, false)
     }
@@ -315,6 +315,9 @@ async function check(ns, state, act) {
   if (cond.cur) cmpB(await action(cond.cur), curAct?.type+"."+curAct?.name)
 
   let curCity = state.city
+  let sk = ns.getPlayer().skills
+  let minSkill = Math.min(sk.strength, sk.agility, sk.defense, sk.dexterity)
+  cmpV(cond.min, minSkill)
   cmpV(cond.chaos, await b.getCityChaos(curCity))
   cmpV(cond.pop, await b.getCityEstimatedPopulation(curCity))
   cmpV(cond.communities, await b.getCityCommunities(curCity))

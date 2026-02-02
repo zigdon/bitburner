@@ -354,7 +354,7 @@ export async function init(ons, types, testfn, nosubmit, noauto) {
   await info(ns, "Attempting to solve contract %s...", c.type)
   let res = await fn(ns, data)
   let msg = nosubmit && host == "home" ? "Not submitted" : c.submit(res)
-  msg ||= ns.sprintf("Contract failed, %d attempts remaining", c.numTriesRemaining)
+  msg ||= ns.sprintf("Contract failed (%s), %d attempts remaining", c.type, c.numTriesRemaining)
   if (fs["toast"]) {
     ns.printf("Result: %j", typeof res == "bigint" ? res.toString() : res)
     ns.print(msg)

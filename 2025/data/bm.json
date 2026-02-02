@@ -9,7 +9,8 @@
     { "cond": {"chance": ">50", "type": "black operations" }, "do": "blackops", "toast": "Starting next blops" },
     { "cond": {"chance": ">50", "type": "operations", "has": "black operations"}, "do": "operations" },
     { "cond": {"chance": ">30", "type": "contracts" }, "do": "contracts" },
-    { "do": "gym" }
+    { "cond": {"min": "<200"}, "do": "gym" },
+    { "do": "training" }
   ],
   "valid": true
 }

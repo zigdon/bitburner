@@ -245,7 +245,7 @@ class BNS {
    * @param {BNSMessage} msg
    **/
   async find(msg) {
-    // this._ns.printf("find(%j)", msg)
+    this._ns.printf("find(%j)", msg)
 
     // If we have a live server, use it. Otherwise, start one.
     let method = msg?.payload?.method
@@ -478,6 +478,11 @@ class BNS {
     let pid = this.exec(fn, dest, 1, port)
     if (pid > 0) {
       this.log("Started RPC server for %s on %s:%d (pid=%d)", method, dest, port, pid)
+      if (this._servers.get(method) != undefined) {
+        let prev = this._servers.get(method)
+        this.log("Shutting down %s at %s:%d, evicted", prev.method, prev.host, prev.port)
+        await this.quit(prev)
+      }
       this._servers.set(method, {pid: pid, host: dest, port: port, method: method})
       return pid
     }

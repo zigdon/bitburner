@@ -53,6 +53,9 @@ async function solve(ns, data) {
     }
     sq = sqrt ** 2n
   }
+  ns.print("min: ", min)
+  ns.print("max: ", min)
+  ns.print("returning: ", min ** 2n == data ? "min" : "max")
 
   return min ** 2n == data ? min : max
 
