@@ -277,7 +277,7 @@ async function check(ns, state, act) {
     if (type == undefined) return
     let acts = []
     if (type == "Black Operations") {
-      if (!state.blops || state.blops.rank > state.rank) {
+      if (c != ">0" && (!state.blops || state.blops.rank > state.rank)) {
         pass = false
         return
       }
