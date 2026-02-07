@@ -285,13 +285,35 @@ async function check(ns, state, act) {
     } else {
       acts = await bbActionNames(ns, type)
     }
-    for (let a of acts.reverse()) {
-      if (await b.getActionCountRemaining(type, a) < 1) continue
-      let est = await b.getActionEstimatedSuccessChance(type, a)
-      if (dir * chance < dir * est[0]*100) {
-        pass &&= true
-        return ns.sprintf("%s.%s", type, a)
+    // Figure out which city has the best chance.
+    let cities = Object.values(ns.enums.CityName)
+    let best = {
+      city: cities[0],
+      act: "",
+      chance: 0,
+    }
+    let orig = curCity
+    for (let city of cities) {
+      await b.switchCity(city)
+      for (let a of acts.reverse()) {
+        if (await b.getActionCountRemaining(type, a) < 1) continue
+        let est = await b.getActionEstimatedSuccessChance(type, a)
+        if (dir * chance < dir * est[0]*100 && dir * est[0] > best.chance) {
+          best.city = city
+          best.act = ns.sprintf("%s.%s", type, a)
+          best.chance = est[0]
+          break
+        }
+        // Don't keep checking past an action type we've already found.
+        if (ns.sprintf("%s.%s", type, a) == best.act) break
       }
+    }
+    if (best.chance > 0) {
+      pass &&= true
+      if (best.city != orig)
+        await info(ns, "Moving to %s to do %s", best.city, best.act)
+      await b.switchCity(best.city)
+      return best.act
     }
     pass = false
   }
