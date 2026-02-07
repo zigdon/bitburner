@@ -286,7 +286,7 @@ export class nsRPC {
     }
     let srv = await this._sendRPC("BNS.find", {method: method}, this._bnsPort)
     this._bnsCache.set(method, srv)
-    this._log("Caching BNS result for %s: %j. Cache size: %d", method, srv, this._bnsCache.size)
+    this._log("Caching BNS result for %s: %j", method, srv)
     return srv.port
   }
 
@@ -297,8 +297,10 @@ export class nsRPC {
    * @param {?boolean} flush
    * @returns any */
   async _sendRPC(method, args, port=0, flush=false) {
-    this._setTitle("... ? %s:%j", method, port)
-    port ||= await this._getPort(method, flush)
+    if (port == 0 || flush) {
+      this._setTitle("... ? %s:%j", method, port)
+      port ||= await this._getPort(method, flush)
+    }
     this._setTitle("... > %s:%j", method, port)
     let mid = await this._send(port, method, args)
     this._setTitle("... < %s:%j", method, port)

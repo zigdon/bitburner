@@ -60,6 +60,21 @@ export async function main(ons) {
       ns.toast("Bitnode ready for destruction", "success", null)
     }
 
+    // Wait until the current action is nearly done
+    let cur = await b.getCurrentAction()
+    if (cur != null) {
+      let duration = await b.getActionTime(cur.type, cur.name)
+      let spent = await b.getActionCurrentTime()
+      let left = duration - spent
+      if (left > 2000) {
+        left += 500
+        if (await b.getBonusTime() > 0) left /= 5
+        ns.printf("Waiting for %s.%s to finish: %s",
+          cur.type, cur.name, ns.tFormat(left))
+        await ns.asleep(left)
+      }
+    }
+
     for (let a of cfg.actions) {
       let res = a.cond ? await check(ns, state, a) : [true, null]
       if (res[0]) {
