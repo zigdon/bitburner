@@ -14,8 +14,12 @@ export async function main(ons) {
   /** @param {NS} ns */
   let ns = new nsRPC(ons)
   if (!await ns.bladeburner.inBladeburner()) {
-    await critical(ns, "Not in bladeburner.")
-    return
+    if (!await ns.bladeburner.joinBladeburnerDivision()) {
+      await critical(ns, "Not in bladeburner.")
+      return
+    } else {
+      await critical(ns, "Joined bladeburner.")
+    }
   }
   if (!singleInstance(ns)) return
   [
@@ -165,11 +169,13 @@ async function bbDo(ns, a, match) {
     }
   }
 
-  if (curTask != null && curTask?.type != "CLASS") {
-    await toast(ns, "Bladeburner waiting 1m for current action to finish")
-    await ns.asleep(60000)
-    return
-  }
+  let augs = await ns.singularity.getOwnedAugmentations(false)
+  if (!augs.includes("The Blade's Simulacrum"))
+    if (curTask != null && curTask?.type != "CLASS") {
+      await toast(ns, "Bladeburner waiting 1m for current action to finish")
+      await ns.asleep(60000)
+      return
+    }
 
   switch (a.do) {
     case "travel": {
@@ -293,6 +299,10 @@ async function check(ns, state, act) {
     let acts = []
     if (type == "Black Operations") {
       if (c != ">0" && (!state.blops || state.blops.rank > state.rank)) {
+        pass = false
+        return
+      }
+      if (!state.blops) {
         pass = false
         return
       }

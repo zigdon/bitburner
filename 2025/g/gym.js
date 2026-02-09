@@ -1,6 +1,6 @@
 import {gyms, univs} from "@/lib/constants.js"
 import {nsRPC} from "@/lib/nsRPC.js"
-import {checkBM} from "@/lib/util.js"
+// import {checkBM} from "@/lib/util.js"
 
 /** @param {NS} ons */
 export async function main(ons) {
@@ -74,10 +74,12 @@ async function course(ns, uni, s, focus, target) {
     topic = "Algorithms"
   }
   while (ns.getPlayer().skills[s] < target) {
+    /* Not needed once we have The Blade's Simulacrum
     if (checkBM(ns)) {
       ns.toast("Aborting gym when bm is running")
       ns.exit()
     }
+    */
     if (ns.singularity.getCurrentWork()?.classType != topic)
       ns.singularity.universityCourse(uni, topic, focus)
     await ns.asleep(1000)
@@ -88,7 +90,12 @@ async function course(ns, uni, s, focus, target) {
 
 async function train(ns, gym, stat, focus, target) {
   while (ns.getPlayer().skills[stat] < target) {
-    checkBM(ns)
+    /* Not needed once we have The Blade's Simulacrum
+    if (checkBM(ns)) {
+      ns.toast("Aborting gym when bm is running")
+      ns.exit()
+    }
+    */
     let cur = await ns.singularity.getCurrentWork()
     if (cur?.classType?.toLowerCase() != stat.toLowerCase().slice(0, 3))
       ns.singularity.gymWorkout(gym, stat.slice(0,3), focus)
