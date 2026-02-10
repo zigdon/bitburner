@@ -50,21 +50,44 @@ async function ascend(ns) {
 }
 
 async function assign(ns) {
-  ns.printf("assign not implemented yet")
-  return
   const combatTarget = 200
   const chaTarget = 150
   let g = ns.gang
+  let gi = g.getGangInformation()
   let peeps = g.getMemberNames()
-  let task = ""
-  for (let p of peeps) {
-    let s = await g.getMemberInformation(p)
-    if ((s.str+s.def+s.dex+s.agi)/4 < combatTarget) {
-      task = "combat"
-    } else if (s.cha < chaTarget) {
-      task = "cha"
-    }
+  let doing = new Map()
 
+  for (let p of peeps) doing.set(p, await g.getMemberInformation(p))
+  let batLight = 0
+  if (gi.wantedLevelGainRate > 0) batLight = 1
+  if (gi.wantedLevelGainRate < -0.3) batLight = -1
+  for (let p of peeps) {
+    let task = ""
+    let s = doing.get(p)
+    // If we need to train, do that
+    if ((s.str+s.def+s.dex+s.agi)/4 < combatTarget) {
+      task = "Train Combat"
+    } else if (s.cha < chaTarget) {
+      task = "Train Charisma"
+    }
+    // Do we need to reduce wanted level?
+    if (s.task == "Vigilante Justice" && batLight < 0) {
+      task = ""
+      batLight++
+    }
+    if (s.task != "Vigilante Justice" && batLight > 0) {
+      task = "Vigilante Justice"
+      batLight--
+    }
+    if (s.task == "Vigilante Justice" && batLight == 0)
+      task = "Vigilante Justice"
+    // Pick a task (for now, always arms)
+    if (task == "") task = "Traffick Illegal Arms"
+
+    if (s.task != task) {
+      await info(ns, "Switching %s to %s", p, task)
+      g.setMemberTask(p, task)
+    }
   }
   return
 }

@@ -4,20 +4,21 @@
     {"name": "syslog.js", "title": "Syslog"},
     {"name": "gm.js", "title": "General Manager", "disabled": true},
     {"name": "bm.js", "title": "BladeBurner Manager", "disabled": false},
+    {"name": "boss.js", "title": "Gang Boss", "disabled": false},
     {"name": "g/gym.js", "args": ["30"], "oneTime": true},
     {"name": "map.js", "args": ["--silent"], "disabled": false},
     {"name": "bns.js", "disabled": false},
     {"name": "go2.js", "title": "Hack Controller", "wait": 30, "disabled": false},
-    {"name": "ipvgo.js", "args": ["--bonus", "combat"], "title": "IPvGO Player"},
+    {"name": "ipvgo.js", "args": ["--bonus", "rep"], "title": "IPvGO Player"},
     {"name": "g/tor.js"},
     {"name": "g/upgrade.js"},
     {"name": "g/program.js"},
     {"name": "g/factions.js"},
     {"name": "g/saveBonus.js"},
-    {"name": "g/pserv.js", "pservs": 1},
+    {"name": "g/pserv.js", "pservs": 0},
     {"name": "g/idle.js"},
-    {"name": "r/bar.tsx", "disabled": true},
-    {"name": "r/bbBar.tsx", "disabled": true}
+    {"name": "r/bar.tsx", "disabled": false},
+    {"name": "r/bbBar.tsx", "disabled": false}
   ],
   "loop": {
     "contracts": true

@@ -317,7 +317,6 @@ async function check(ns, state, act) {
       act: "",
       chance: 0,
     }
-    let orig = curCity
     for (let city of cities) {
       await b.switchCity(city)
       for (let a of acts.reverse()) {
@@ -335,7 +334,7 @@ async function check(ns, state, act) {
     }
     if (best.chance > 0) {
       pass &&= true
-      if (best.city != orig)
+      if (best.city != state.city)
         await info(ns, "Moving to %s to do %s", best.city, best.act)
       await b.switchCity(best.city)
       return best.act
